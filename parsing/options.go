@@ -4,6 +4,12 @@ import "go.uber.org/zap"
 
 type FilterOption func(*filter)
 
+func WithZapLogger(logger *zap.Logger) FilterOption {
+	return func(f *filter) {
+		f.logger = logger
+	}
+}
+
 // WithChunkSize Warning: This option is not well tested. We rolled out quickly to unblock evals and it is only used internally.
 func WithChunkSize(size int) FilterOption {
 	return func(f *filter) {
