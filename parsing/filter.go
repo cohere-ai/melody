@@ -17,6 +17,9 @@ type Filter interface {
 }
 
 func newF(logger *zap.Logger, tokenizer Decoder, opts ...FilterOption) *filter {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	f := &filter{
 		logger:               logger,
 		tokenizer:            tokenizer,
