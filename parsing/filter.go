@@ -290,9 +290,8 @@ func (f *filter) handleInclusiveStop(str string, idx int, token string) []Filter
 		if f.curCitationByteIndex != -1 {
 			// don't resend what has been sent
 			return []FilterOutput{{Text: str[f.curCitationByteIndex : idx+len(token)]}}
-		} else {
-			return []FilterOutput{{Text: str[:idx+len(token)]}}
 		}
+		return []FilterOutput{{Text: str[:idx+len(token)]}}
 	}
 	return nil
 }
@@ -451,13 +450,13 @@ func (f *filter) trimSpace(s string) (string, int) {
 
 	if f.leftTrimmed {
 		s = strings.TrimLeftFunc(s, unicode.IsSpace)
-		if len(s) > 0 {
+		if s != "" {
 			// remember if left is already trimmed
 			f.leftTrimmed = false
 		}
 	}
 
-	if len(f.trimPrefix) > 0 {
+	if f.trimPrefix != "" {
 		// if prefix longer shorten it
 		prefix := f.trimPrefix
 		if len(s) < len(f.trimPrefix) {
@@ -471,10 +470,9 @@ func (f *filter) trimSpace(s string) (string, int) {
 			}
 			// partial match, keep the prefix
 			return "", len(s) + rem
-		} else {
-			// no match at all, forget the prefix
-			f.trimPrefix = ""
 		}
+		// no match at all, forget the prefix
+		f.trimPrefix = ""
 	}
 	return s, rem
 }

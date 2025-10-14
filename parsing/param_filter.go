@@ -6,13 +6,13 @@ import (
 	"unicode"
 )
 
-type ParamState int
+type ParamState struct{ e uint }
 
-const (
-	Beginning ParamState = iota
-	ComplexType
-	BasicType
-	End
+var (
+	Beginning   = ParamState{0}
+	ComplexType = ParamState{1}
+	BasicType   = ParamState{2}
+	End         = ParamState{3}
 )
 
 /*

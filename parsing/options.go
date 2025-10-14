@@ -95,6 +95,7 @@ func HandleMultiHop() FilterOption {
 	}
 }
 
+// HandleMultiHopCmd3 enables parsing for the format used in command-3 models.
 func HandleMultiHopCmd3() FilterOption {
 	return func(f *filter) {
 		// default needs to be grounded since response sometimes does not start with <|START_RESPONSE|>
@@ -106,6 +107,7 @@ func HandleMultiHopCmd3() FilterOption {
 	}
 }
 
+// HandleMultiHopCmd4 enables parsing for the format used in command-4 models.
 func HandleMultiHopCmd4() FilterOption {
 	return func(f *filter) {
 		// default needs to be grounded since response sometimes does not start with <|START_RESPONSE|>
@@ -117,6 +119,7 @@ func HandleMultiHopCmd4() FilterOption {
 	}
 }
 
+// HandleLlama enables parsing for the format used in LLaMA models.
 func HandleLlama() FilterOption {
 	return func(f *filter) {
 		f.defaultMode = GroundedAnswer

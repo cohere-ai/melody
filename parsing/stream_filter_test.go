@@ -252,6 +252,9 @@ func TestStreamFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var wg sync.WaitGroup
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			defer wg.Wait()
 
 			tkzr, err := tokenizers.GetTokenizer("50k")
@@ -274,27 +277,22 @@ func TestStreamFilter(t *testing.T) {
 				opts = append(opts, HandleMultiHopCmd3())
 			}
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, opts...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
-					var err error
-					if tt.inputLogProb != nil {
-						err = f.Write(token, tt.inputLogProb)
-					} else {
-						err = f.Write(token, nil)
+					err := f.Write(token, tt.inputLogProb)
+					if err != nil {
+						wgErr <- err
+						return
 					}
-
-					require.NoError(t, err)
 				}
-			}()
+			})
 			var got string
 			var gotProbs []TokenIDsWithLogProb
 			for s := range f.Read() {
-				assert.NotEmpty(t, s)
+				require.NotEmpty(t, s)
 				got += s.Text
 
 				if tt.inputLogProb != nil {
@@ -304,7 +302,7 @@ func TestStreamFilter(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
-			assert.Equal(t, tt.expectedLogProbs, gotProbs)
+			require.Equal(t, tt.expectedLogProbs, gotProbs)
 		})
 	}
 }
@@ -347,6 +345,9 @@ func TestMessages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 			tokenizer, err := tokenizers.GetTokenizer(tt.tokenizerID)
@@ -358,17 +359,18 @@ func TestMessages(t *testing.T) {
 				WithInclusiveStops(tt.inclusiveStops...),
 				WithExclusiveStops(tt.exclusiveStops...),
 			)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tokenizer.Encode(tt.input, tokenizers.NoSpecialTokens())
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tokenizer.Encode(tt.input, tokenizers.NoSpecialTokens())
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got []string
 			for s := range f.Read() {
 				got = append(got, s.Text)
@@ -482,6 +484,9 @@ func TestMessages_SearchQueries(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -489,13 +494,16 @@ func TestMessages_SearchQueries(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, HandleSearchQuery())
+			tokens, err := tkzr.Encode(tc.input)
+			require.NoError(t, err)
 			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tc.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
 			})
 			var got []FilterOutput
@@ -632,6 +640,9 @@ func TestMessages_Stops(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -639,17 +650,18 @@ func TestMessages_Stops(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, tt.filter...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			for s := range f.Read() {
 				assert.NotEmpty(t, s)
@@ -916,6 +928,9 @@ func TestMessages_Citations_Complete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -930,17 +945,18 @@ func TestMessages_Citations_Complete(t *testing.T) {
 					StreamNonGroundedAnswer(),
 					WithLeftTrimmed(),
 				}...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			index := 0
 			var got string
 			var gotCitations []FilterCitation
@@ -1077,6 +1093,9 @@ func TestMessages_Citations_DifferentDocumentIndices(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -1090,17 +1109,18 @@ func TestMessages_Citations_DifferentDocumentIndices(t *testing.T) {
 					HandleRag(),
 					StreamNonGroundedAnswer(),
 				}...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
@@ -1187,6 +1207,9 @@ func TestMessages_Citations_BadTag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -1200,17 +1223,18 @@ func TestMessages_Citations_BadTag(t *testing.T) {
 					HandleRag(),
 					WithLeftTrimmed(),
 				}...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
@@ -1299,6 +1323,9 @@ func TestStreamFilter_StopSequencesWithCitations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -1306,17 +1333,18 @@ func TestStreamFilter_StopSequencesWithCitations(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, tt.opts...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
@@ -1453,6 +1481,8 @@ func TestMessages_Citations_Filter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -1460,17 +1490,18 @@ func TestMessages_Citations_Filter(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, tt.filterOptions...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			var gotPostAnswer string
 			var gotCitations []FilterCitation
@@ -1503,6 +1534,13 @@ type MultiHopTestCase struct {
 }
 
 func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
+	t.Helper()
+	wgErr := make(chan error, 2)
+	defer func() {
+		require.NoError(t, <-wgErr)
+		require.NoError(t, <-wgErr)
+	}()
+	defer close(wgErr)
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -1524,31 +1562,31 @@ func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
 		tokens, err = tkzr.Encode(tt.completion)
 		require.NoError(t, err)
 	}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer f.Close()
 		for _, token := range tokens {
 			err := f.Write(token, nil)
-			//nolint:testifylint
-			require.NoError(t, err)
+			if err != nil {
+				wgErr <- err
+				return
+			}
 		}
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		defer fraw.Close()
 		for _, token := range tokens {
 			err := fraw.Write(token, nil)
-			//nolint:testifylint
-			require.NoError(t, err)
+			if err != nil {
+				wgErr <- err
+				return
+			}
 		}
-	}()
+	})
 	var gotToolCalls []testGeneratedToolInput
 	var gotText, gotPlan string
 	var citations []FilterCitation
 	for s := range f.Read() {
-		assert.NotEmpty(t, s)
+		require.NotEmpty(t, s)
 		if s.Text != "" {
 			if s.IsToolsReason {
 				gotPlan += s.Text
@@ -1563,14 +1601,14 @@ func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
 			citations = append(citations, s.Citations...)
 		}
 	}
-	assert.Equal(t, tt.expectedPlan, gotPlan)
-	assert.Equal(t, tt.expectedText, gotText)
-	assert.Equal(t, tt.expected, gotToolCalls)
-	assert.Equal(t, tt.expectedCitations, citations)
+	require.Equal(t, tt.expectedPlan, gotPlan)
+	require.Equal(t, tt.expectedText, gotText)
+	require.Equal(t, tt.expected, gotToolCalls)
+	require.Equal(t, tt.expectedCitations, citations)
 
 	var gotToolCallDeltaConcatenations []string
 	for s := range fraw.Read() {
-		assert.NotEmpty(t, s)
+		require.NotEmpty(t, s)
 		if s.ToolCalls != nil {
 			i := s.ToolCalls.Index
 			if i >= len(gotToolCallDeltaConcatenations) {
@@ -1580,7 +1618,7 @@ func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
 			}
 		}
 	}
-	assert.Equal(t, tt.expectedDeltaConcatenations, gotToolCallDeltaConcatenations)
+	require.Equal(t, tt.expectedDeltaConcatenations, gotToolCallDeltaConcatenations)
 }
 
 func Test_ParseMultiHopCompletion(t *testing.T) {
@@ -2120,6 +2158,9 @@ func TestRepetitionLimits(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.Equal(t, tt.err, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -2127,21 +2168,19 @@ func TestRepetitionLimits(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, tt.filter...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				defer f.Close()
 				tokens := tt.input
 				for _, token := range tokens {
 					err := f.Write(token, nil)
 					if err != nil {
-						assert.Equal(t, tt.err, err)
+						wgErr <- err
 						return
 					}
 				}
-			}()
+			})
 			for s := range f.Read() {
-				assert.NotEmpty(t, s)
+				require.NotEmpty(t, s)
 			}
 		})
 	}
@@ -2340,6 +2379,9 @@ func BenchmarkHasHitTokenRepetitionLimit(b *testing.B) {
 // Ensure that HandleMultiHopCmd3 doesn't overwrite the specialTokensMap.
 func TestStreamFilterSpecialTokenMapMerging(t *testing.T) {
 	t.Parallel()
+	wgErr := make(chan error, 1)
+	defer func() { require.NoError(t, <-wgErr) }()
+	defer close(wgErr)
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	tkzr, err := tokenizers.GetTokenizer("50k")
@@ -2353,15 +2395,16 @@ func TestStreamFilterSpecialTokenMapMerging(t *testing.T) {
 	input := "should see title should not see"
 	tokens, err := tkzr.Encode(input)
 	require.NoError(t, err)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer f.Close()
 		for _, token := range tokens {
 			err := f.Write(token, nil)
-			assert.NoError(t, err)
+			if err != nil {
+				wgErr <- err
+				return
+			}
 		}
-	}()
+	})
 	actual := ""
 	for s := range f.Read() {
 		actual += s.Text
@@ -2439,6 +2482,9 @@ func TestStreamFilterChunkSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 			tokenizer, err := tokenizers.GetTokenizer("")
@@ -2450,17 +2496,18 @@ func TestStreamFilterChunkSize(t *testing.T) {
 				WithChunkSize(tt.filterChunkSize),
 				WithInclusiveStops(tt.inclusiveStops...),
 			)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tokenizer.Encode(tt.input, tokenizers.NoSpecialTokens())
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tokenizer.Encode(tt.input, tokenizers.NoSpecialTokens())
-				assert.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					assert.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got []string
 			for s := range f.Read() {
 				got = append(got, s.Text)

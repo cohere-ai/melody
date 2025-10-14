@@ -1,5 +1,7 @@
 package parsing
 
+// parsing contains logic to parse model generations for various Cohere models
+
 type Decoder interface {
 	Decode(tokens []int64, skipSpecialTokens bool) (string, error)
 }

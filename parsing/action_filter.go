@@ -175,7 +175,7 @@ func (f *filter) HandleRawParam(str string) ([]FilterOutput, int) {
 	return append(out, o...), r + len(str[:idx])
 }
 
-// When streaming the raw parameters we need to remove exactly 8 spaces from the start of each line
+// NumSpaceToRemovePerLine is the number of spaces to remove from each line when streaming raw parameters.
 // (excluding the first line which is just "{\n"). This is exactly two levels of indentation.
 const NumSpaceToRemovePerLine = 8
 
