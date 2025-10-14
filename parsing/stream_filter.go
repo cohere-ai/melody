@@ -44,7 +44,7 @@ func (s *streamFilter) run() {
 			s.out <- output
 		}
 	}
-	o := s.filter.flushPartials()
+	o := s.filter.FlushPartials()
 	for _, output := range o {
 		s.out <- output
 	}

@@ -13,6 +13,7 @@ import (
 type Filter interface {
 	Write(token int64, likelihood *float32) ([]FilterOutput, error)
 	WriteDecoded(decodedToken string) []FilterOutput
+	FlushPartials() []FilterOutput
 	GetRawTokens() []int64
 }
 
@@ -236,7 +237,11 @@ func (f *filter) writeText(text []byte, logprobs TokenIDsWithLogProb) (out []Fil
 	}
 	return out
 }
-func (f *filter) flushPartials() []FilterOutput {
+
+// FlushPartials implies that no more tokens will be written to the filter
+// and it is safe to flush any partial special tokens we have buffered.
+// This only has implications if the stream does not end with a EOS token.
+func (f *filter) FlushPartials() []FilterOutput {
 	f.done = true
 	// If there was a partial special token at the end, process it
 	if f.buf.Len() > 0 && f.mode != InclusiveStop && f.mode != ExclusiveStop {
@@ -404,7 +409,8 @@ func (f *filter) processGroundedText(
 	resOut.IsPostAnswer = f.streamNonGroundedAnswer && mode != ToolReason
 	resOut.IsToolsReason = mode == ToolReason
 
-	if tokenLogProbs != nil {
+	// Don't send logprobs for citations if there's no corresponding text.
+	if tokenLogProbs != nil && (resOut.Citations == nil || resOut.Text != "") {
 		resOut.Logprobs = *tokenLogProbs
 	}
 

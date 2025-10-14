@@ -10,9 +10,10 @@ import (
 
 func TestFilter_Command3(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  []FilterOutput
+		name    string
+		input   string
+		options []FilterOption
+		want    []FilterOutput
 	}{
 		{
 			name:  "basic test",
@@ -64,14 +65,49 @@ func TestFilter_Command3(t *testing.T) {
 				{Text: "]>", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{70118}}},
 				{Text: "<|END_RESPONSE|>", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{255022}}}},
 		},
+		{
+			name: "With command 3 parsing",
+			options: []FilterOption{
+				HandleMultiHopCmd3(),
+				StreamToolActions(),
+			},
+			input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
+			want: []FilterOutput{
+				{IsToolsReason: true, Text: "This", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{4184}}},
+				{IsToolsReason: true, Text: " is", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{1801}}},
+				{IsToolsReason: true, Text: " a", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{1671}}},
+				{IsToolsReason: true, Text: " rainbow", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{84470}}},
+				{IsToolsReason: true, Text: " ", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{37}}},
+				{IsToolsReason: true, Text: "emoji", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{104150}}},
+				{IsToolsReason: true, Text: ":", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{33}}},
+				{IsToolsReason: true, Text: " 🌈", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{11254, 242, 238}}},
+				{IsToolsReason: true, Citations: []FilterCitation{{
+					StartIndex: 18,
+					EndIndex:   26,
+					Text:       "emoji: 🌈",
+					DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{1}}},
+					IsThinking: true,
+				}}},
+				{Text: "foo", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{15579}}},
+				{Text: " ", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{37}}},
+				{Text: "bar", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{4962}}},
+				{Citations: []FilterCitation{{
+					StartIndex: 4,
+					EndIndex:   7,
+					Text:       "bar",
+					DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{1, 2}}, {ToolIndex: 1, ResultIndices: []int{3, 4}}},
+					IsThinking: false,
+				}}},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			tkzr, err := tokenizers.GetTokenizer("multilingual+255k+bos+eos+sptok+fim+agents3")
-			f := NewFilter(nil, tkzr)
+			f := NewFilter(nil, tkzr, tt.options...)
 			require.NoError(t, err)
-			tokens, err := tkzr.Encode(tt.input)
+			tokens, err := tkzr.Encode(tt.input, tokenizers.NoSpecialTokens())
 			require.NoError(t, err)
 			out := []FilterOutput{}
 			for _, token := range tokens {

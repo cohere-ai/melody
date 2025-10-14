@@ -489,9 +489,7 @@ func TestMessages_SearchQueries(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, HandleSearchQuery())
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				defer f.Close()
 				tokens, err := tkzr.Encode(tc.input)
 				require.NoError(t, err)
@@ -499,7 +497,7 @@ func TestMessages_SearchQueries(t *testing.T) {
 					err := f.Write(token, nil)
 					require.NoError(t, err)
 				}
-			}()
+			})
 			var got []FilterOutput
 			for s := range f.Read() {
 				assert.NotEmpty(t, s)
