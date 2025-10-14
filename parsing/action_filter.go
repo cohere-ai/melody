@@ -13,13 +13,13 @@ var (
 	toolCallID    = actionMode{1}
 	toolCallIDEnd = actionMode{2}
 	toolName      = actionMode{3}
-	toolNameEnd   = actionMode{3}
-	paramName     = actionMode{4}
-	paramValue    = actionMode{5}
-	toolEnd       = actionMode{6}
-	paramNameEnd  = actionMode{7}
-	paramValueEnd = actionMode{8}
-	rawParam      = actionMode{9}
+	toolNameEnd   = actionMode{4}
+	paramName     = actionMode{5}
+	paramValue    = actionMode{6}
+	toolEnd       = actionMode{7}
+	paramNameEnd  = actionMode{8}
+	paramValueEnd = actionMode{9}
+	rawParam      = actionMode{10}
 )
 
 type filterAction struct {

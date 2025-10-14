@@ -6,10 +6,6 @@ on:
   pull_request: {}
   merge_group: {}
 
-permissions:
-  contents: read
-  pull-requests: read # for only-new-issues option
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

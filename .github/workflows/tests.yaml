@@ -1,0 +1,87 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  merge_group: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  branch_name: ${{ github.head_ref || github.ref_name }} # https://stackoverflow.com/a/71158878
+  bucket_name: "main"
+
+jobs:
+  go-test:
+    runs-on: depot-ubuntu-24.04-16
+    permissions:
+      contents: "read"
+      id-token: "write"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 2
+
+      # only run go tests if there are differences in go files
+      - name: Check for modified files
+        run: |
+          PATHS=(
+            ':*.go'
+            ':.github/workflows/tests.yaml'
+            ':Makefile'
+            ':go.mod'
+            ':go.sum'
+          )
+          git fetch origin main
+          if [ "${branch_name}" == "main" ] && ! git diff --quiet HEAD~1 HEAD -- "${PATHS[@]}"; then
+            echo "on main branch with relevant files changed, running go tests"
+            echo "run_go_tests=true" >> $GITHUB_ENV
+          elif git diff --quiet origin/main -- "${PATHS[@]}"; then
+            echo "no relevant files modified!"
+          else
+            echo "relevant files modified, running go tests"
+            echo "run_go_tests=true" >> $GITHUB_ENV
+          fi
+
+      - name: Set up Go
+        if: env.run_go_tests
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          cache: false
+          go-version-file: go.mod
+
+      - name: Get Go environment
+        if: env.run_go_tests
+        id: go-env
+        run: |
+          GOCACHE="$(go env GOCACHE)"
+          GOMODCACHE="$(go env GOMODCACHE)"
+          GOVERSION="$(go env GOVERSION)"
+          echo "GOCACHE=${GOCACHE}" >>"${GITHUB_OUTPUT}"
+          echo "GOMODCACHE=${GOMODCACHE}" >>"${GITHUB_OUTPUT}"
+          echo "GOVERSION=${GOVERSION}" >>"${GITHUB_OUTPUT}"
+
+      # https://github.com/actions/setup-go/issues/358
+      # https://github.com/actions/setup-go/issues/478
+      - name: Set up Go cache
+        if: env.run_go_tests
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ${{ steps.go-env.outputs.GOCACHE }}
+            ${{ steps.go-env.outputs.GOMODCACHE }}
+          key: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.GOVERSION }}-${{ hashFiles('go.mod') }}
+
+      - name: Install tokenizer
+        if: env.run_go_tests
+        run: make install-tokenizers
+
+      - name: Run Go tests
+        if: env.run_go_tests
+        run: |
+          go env -w GOPRIVATE=github.com/cohere-ai
+          make test-coverage
