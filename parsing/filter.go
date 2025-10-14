@@ -315,7 +315,7 @@ func (f *filter) handleExclusiveStop(str string, idx int) []FilterOutput {
 
 func (f *filter) handleSpecialToken(str string, idx int, token string, curMode filterMode) ([]FilterOutput, filterMode, bool, bool) {
 	newMode := f.specialTokenMap[token]
-	// Disable mode change if in grounded answer or answer mode and see "answer:" in the text
+	// Disable mode change if in grounded answer or answer mode and see "Answer:" in the text
 	notSpecial := (curMode == groundedAnswer || curMode == answer) && newMode == answer
 	if notSpecial {
 		return nil, curMode, false, false
