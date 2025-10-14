@@ -19,7 +19,6 @@ func TestFilter_Command3(t *testing.T) {
 			name:  "basic test",
 			input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
 			want: []FilterOutput{
-				{Text: "<BOS_TOKEN>", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{5}}},
 				{Text: "<|START_THINKING|>", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{255019}}},
 				{Text: "This", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{4184}}},
 				{Text: " is", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{1801}}},
