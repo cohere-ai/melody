@@ -14,7 +14,7 @@ text := "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_TH
 f := parsing.NewFilter(parsing.HandleMultiHopCmd3(), parsing.StreamToolActions())
 out := []FilterOutput{}
 for _, token := range(tokenizer.Encode(text)) {
-	o, err := append(out, f.Write(token, nil))
+	o, err := f.Write(token, nil)
 	out = append(out, o...)
 }
 out = append(out, f.FlushPartials()...)
