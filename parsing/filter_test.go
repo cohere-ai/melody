@@ -1,6 +1,7 @@
 package parsing
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -105,8 +106,8 @@ func TestFilter_Command3(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			tkzr, err := tokenizers.GetTokenizer("multilingual+255k+bos+eos+sptok+fim+agents3")
-			f := NewFilter(nil, tkzr, tt.options...)
 			require.NoError(t, err)
+			f := NewFilter(nil, tkzr, tt.options...)
 			tokens, err := tkzr.Encode(tt.input, tokenizers.NoSpecialTokens())
 			require.NoError(t, err)
 			out := []FilterOutput{}
@@ -114,6 +115,29 @@ func TestFilter_Command3(t *testing.T) {
 				o, e := f.Write(token, nil)
 				require.NoError(t, e)
 				out = append(out, o...)
+			}
+			require.Equal(t, tt.want, out)
+
+			// Duplicate the test by writing the raw strings instead
+			var textChunks []string
+			var buffer []int64
+			for _, token := range tokens {
+				decoded, err := tkzr.Decode(append(buffer, token), false)
+				require.NoError(t, err)
+				if strings.HasSuffix(decoded, "\ufffd") {
+					buffer = append(buffer, token)
+					continue
+				}
+				buffer = []int64{}
+				textChunks = append(textChunks, decoded)
+			}
+			for i := range tt.want {
+				tt.want[i].Logprobs = TokenIDsWithLogProb{} // zero out logprobs as we are writing raw text
+			}
+			f = NewFilter(nil, nil, tt.options...)
+			out = []FilterOutput{}
+			for _, chunk := range textChunks {
+				out = append(out, f.WriteDecoded(chunk)...)
 			}
 			require.Equal(t, tt.want, out)
 		})
