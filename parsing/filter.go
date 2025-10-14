@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Filter is the interface used to parse the output of a cohere model
 type Filter interface {
 	Write(token int64, likelihood *float32) ([]FilterOutput, error)
 	WriteDecoded(decodedToken string) []FilterOutput
@@ -24,8 +25,8 @@ func newF(logger *zap.Logger, tokenizer Decoder, opts ...FilterOption) *filter {
 	f := &filter{
 		logger:               logger,
 		tokenizer:            tokenizer,
-		specialTokenMap:      make(map[string]FilterMode),
-		defaultMode:          PlainText,
+		specialTokenMap:      make(map[string]filterMode),
+		defaultMode:          plainText,
 		curCitationByteIndex: -1,
 		chunkSize:            1,
 	}
@@ -44,6 +45,7 @@ func keys[T any](m map[string]T) []string {
 	return res
 }
 
+// NewFilter creates a new Filter with the given options.
 func NewFilter(logger *zap.Logger, tokenizer Decoder, opts ...FilterOption) Filter {
 	return newF(logger, tokenizer, opts...)
 }
@@ -62,8 +64,8 @@ type filter struct {
 	maxRepetitionLimit          int
 	maxRepetitionSequenceLength int
 
-	defaultMode             FilterMode
-	specialTokenMap         map[string]FilterMode
+	defaultMode             filterMode
+	specialTokenMap         map[string]filterMode
 	streamNonGroundedAnswer bool
 	streamToolActions       bool
 	streamProcessedParams   bool
@@ -85,7 +87,7 @@ type filter struct {
 	// As it is "<co: 1>hel", we use it to keep track of what we have sent and what we will need to send
 	// After each citation it is reset to -1
 	curCitationByteIndex int
-	actionMetaData       FilterAction
+	actionMetaData       filterAction
 
 	// The current search query index
 	currSearchQueryIdx int
@@ -106,7 +108,7 @@ type filter struct {
 	// filter state
 	buf                        bytes.Buffer
 	partialSpecialTokenLogProb TokenIDsWithLogProb
-	mode                       FilterMode
+	mode                       filterMode
 	specialTokenKeys           []string
 	done                       bool
 }
@@ -138,7 +140,7 @@ func (f *filter) getFullTextWithLogProbs(token int64, tokenLogProb *float32) (fu
 	f.rawTokens = append(f.rawTokens, token)
 	// Check if the token is repeated too many times
 	hasRepetitionLimits := f.maxRepetitionLimit > 0 && f.maxRepetitionSequenceLength > 0
-	if hasRepetitionLimits && HasHitTokenRepetitionLimit(f.rawTokens, f.maxRepetitionLimit, f.maxRepetitionSequenceLength) {
+	if hasRepetitionLimits && hasHitTokenRepetitionLimit(f.rawTokens, f.maxRepetitionLimit, f.maxRepetitionSequenceLength) {
 		f.logger.Error(
 			"too many repeated tokens in strict (guided generation) mode",
 			zap.Int("maxRepetitionLimit", f.maxRepetitionLimit),
@@ -161,7 +163,7 @@ func (f *filter) getFullTextWithLogProbs(token int64, tokenLogProb *float32) (fu
 	copy(tokenBufCopy, f.tokenBuf)
 	f.tokenBuf = nil
 
-	var logProbsCopy []float32 = nil
+	var logProbsCopy []float32
 	if len(f.logProbBuf) != 0 {
 		logProbsCopy = make([]float32, len(f.logProbBuf))
 		copy(logProbsCopy, f.logProbBuf)
@@ -244,7 +246,7 @@ func (f *filter) writeText(text []byte, logprobs TokenIDsWithLogProb) (out []Fil
 func (f *filter) FlushPartials() []FilterOutput {
 	f.done = true
 	// If there was a partial special token at the end, process it
-	if f.buf.Len() > 0 && f.mode != InclusiveStop && f.mode != ExclusiveStop {
+	if f.buf.Len() > 0 && f.mode != inclusiveStop && f.mode != exclusiveStop {
 		o, remove := f.handleToken(f.mode, f.buf.Bytes(), true, f.partialSpecialTokenLogProb)
 		_, _ = f.buf.Read(make([]byte, remove))
 		return o
@@ -256,29 +258,29 @@ func (f *filter) FlushPartials() []FilterOutput {
 // Each helper function sends the results to the out channel in the filter
 // And returns the number of bytes to remove from the buffer
 func (f *filter) handleToken(
-	mode FilterMode,
+	mode filterMode,
 	bstr []byte,
 	afterLastToken bool,
 	tokenLogProbs TokenIDsWithLogProb) ([]FilterOutput, int) {
 	switch mode {
-	case InclusiveStop, ExclusiveStop:
+	case inclusiveStop, exclusiveStop:
 		f.logger.Error("in stop mode but we should have already stopped")
 		return nil, 0
-	case Ignore:
+	case ignore:
 		return nil, 0
-	case ToolAction:
+	case toolAction:
 		return f.ParseActions(string(bstr))
-	case GroundedAnswer, ToolReason:
+	case groundedAnswer, toolReason:
 		return f.processGroundedText(bstr, afterLastToken, mode, &tokenLogProbs)
-	case SearchQuery:
+	case searchQuery:
 		return f.processSearchQuery(bstr)
-	case Answer:
+	case answer:
 		if f.streamNonGroundedAnswer {
 			return f.processText(bstr, nil)
 		}
 		// If we don't stream the answer just remove all the bytes
 		return nil, len(bstr)
-	case PlainText:
+	case plainText:
 		return f.processText(bstr, &tokenLogProbs)
 	}
 	return nil, 0
@@ -290,9 +292,8 @@ func (f *filter) handleInclusiveStop(str string, idx int, token string) []Filter
 		if f.curCitationByteIndex != -1 {
 			// don't resend what has been sent
 			return []FilterOutput{{Text: str[f.curCitationByteIndex : idx+len(token)]}}
-		} else {
-			return []FilterOutput{{Text: str[:idx+len(token)]}}
 		}
+		return []FilterOutput{{Text: str[:idx+len(token)]}}
 	}
 	return nil
 }
@@ -312,40 +313,40 @@ func (f *filter) handleExclusiveStop(str string, idx int) []FilterOutput {
 	return nil
 }
 
-func (f *filter) handleSpecialToken(str string, idx int, token string, curMode FilterMode) ([]FilterOutput, FilterMode, bool, bool) {
+func (f *filter) handleSpecialToken(str string, idx int, token string, curMode filterMode) ([]FilterOutput, filterMode, bool, bool) {
 	newMode := f.specialTokenMap[token]
-	// Disable mode change if in grounded answer or answer mode and see "Answer:" in the text
-	notSpecial := (curMode == GroundedAnswer || curMode == Answer) && newMode == Answer
+	// Disable mode change if in grounded answer or answer mode and see "answer:" in the text
+	notSpecial := (curMode == groundedAnswer || curMode == answer) && newMode == answer
 	if notSpecial {
 		return nil, curMode, false, false
 	}
 	switch newMode {
-	case InclusiveStop:
+	case inclusiveStop:
 		out := f.handleInclusiveStop(str, idx, token)
 		return out, newMode, true, true
-	case ExclusiveStop:
+	case exclusiveStop:
 		out := f.handleExclusiveStop(str, idx)
 		return out, newMode, true, true
-	case GroundedAnswer:
+	case groundedAnswer:
 		f.curTextIndex = 0 // Reset the curTextIndex so citations aren't offset by the length of plans/reflections
 		if f.streamNonGroundedAnswer {
-			// Reset from the "Answer" to left trim the grounded answer
+			// Reset from the "answer" to left trim the grounded answer
 			f.leftTrimmed = true
 		}
-	case ToolReason:
+	case toolReason:
 		f.leftTrimmed = true
 		f.rightTrimmed = true
-	case Answer:
+	case answer:
 		f.leftTrimmed = true
-	case SearchQuery:
+	case searchQuery:
 		f.leftTrimmed = true
-	case NextSearchQuery:
+	case nextSearchQuery:
 		f.leftTrimmed = true
 		if f.sentCurrIndex {
 			f.currSearchQueryIdx++
 			f.sentCurrIndex = false
 		}
-		return nil, SearchQuery, false, true
+		return nil, searchQuery, false, true
 	}
 
 	return nil, newMode, false, true
@@ -388,7 +389,7 @@ func (f *filter) processSearchQuery(bstr []byte) ([]FilterOutput, int) {
 func (f *filter) processGroundedText(
 	bstr []byte,
 	afterLastToken bool,
-	mode FilterMode,
+	mode filterMode,
 	tokenLogProbs *TokenIDsWithLogProb) ([]FilterOutput, int) {
 	// This should be handled in StreamFilter.Write , but left as safety
 	if !f.utf8ValidOrLimit(bstr) {
@@ -406,8 +407,8 @@ func (f *filter) processGroundedText(
 		}
 		resOut = &FilterOutput{Text: send}
 	}
-	resOut.IsPostAnswer = f.streamNonGroundedAnswer && mode != ToolReason
-	resOut.IsToolsReason = mode == ToolReason
+	resOut.IsPostAnswer = f.streamNonGroundedAnswer && mode != toolReason
+	resOut.IsToolsReason = mode == toolReason
 
 	// Don't send logprobs for citations if there's no corresponding text.
 	if tokenLogProbs != nil && (resOut.Citations == nil || resOut.Text != "") {
@@ -451,13 +452,13 @@ func (f *filter) trimSpace(s string) (string, int) {
 
 	if f.leftTrimmed {
 		s = strings.TrimLeftFunc(s, unicode.IsSpace)
-		if len(s) > 0 {
+		if s != "" {
 			// remember if left is already trimmed
 			f.leftTrimmed = false
 		}
 	}
 
-	if len(f.trimPrefix) > 0 {
+	if f.trimPrefix != "" {
 		// if prefix longer shorten it
 		prefix := f.trimPrefix
 		if len(s) < len(f.trimPrefix) {
@@ -471,10 +472,9 @@ func (f *filter) trimSpace(s string) (string, int) {
 			}
 			// partial match, keep the prefix
 			return "", len(s) + rem
-		} else {
-			// no match at all, forget the prefix
-			f.trimPrefix = ""
 		}
+		// no match at all, forget the prefix
+		f.trimPrefix = ""
 	}
 	return s, rem
 }
@@ -520,7 +520,7 @@ func hashTokensForRepetitionCheck(seq []int64) uint64 {
 	return hash
 }
 
-func HasHitTokenRepetitionLimit(seenTokens []int64, repetitionLimit int, maxSequenceLength int) bool {
+func hasHitTokenRepetitionLimit(seenTokens []int64, repetitionLimit int, maxSequenceLength int) bool {
 	/*
 		Checks if the last repetitionLimit tokens, or any combination of number of tokens up to maxSequenceLength tokens are the same.
 		Examples:

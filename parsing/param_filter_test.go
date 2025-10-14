@@ -12,10 +12,10 @@ func Test_HandleParamValue(t *testing.T) {
 	testcases := []struct {
 		name               string
 		input              string
-		metadata           FilterAction
+		metadata           filterAction
 		expectedParamValue string
 		expectedRemove     int
-		expectedEndState   ParamState
+		expectedEndState   paramState
 	}{
 		{
 			name:               "empty",

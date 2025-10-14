@@ -9,11 +9,7 @@ import (
 )
 
 func Test_HandleCitations(t *testing.T) {
-	defaultFilter := filter{
-		streamNonGroundedAnswer: true,
-		curCitationByteIndex:    -1,
-	}
-
+	t.Parallel()
 	tests := []struct {
 		name   string
 		input  string
@@ -22,9 +18,12 @@ func Test_HandleCitations(t *testing.T) {
 		filter filter
 	}{
 		{
-			name:   "standard case",
-			filter: defaultFilter,
-			input:  "hello <co: 2,1>foo</co: 2,1>",
+			name: "standard case",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: 2,1>foo</co: 2,1>",
 			output: &FilterOutput{
 				Text: "hello foo",
 				Citations: []FilterCitation{
@@ -59,9 +58,12 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 28,
 		},
 		{
-			name:   "no document",
-			filter: defaultFilter,
-			input:  "hello <co: >foo</co: >",
+			name: "no document",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: >foo</co: >",
 			output: &FilterOutput{
 				Text: "hello foo",
 				Citations: []FilterCitation{
@@ -75,9 +77,12 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 22,
 		},
 		{
-			name:   "non int document",
-			filter: defaultFilter,
-			input:  "hello <co: 2, foo>foo</co: 2, foo>",
+			name: "non int document",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: 2, foo>foo</co: 2, foo>",
 			output: &FilterOutput{
 				Text: "hello foo",
 				Citations: []FilterCitation{
@@ -93,9 +98,12 @@ func Test_HandleCitations(t *testing.T) {
 		},
 
 		{
-			name:   "different documents",
-			filter: defaultFilter,
-			input:  "hello <co: 1,2>foo</co: 3,4>",
+			name: "different documents",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: 1,2>foo</co: 3,4>",
 			output: &FilterOutput{
 				Text: "hello foo",
 				Citations: []FilterCitation{
@@ -110,24 +118,33 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 28,
 		},
 		{
-			name:   "no citation",
-			filter: defaultFilter,
-			input:  "hello coo",
+			name: "no citation",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello coo",
 			output: &FilterOutput{
 				Text: "hello coo",
 			},
 			remove: 9,
 		},
 		{
-			name:   "incomplete first citation",
-			filter: defaultFilter,
+			name: "incomplete first citation",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
 			input:  "<",
 			output: nil,
 			remove: 0,
 		},
 		{
-			name:   "incomplete first citation more",
-			filter: defaultFilter,
+			name: "incomplete first citation more",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
 			input:  "hello coo <co: 2",
 			output: nil,
 			remove: 0,
@@ -143,8 +160,11 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 0,
 		},
 		{
-			name:   "only first citation element ",
-			filter: defaultFilter,
+			name: "only first citation element ",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
 			input:  "hello coo <co: 2,1>fo",
 			output: nil,
 			remove: 0,
@@ -174,8 +194,11 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 0,
 		},
 		{
-			name:   "incomplete end citation element ",
-			filter: defaultFilter,
+			name: "incomplete end citation element ",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
 			input:  "hello <co: 2,1>foo<",
 			output: nil,
 			remove: 0,
@@ -193,16 +216,22 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 6,
 		},
 		{
-			name:   "incomplete end citation element more",
-			filter: defaultFilter,
+			name: "incomplete end citation element more",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
 			input:  "hello <co: 2,1>foo</co: 2,1",
 			output: nil,
 			remove: 0,
 		},
 		{
-			name:   "multiple citations",
-			filter: defaultFilter,
-			input:  "hello <co: 2,1>foo</co: 2,1> hi <co: 0>barber</co: 0>",
+			name: "multiple citations",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: 2,1>foo</co: 2,1> hi <co: 0>barber</co: 0>",
 			output: &FilterOutput{
 				Text: "hello foo hi barber",
 				Citations: []FilterCitation{
@@ -223,9 +252,12 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 53,
 		},
 		{
-			name:   "multiple citations - second no citation",
-			filter: defaultFilter,
-			input:  "hello <co: 2,1>foo</co: 2,1> hi",
+			name: "multiple citations - second no citation",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: 2,1>foo</co: 2,1> hi",
 			output: &FilterOutput{
 				Text: "hello foo hi",
 				Citations: []FilterCitation{
@@ -240,9 +272,12 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 31,
 		},
 		{
-			name:   "multiple citations - second incomplete first citation",
-			filter: defaultFilter,
-			input:  "hello <co: 2,1>foo</co: 2,1> hi <",
+			name: "multiple citations - second incomplete first citation",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: 2,1>foo</co: 2,1> hi <",
 			output: &FilterOutput{
 				Text: "hello foo",
 				Citations: []FilterCitation{
@@ -257,9 +292,12 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 28,
 		},
 		{
-			name:   "multiple citations - only first citation",
-			filter: defaultFilter,
-			input:  "hello <co: 2,1>foo</co: 2,1> hi <co: 2,1>",
+			name: "multiple citations - only first citation",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: 2,1>foo</co: 2,1> hi <co: 2,1>",
 			output: &FilterOutput{
 				Text: "hello foo",
 				Citations: []FilterCitation{
@@ -274,9 +312,12 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 28,
 		},
 		{
-			name:   "multiple citations - incomplete end citation",
-			filter: defaultFilter,
-			input:  "hello <co: 2,1>foo</co: 2,1> hi <co: 2,1>barber<",
+			name: "multiple citations - incomplete end citation",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: 2,1>foo</co: 2,1> hi <co: 2,1>barber<",
 			output: &FilterOutput{
 				Text: "hello foo",
 				Citations: []FilterCitation{
@@ -311,9 +352,12 @@ func Test_HandleCitations(t *testing.T) {
 			remove: 32,
 		},
 		{
-			name:   "multiple citations - incomplete end citation more",
-			filter: defaultFilter,
-			input:  "hello <co: 2,1>foo</co: 2,1> hi <co: 2,1>barber</co: 2,1",
+			name: "multiple citations - incomplete end citation more",
+			filter: filter{
+				streamNonGroundedAnswer: true,
+				curCitationByteIndex:    -1,
+			},
+			input: "hello <co: 2,1>foo</co: 2,1> hi <co: 2,1>barber</co: 2,1",
 			output: &FilterOutput{
 				Text: "hello foo",
 				Citations: []FilterCitation{
@@ -330,7 +374,8 @@ func Test_HandleCitations(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, remove := tt.filter.ParseCitations(tt.input, GroundedAnswer)
+			t.Parallel()
+			output, remove := tt.filter.ParseCitations(tt.input, groundedAnswer)
 			require.Equal(t, tt.output, output)
 			require.Equal(t, tt.remove, remove)
 		})
@@ -338,6 +383,7 @@ func Test_HandleCitations(t *testing.T) {
 }
 
 func Test_FindAnElement(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name               string
 		input              string
@@ -460,6 +506,7 @@ func Test_FindAnElement(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			f := filter{logger: zaptest.NewLogger(t, zaptest.Level(zapcore.ErrorLevel))}
 			startIndex, endIndex, docs := f.findAnElement(tt.input, tt.inputStartElement, tt.inputEndElement, tt.cmd3Citations)
 			require.Equal(t, tt.expectedStartIndex, startIndex)
@@ -470,6 +517,7 @@ func Test_FindAnElement(t *testing.T) {
 }
 
 func Test_ConvertStringToIntList(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		input  string
@@ -523,6 +571,7 @@ func Test_ConvertStringToIntList(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			output := convertStringToIntList(tt.input)
 			require.Equal(t, tt.output, output)
 		})

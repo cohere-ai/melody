@@ -8,13 +8,13 @@ import (
 
 func Test_ParseActions(t *testing.T) {
 	t.Parallel()
-	startingMetadata := FilterAction{
-		mode: NotStarted,
+	startingMetadata := filterAction{
+		mode: notStarted,
 	}
 	testcases := []struct {
 		name           string
 		completion     string
-		metadata       FilterAction
+		metadata       filterAction
 		expected       []FilterOutput
 		expectedRemove int
 		cmd3           bool
@@ -66,9 +66,9 @@ func Test_ParseActions(t *testing.T) {
 					}},
 			},
 			expectedRemove: 4,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curToolIndex: 0,
-				mode:         ToolName,
+				mode:         toolName,
 			},
 		},
 		{
@@ -116,9 +116,9 @@ func Test_ParseActions(t *testing.T) {
 						}},
 				}},
 			expectedRemove: 7,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curToolIndex: 0,
-				mode:         ParamName,
+				mode:         paramName,
 			},
 		},
 		{
@@ -133,9 +133,9 @@ func Test_ParseActions(t *testing.T) {
 						}},
 				}},
 			expectedRemove: 9,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curToolIndex: 0,
-				mode:         ParamName,
+				mode:         paramName,
 			},
 		},
 		{
@@ -151,10 +151,10 @@ func Test_ParseActions(t *testing.T) {
 						}},
 				}},
 			expectedRemove: 6,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curParamName: "param_name",
 				curToolIndex: 0,
-				mode:         ParamValue,
+				mode:         paramValue,
 			},
 		},
 		{
@@ -170,10 +170,10 @@ func Test_ParseActions(t *testing.T) {
 						}},
 				}},
 			expectedRemove: 8,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curParamName: "param_name",
 				curToolIndex: 0,
-				mode:         ParamValue,
+				mode:         paramValue,
 			},
 		},
 		{
@@ -426,11 +426,11 @@ func Test_ParseActions(t *testing.T) {
 				},
 			},
 			expectedRemove: 60,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curToolIndex:     0,
 				curParamName:     "code",
-				mode:             ParamValue,
-				curParamState:    ComplexType,
+				mode:             paramValue,
+				curParamState:    complexType,
 				paramValueBuffer: "\"",
 			},
 		},
@@ -456,13 +456,13 @@ func Test_ParseActions(t *testing.T) {
 
 func Test_ParseRawActions(t *testing.T) {
 	t.Parallel()
-	startingMetadata := FilterAction{
-		mode: NotStarted,
+	startingMetadata := filterAction{
+		mode: notStarted,
 	}
 	testcases := []struct {
 		name           string
 		completion     string
-		metadata       FilterAction
+		metadata       filterAction
 		expected       []FilterOutput
 		expectedRemove int
 		cmd3           bool
@@ -504,9 +504,9 @@ func Test_ParseRawActions(t *testing.T) {
 					}},
 			},
 			expectedRemove: 4,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curToolIndex: 0,
-				mode:         ToolName,
+				mode:         toolName,
 			},
 		},
 		{
@@ -537,9 +537,9 @@ func Test_ParseRawActions(t *testing.T) {
 						}},
 				}},
 			expectedRemove: 7,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curToolIndex: 0,
-				mode:         ParamName,
+				mode:         paramName,
 			},
 		},
 		{
@@ -554,9 +554,9 @@ func Test_ParseRawActions(t *testing.T) {
 						}},
 				}},
 			expectedRemove: 9,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curToolIndex: 0,
-				mode:         ParamName,
+				mode:         paramName,
 			},
 		},
 		{
@@ -572,10 +572,10 @@ func Test_ParseRawActions(t *testing.T) {
 						}},
 				}},
 			expectedRemove: 6,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curParamName: "param_name",
 				curToolIndex: 0,
-				mode:         ParamValue,
+				mode:         paramValue,
 			},
 		},
 		{
@@ -591,10 +591,10 @@ func Test_ParseRawActions(t *testing.T) {
 						}},
 				}},
 			expectedRemove: 8,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curParamName: "param_name",
 				curToolIndex: 0,
-				mode:         ParamValue,
+				mode:         paramValue,
 			},
 		},
 		{
@@ -816,11 +816,11 @@ func Test_ParseRawActions(t *testing.T) {
 				},
 			},
 			expectedRemove: 60,
-			metadata: FilterAction{
+			metadata: filterAction{
 				curToolIndex:     0,
 				curParamName:     "code",
-				mode:             ParamValue,
-				curParamState:    ComplexType,
+				mode:             paramValue,
+				curParamState:    complexType,
 				paramValueBuffer: "\"",
 			},
 		},
@@ -846,14 +846,14 @@ func Test_ParseRawActions(t *testing.T) {
 
 func TestHandleLlamaTools(t *testing.T) {
 	t.Parallel()
-	startingMetadata := FilterAction{
-		mode: NotStarted,
+	startingMetadata := filterAction{
+		mode: notStarted,
 	}
 
 	tests := []struct {
 		name           string
 		completion     string
-		metadata       FilterAction
+		metadata       filterAction
 		expected       []FilterOutput
 		expectedRemove int
 	}{
@@ -892,7 +892,7 @@ func TestHandleLlamaTools(t *testing.T) {
 				actionMetaData:        tc.metadata,
 				streamToolActions:     true,
 				streamProcessedParams: true,
-				specialTokenMap:       map[string]FilterMode{},
+				specialTokenMap:       map[string]filterMode{},
 			}
 			HandleLlama()(&f)
 			out, actualRemove := f.ParseActions(tc.completion)

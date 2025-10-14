@@ -252,6 +252,9 @@ func TestStreamFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var wg sync.WaitGroup
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			defer wg.Wait()
 
 			tkzr, err := tokenizers.GetTokenizer("50k")
@@ -274,27 +277,22 @@ func TestStreamFilter(t *testing.T) {
 				opts = append(opts, HandleMultiHopCmd3())
 			}
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, opts...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
-					var err error
-					if tt.inputLogProb != nil {
-						err = f.Write(token, tt.inputLogProb)
-					} else {
-						err = f.Write(token, nil)
+					err := f.Write(token, tt.inputLogProb)
+					if err != nil {
+						wgErr <- err
+						return
 					}
-
-					require.NoError(t, err)
 				}
-			}()
+			})
 			var got string
 			var gotProbs []TokenIDsWithLogProb
 			for s := range f.Read() {
-				assert.NotEmpty(t, s)
+				require.NotEmpty(t, s)
 				got += s.Text
 
 				if tt.inputLogProb != nil {
@@ -304,7 +302,7 @@ func TestStreamFilter(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
-			assert.Equal(t, tt.expectedLogProbs, gotProbs)
+			require.Equal(t, tt.expectedLogProbs, gotProbs)
 		})
 	}
 }
@@ -347,6 +345,9 @@ func TestMessages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 			tokenizer, err := tokenizers.GetTokenizer(tt.tokenizerID)
@@ -358,17 +359,18 @@ func TestMessages(t *testing.T) {
 				WithInclusiveStops(tt.inclusiveStops...),
 				WithExclusiveStops(tt.exclusiveStops...),
 			)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tokenizer.Encode(tt.input, tokenizers.NoSpecialTokens())
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tokenizer.Encode(tt.input, tokenizers.NoSpecialTokens())
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got []string
 			for s := range f.Read() {
 				got = append(got, s.Text)
@@ -482,6 +484,9 @@ func TestMessages_SearchQueries(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -489,13 +494,16 @@ func TestMessages_SearchQueries(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, HandleSearchQuery())
+			tokens, err := tkzr.Encode(tc.input)
+			require.NoError(t, err)
 			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tc.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
 			})
 			var got []FilterOutput
@@ -632,6 +640,9 @@ func TestMessages_Stops(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -639,17 +650,18 @@ func TestMessages_Stops(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, tt.filter...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			for s := range f.Read() {
 				assert.NotEmpty(t, s)
@@ -672,7 +684,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 	}{
 		{
 			name: "Test with character '’' that is more than one byte",
-			input: "Answer: Fiber is a type of carbohydrate that the body can’t digest." +
+			input: "answer: Fiber is a type of carbohydrate that the body can’t digest." +
 				"Grounded answer: Fiber is a type of <co: 1>carbohydrate</co: 1> that the body can’t <co: 1,2>digest.</co: 1,2>",
 			wantCompleteString: "Fiber is a type of carbohydrate that the body can’t digest.",
 			wantCitations: []FilterCitation{
@@ -692,7 +704,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name: "Two citations, one different document each, with new lines inside answer",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
 				" The tallest penguin is the <co: 0>emperor penguin</co: 0>.\n They are <co: 1>1.2 feet</co: 1> tall.",
 			wantCompleteString: "The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.",
 			wantCitations: []FilterCitation{
@@ -712,7 +724,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name: "Two citations, one document each",
-			input: " Relevant Documents: 0,1\nCited Documents: 1\nAnswer: The tallest penguin is the emperor penguin, which is 1.2 feet tall.\n" +
+			input: " Relevant Documents: 0,1\nCited Documents: 1\nanswer: The tallest penguin is the emperor penguin, which is 1.2 feet tall.\n" +
 				"Grounded answer: The tallest penguin is the <co: 1>emperor penguin</co: 1>, which is <co: 1>1.2 feet</co: 1> tall.\n",
 			wantCompleteString: "The tallest penguin is the emperor penguin, which is 1.2 feet tall.",
 			wantCitations: []FilterCitation{
@@ -742,12 +754,12 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "no citations",
-			input:              "Answer: no citations\nGrounded answer: no citations",
+			input:              "answer: no citations\nGrounded answer: no citations",
 			wantCompleteString: "no citations",
 		},
 		{
 			name:               "single citation, start of answer",
-			input:              "Answer:foo\nGrounded answer:<co: 0>foo</co: 0>",
+			input:              "answer:foo\nGrounded answer:<co: 0>foo</co: 0>",
 			wantCompleteString: "foo",
 			wantCitations: []FilterCitation{
 				{
@@ -771,7 +783,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "single citation, two documents",
-			input:              "Answer: foo\nGrounded answer:<co: 0,1>foo</co: 0,1>",
+			input:              "answer: foo\nGrounded answer:<co: 0,1>foo</co: 0,1>",
 			wantCompleteString: "foo",
 			wantCitations: []FilterCitation{
 				{
@@ -784,7 +796,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "single citation, multiple documents",
-			input:              "Answer: foo\nGrounded answer:<co: 0,1,2,3,4>foo</co: 0,1,2,3,4>",
+			input:              "answer: foo\nGrounded answer:<co: 0,1,2,3,4>foo</co: 0,1,2,3,4>",
 			wantCompleteString: "foo",
 			wantCitations: []FilterCitation{
 				{
@@ -797,7 +809,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "single citation, not start of answer",
-			input:              "Answer: foo bar\nGrounded answer: foo <co: 0>bar</co: 0>",
+			input:              "answer: foo bar\nGrounded answer: foo <co: 0>bar</co: 0>",
 			wantCompleteString: "foo bar",
 			wantCitations: []FilterCitation{
 				{
@@ -810,7 +822,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "single citation, multiple words",
-			input:              "Answer: foo bar\nGrounded answer:<co: 0>foo bar</co: 0>",
+			input:              "answer: foo bar\nGrounded answer:<co: 0>foo bar</co: 0>",
 			wantCompleteString: "foo bar",
 			wantCitations: []FilterCitation{
 				{
@@ -823,7 +835,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "multiple citations, separated by whitespace",
-			input:              "Answer: foo bar baz\nGrounded answer: foo <co: 0>bar</co: 0> <co: 0>baz</co: 0>",
+			input:              "answer: foo bar baz\nGrounded answer: foo <co: 0>bar</co: 0> <co: 0>baz</co: 0>",
 			wantCompleteString: "foo bar baz",
 			wantCitations: []FilterCitation{
 				{
@@ -842,7 +854,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "multiple citations, separated by character",
-			input:              "Answer: foo bar-baz\nGrounded answer: foo <co: 0>bar</co: 0>-<co: 0>baz</co: 0>",
+			input:              "answer: foo bar-baz\nGrounded answer: foo <co: 0>bar</co: 0>-<co: 0>baz</co: 0>",
 			wantCompleteString: "foo bar-baz",
 			wantCitations: []FilterCitation{
 				{
@@ -861,7 +873,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "multiple citations, not separated by whitespace",
-			input:              "Answer: foo barbaz\nGrounded answer: foo <co: 0>bar</co: 0><co: 0>baz</co: 0>",
+			input:              "answer: foo barbaz\nGrounded answer: foo <co: 0>bar</co: 0><co: 0>baz</co: 0>",
 			wantCompleteString: "foo barbaz",
 			wantCitations: []FilterCitation{
 				{
@@ -879,9 +891,9 @@ func TestMessages_Citations_Complete(t *testing.T) {
 			},
 		},
 		{
-			name:               "multiple citations, with 'Answer:' in output",
-			input:              "Answer: foo Answer: bar Answer: baz\nGrounded answer: foo Answer: <co: 0>bar</co: 0> Answer: <co: 0>baz</co: 0>",
-			wantCompleteString: "foo Answer: bar Answer: baz",
+			name:               "multiple citations, with 'answer:' in output",
+			input:              "answer: foo answer: bar answer: baz\nGrounded answer: foo answer: <co: 0>bar</co: 0> answer: <co: 0>baz</co: 0>",
+			wantCompleteString: "foo answer: bar answer: baz",
 			wantCitations: []FilterCitation{
 				{
 					StartIndex: 12,
@@ -909,13 +921,16 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "ungrounded answer",
-			input:              "Answer: foo",
+			input:              "answer: foo",
 			wantCompleteString: "foo",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -930,17 +945,18 @@ func TestMessages_Citations_Complete(t *testing.T) {
 					StreamNonGroundedAnswer(),
 					WithLeftTrimmed(),
 				}...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			index := 0
 			var got string
 			var gotCitations []FilterCitation
@@ -1077,6 +1093,9 @@ func TestMessages_Citations_DifferentDocumentIndices(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -1090,17 +1109,18 @@ func TestMessages_Citations_DifferentDocumentIndices(t *testing.T) {
 					HandleRag(),
 					StreamNonGroundedAnswer(),
 				}...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
@@ -1175,7 +1195,7 @@ func TestMessages_Citations_BadTag(t *testing.T) {
 		},
 		{
 			name:               "Ungrounded answer",
-			input:              "Answer: foo",
+			input:              "answer: foo",
 			wantCompleteString: "",
 		},
 		{
@@ -1187,6 +1207,9 @@ func TestMessages_Citations_BadTag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -1200,17 +1223,18 @@ func TestMessages_Citations_BadTag(t *testing.T) {
 					HandleRag(),
 					WithLeftTrimmed(),
 				}...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
@@ -1235,7 +1259,7 @@ func TestStreamFilter_StopSequencesWithCitations(t *testing.T) {
 	}{
 		{
 			name:  "exclusive stop with accurate citation, stop before answer",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer: foo bar",
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer: foo bar",
 			opts: []FilterOption{
 				HandleRag(),
 				StreamNonGroundedAnswer(),
@@ -1245,7 +1269,7 @@ func TestStreamFilter_StopSequencesWithCitations(t *testing.T) {
 		},
 		{
 			name:  "inclusive stop with accurate citation, stop before answer",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer: foo bar",
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer: foo bar",
 			opts: []FilterOption{
 				HandleRag(),
 				StreamNonGroundedAnswer(),
@@ -1299,6 +1323,9 @@ func TestStreamFilter_StopSequencesWithCitations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -1306,17 +1333,18 @@ func TestStreamFilter_StopSequencesWithCitations(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, tt.opts...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
@@ -1342,7 +1370,7 @@ func TestMessages_Citations_Filter(t *testing.T) {
 	}{
 		{
 			name: "For accurate answer",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
 				" The tallest penguin is the <co: 0>emperor penguin</co: 0>.\n They are <co: 1>1.2 feet</co: 1> tall.",
 			wantCompleteString:   "The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.",
 			wantPostAnswerString: "The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.",
@@ -1367,10 +1395,10 @@ func TestMessages_Citations_Filter(t *testing.T) {
 			},
 		},
 		{
-			name:                 "For answer with 'Answer:' in output",
-			input:                "Answer: foo Answer: bar Answer: baz\nGrounded answer: foo Answer: <co: 0>bar</co: 0> Answer: <co: 0>baz</co: 0>",
-			wantCompleteString:   "foo Answer: bar Answer: baz",
-			wantPostAnswerString: "foo Answer: bar Answer: baz",
+			name:                 "For answer with 'answer:' in output",
+			input:                "answer: foo answer: bar answer: baz\nGrounded answer: foo answer: <co: 0>bar</co: 0> answer: <co: 0>baz</co: 0>",
+			wantCompleteString:   "foo answer: bar answer: baz",
+			wantPostAnswerString: "foo answer: bar answer: baz",
 			wantCitations: []FilterCitation{
 				{
 					StartIndex: 12,
@@ -1442,9 +1470,9 @@ func TestMessages_Citations_Filter(t *testing.T) {
 		},
 		{
 			name: "With no filter",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
 				" The tallest penguin is the <co: 0>emperor penguin</co: 0>.\n They are <co: 0>1.2 feet</co: 0> tall.",
-			wantCompleteString: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
+			wantCompleteString: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
 				" The tallest penguin is the <co: 0>emperor penguin</co: 0>.\n They are <co: 0>1.2 feet</co: 0> tall.",
 			wantCitations: nil,
 			filterOptions: []FilterOption{},
@@ -1453,6 +1481,8 @@ func TestMessages_Citations_Filter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -1460,17 +1490,18 @@ func TestMessages_Citations_Filter(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, tt.filterOptions...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tkzr.Encode(tt.input)
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tkzr.Encode(tt.input)
-				require.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					require.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got string
 			var gotPostAnswer string
 			var gotCitations []FilterCitation
@@ -1503,6 +1534,13 @@ type MultiHopTestCase struct {
 }
 
 func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
+	t.Helper()
+	wgErr := make(chan error, 2)
+	defer func() {
+		require.NoError(t, <-wgErr)
+		require.NoError(t, <-wgErr)
+	}()
+	defer close(wgErr)
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -1524,31 +1562,31 @@ func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
 		tokens, err = tkzr.Encode(tt.completion)
 		require.NoError(t, err)
 	}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer f.Close()
 		for _, token := range tokens {
 			err := f.Write(token, nil)
-			//nolint:testifylint
-			require.NoError(t, err)
+			if err != nil {
+				wgErr <- err
+				return
+			}
 		}
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		defer fraw.Close()
 		for _, token := range tokens {
 			err := fraw.Write(token, nil)
-			//nolint:testifylint
-			require.NoError(t, err)
+			if err != nil {
+				wgErr <- err
+				return
+			}
 		}
-	}()
+	})
 	var gotToolCalls []testGeneratedToolInput
 	var gotText, gotPlan string
 	var citations []FilterCitation
 	for s := range f.Read() {
-		assert.NotEmpty(t, s)
+		require.NotEmpty(t, s)
 		if s.Text != "" {
 			if s.IsToolsReason {
 				gotPlan += s.Text
@@ -1563,14 +1601,14 @@ func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
 			citations = append(citations, s.Citations...)
 		}
 	}
-	assert.Equal(t, tt.expectedPlan, gotPlan)
-	assert.Equal(t, tt.expectedText, gotText)
-	assert.Equal(t, tt.expected, gotToolCalls)
-	assert.Equal(t, tt.expectedCitations, citations)
+	require.Equal(t, tt.expectedPlan, gotPlan)
+	require.Equal(t, tt.expectedText, gotText)
+	require.Equal(t, tt.expected, gotToolCalls)
+	require.Equal(t, tt.expectedCitations, citations)
 
 	var gotToolCallDeltaConcatenations []string
 	for s := range fraw.Read() {
-		assert.NotEmpty(t, s)
+		require.NotEmpty(t, s)
 		if s.ToolCalls != nil {
 			i := s.ToolCalls.Index
 			if i >= len(gotToolCallDeltaConcatenations) {
@@ -1580,7 +1618,7 @@ func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
 			}
 		}
 	}
-	assert.Equal(t, tt.expectedDeltaConcatenations, gotToolCallDeltaConcatenations)
+	require.Equal(t, tt.expectedDeltaConcatenations, gotToolCallDeltaConcatenations)
 }
 
 func Test_ParseMultiHopCompletion(t *testing.T) {
@@ -1819,7 +1857,7 @@ func Test_ParseMultiHopCompletion(t *testing.T) {
 				"Reflection: reflection33",
 				"Relevant Documents: 0,1",
 				"Cited Documents: 0,1",
-				"Answer: foo bar",
+				"answer: foo bar",
 				"Grounded answer: foo <co: 0,1>bar</co: 0,1>",
 			}, "\n"),
 			expectedPlan: "reflection33",
@@ -2120,6 +2158,9 @@ func TestRepetitionLimits(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.Equal(t, tt.err, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
@@ -2127,21 +2168,19 @@ func TestRepetitionLimits(t *testing.T) {
 			require.NoError(t, err)
 
 			f := NewStreamFilter(zaptest.NewLogger(t), tkzr, tt.filter...)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				defer f.Close()
 				tokens := tt.input
 				for _, token := range tokens {
 					err := f.Write(token, nil)
 					if err != nil {
-						assert.Equal(t, tt.err, err)
+						wgErr <- err
 						return
 					}
 				}
-			}()
+			})
 			for s := range f.Read() {
-				assert.NotEmpty(t, s)
+				require.NotEmpty(t, s)
 			}
 		})
 	}
@@ -2259,7 +2298,7 @@ func TestHasHitTokenRepetitionLimit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			actual := HasHitTokenRepetitionLimit(tt.tokens, tt.repetitionLimit, tt.maxSequenceLength)
+			actual := hasHitTokenRepetitionLimit(tt.tokens, tt.repetitionLimit, tt.maxSequenceLength)
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
@@ -2331,7 +2370,7 @@ func BenchmarkHasHitTokenRepetitionLimit(b *testing.B) {
 			// Enable memory profiling
 			b.ReportAllocs()
 			for b.Loop() {
-				_ = HasHitTokenRepetitionLimit(tt.seenTokens, tt.repetitionLimit, tt.maxSequenceLength)
+				_ = hasHitTokenRepetitionLimit(tt.seenTokens, tt.repetitionLimit, tt.maxSequenceLength)
 			}
 		})
 	}
@@ -2340,6 +2379,9 @@ func BenchmarkHasHitTokenRepetitionLimit(b *testing.B) {
 // Ensure that HandleMultiHopCmd3 doesn't overwrite the specialTokensMap.
 func TestStreamFilterSpecialTokenMapMerging(t *testing.T) {
 	t.Parallel()
+	wgErr := make(chan error, 1)
+	defer func() { require.NoError(t, <-wgErr) }()
+	defer close(wgErr)
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	tkzr, err := tokenizers.GetTokenizer("50k")
@@ -2353,15 +2395,16 @@ func TestStreamFilterSpecialTokenMapMerging(t *testing.T) {
 	input := "should see title should not see"
 	tokens, err := tkzr.Encode(input)
 	require.NoError(t, err)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer f.Close()
 		for _, token := range tokens {
 			err := f.Write(token, nil)
-			assert.NoError(t, err)
+			if err != nil {
+				wgErr <- err
+				return
+			}
 		}
-	}()
+	})
 	actual := ""
 	for s := range f.Read() {
 		actual += s.Text
@@ -2439,6 +2482,9 @@ func TestStreamFilterChunkSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			wgErr := make(chan error, 1)
+			defer func() { require.NoError(t, <-wgErr) }()
+			defer close(wgErr)
 			var wg sync.WaitGroup
 			defer wg.Wait()
 			tokenizer, err := tokenizers.GetTokenizer("")
@@ -2450,17 +2496,18 @@ func TestStreamFilterChunkSize(t *testing.T) {
 				WithChunkSize(tt.filterChunkSize),
 				WithInclusiveStops(tt.inclusiveStops...),
 			)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			tokens, err := tokenizer.Encode(tt.input, tokenizers.NoSpecialTokens())
+			require.NoError(t, err)
+			wg.Go(func() {
 				defer f.Close()
-				tokens, err := tokenizer.Encode(tt.input, tokenizers.NoSpecialTokens())
-				assert.NoError(t, err)
 				for _, token := range tokens {
 					err := f.Write(token, nil)
-					assert.NoError(t, err)
+					if err != nil {
+						wgErr <- err
+						return
+					}
 				}
-			}()
+			})
 			var got []string
 			for s := range f.Read() {
 				got = append(got, s.Text)

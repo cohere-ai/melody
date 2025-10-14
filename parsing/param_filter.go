@@ -6,13 +6,13 @@ import (
 	"unicode"
 )
 
-type ParamState int
+type paramState struct{ e uint }
 
-const (
-	Beginning ParamState = iota
-	ComplexType
-	BasicType
-	End
+var (
+	beginning   = paramState{0}
+	complexType = paramState{1}
+	basicType   = paramState{2}
+	end         = paramState{3}
 )
 
 /*
@@ -30,13 +30,13 @@ func (f *filter) HandleParamValue(str string) ([]FilterOutput, int) {
 		return nil, 0
 	}
 	switch f.actionMetaData.curParamState {
-	case Beginning:
+	case beginning:
 		return f.HandleParamValueBeginning(str)
-	case ComplexType:
+	case complexType:
 		return f.HandleParamValueComplexType(str)
-	case BasicType:
+	case basicType:
 		return f.HandleParamValueBasicType(str)
-	case End:
+	case end:
 		return f.HandleParamValueEndType(str)
 	}
 	return nil, 0
@@ -49,13 +49,13 @@ func (f *filter) HandleParamValueBeginning(str string) ([]FilterOutput, int) {
 	case trim == "":
 		return nil, 0
 	case trim[0] == '"' || trim[0] == '{' || trim[0] == '[':
-		f.actionMetaData.curParamState = ComplexType
+		f.actionMetaData.curParamState = complexType
 		return f.HandleParamValue(str)
 	case trim[0] == '}' || trim[0] == ',':
-		f.actionMetaData.curParamState = End
+		f.actionMetaData.curParamState = end
 		return f.HandleParamValue(str)
 	default:
-		f.actionMetaData.curParamState = BasicType
+		f.actionMetaData.curParamState = basicType
 		return f.HandleParamValue(str)
 	}
 }
@@ -67,7 +67,7 @@ func (f *filter) HandleParamValueBasicType(str string) ([]FilterOutput, int) {
 		return f.sendParamValueChunk(str)
 	}
 	out, _ := f.sendParamValueChunk(str[:idx])
-	f.actionMetaData.curParamState = End
+	f.actionMetaData.curParamState = end
 	o, r := f.HandleParamValue(str[idx:])
 	return append(out, o...), r + len(str[:idx])
 }
@@ -85,7 +85,7 @@ func (f *filter) HandleParamValueComplexType(str string) ([]FilterOutput, int) {
 
 	// We have a valid JSON value
 	f.actionMetaData.paramValueBuffer = ""
-	f.actionMetaData.curParamState = End
+	f.actionMetaData.curParamState = end
 	out, _ := f.sendParamValueChunk(str[:idx])
 	o, r := f.HandleParamValue(str[idx:])
 	return append(out, o...), r + len(str[:idx])
@@ -105,16 +105,16 @@ func (f *filter) HandleParamValueEndType(str string) ([]FilterOutput, int) {
 	// Reset all the metadata
 	f.actionMetaData.trimLeft = true
 	f.actionMetaData.paramValueBuffer = ""
-	f.actionMetaData.curParamState = Beginning
+	f.actionMetaData.curParamState = beginning
 	f.actionMetaData.curParamName = ""
 
 	if trim[0] == '}' {
-		// End of the all the parameters - end of the tool
-		f.actionMetaData.mode = ToolEnd
+		// end of the all the parameters - end of the tool
+		f.actionMetaData.mode = toolEnd
 		f.actionMetaData.curToolIndex++
 	} else {
-		// End of the parameter - next is the parameter name
-		f.actionMetaData.mode = ParamValueEnd
+		// end of the parameter - next is the parameter name
+		f.actionMetaData.mode = paramValueEnd
 	}
 	o, r := f.ParseActions(str[rem+1:])
 	return append(out, o...), r + len(str[:rem+1]) // +1 for the , or }
