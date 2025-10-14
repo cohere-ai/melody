@@ -123,14 +123,14 @@ for o := range f.Read() {
 
 /*
 []FilterOutput{
-    {IsToolsReason: true, Text: "This", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{4184}}},
-    {IsToolsReason: true, Text: " is", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{1801}}},
-    {IsToolsReason: true, Text: " a", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{1671}}},
-    {IsToolsReason: true, Text: " rainbow", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{84470}}},
-    {IsToolsReason: true, Text: " ", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{37}}},
-    {IsToolsReason: true, Text: "emoji", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{104150}}},
-    {IsToolsReason: true, Text: ":", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{33}}},
-    {IsToolsReason: true, Text: " 🌈", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{11254, 242, 238}}},
+    {IsToolsReason: true, Text: "This"},
+    {IsToolsReason: true, Text: " is"},
+    {IsToolsReason: true, Text: " a"},
+    {IsToolsReason: true, Text: " rainbow"},
+    {IsToolsReason: true, Text: " "},
+    {IsToolsReason: true, Text: "emoji"},
+    {IsToolsReason: true, Text: ":"},
+    {IsToolsReason: true, Text: " 🌈"},
     {IsToolsReason: true, Citations: []FilterCitation{{
         StartIndex: 18,
         EndIndex:   26,
@@ -138,9 +138,9 @@ for o := range f.Read() {
         DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{1}}},
         IsThinking: true,
     }}},
-    {Text: "foo", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{15579}}},
-    {Text: " ", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{37}}},
-    {Text: "bar", Logprobs: TokenIDsWithLogProb{TokenIDs: []int64{4962}}},
+    {Text: "foo"},
+    {Text: " "},
+    {Text: "bar"},
     {Citations: []FilterCitation{{
         StartIndex: 4,
         EndIndex:   7,
