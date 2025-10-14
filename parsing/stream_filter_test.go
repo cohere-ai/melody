@@ -927,7 +927,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			//t.Parallel()
+			t.Parallel()
 			wgErr := make(chan error, 1)
 			defer func() { require.NoError(t, <-wgErr) }()
 			defer close(wgErr)
