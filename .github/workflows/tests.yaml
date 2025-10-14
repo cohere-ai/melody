@@ -84,4 +84,4 @@ jobs:
         if: env.run_go_tests
         run: |
           go env -w GOPRIVATE=github.com/cohere-ai
-          make test-coverage
+          go test ./...
