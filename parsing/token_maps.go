@@ -2,12 +2,12 @@ package parsing
 
 var ragTokenMap = map[string]filterMode{
 	"Grounded answer:": groundedAnswer,
-	"answer:":          answer,
+	"Answer:":          answer,
 }
 
 var multiHopTokenMap = map[string]filterMode{
 	"Grounded answer:": groundedAnswer,
-	"answer:":          answer,
+	"Answer:":          answer,
 	"Plan:":            toolReason,
 	"Reflection:":      toolReason,
 	"Action:":          toolAction,
