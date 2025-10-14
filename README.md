@@ -11,7 +11,7 @@ Templating rendering and generation parsing for Cohere models.
 ```Go
 import "github.com/cohere-ai/melody/parsing"
 text := "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>"
-f := parsing.NewFilter(parsing. andleMultiHopCmd3(), parsing. StreamToolActions())
+f := parsing.NewFilter(parsing.HandleMultiHopCmd3(), parsing.StreamToolActions())
 out := []FilterOutput{}
 for _, token := range(tokenizer.Encode(text)) {
 	o, err := append(out, f.Write(token, nil))
@@ -52,7 +52,7 @@ out = append(out, f.FlushPartials()...)
 ```Go
 import "github.com/cohere-ai/melody/parsing"
 text := "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>"
-f := parsing.NewStreamFilter(parsing. andleMultiHopCmd3(), parsing. StreamToolActions())
+f := parsing.NewStreamFilter(parsing.HandleMultiHopCmd3(), parsing.StreamToolActions())
 var wg sync.WaitGroup
 defer wg.Wait()
 wg.Go(func(){
