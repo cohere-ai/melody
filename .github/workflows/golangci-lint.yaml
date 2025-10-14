@@ -61,4 +61,4 @@ jobs:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           working-directory: parsing
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout=15m --verbose --config=../.golangci.yaml --new-from-rev origin/${{ github.event.pull_request.base.ref }}
+          args: --timeout=15m --verbose --config=../.golangci.yaml
