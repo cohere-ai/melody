@@ -6,30 +6,30 @@ import (
 	"unicode"
 )
 
-type ActionMode int
+type actionMode struct{ e uint }
 
-const (
-	NotStarted ActionMode = iota
-	ToolCallID
-	ToolCallIDEnd
-	ToolName
-	ToolNameEnd
-	ParamName
-	ParamValue
-	ToolEnd
-	ParamNameEnd
-	ParamValueEnd
-	RawParam
+var (
+	notStarted    = actionMode{0}
+	toolCallID    = actionMode{1}
+	toolCallIDEnd = actionMode{2}
+	toolName      = actionMode{3}
+	toolNameEnd   = actionMode{3}
+	paramName     = actionMode{4}
+	paramValue    = actionMode{5}
+	toolEnd       = actionMode{6}
+	paramNameEnd  = actionMode{7}
+	paramValueEnd = actionMode{8}
+	rawParam      = actionMode{9}
 )
 
-type FilterAction struct {
-	mode         ActionMode
+type filterAction struct {
+	mode         actionMode
 	curToolIndex int
 	trimLeft     bool
 
 	// Parameter metadata
 	curParamName     string
-	curParamState    ParamState
+	curParamState    paramState
 	paramValueBuffer string
 }
 
@@ -49,25 +49,25 @@ func (f *filter) ParseActions(str string) ([]FilterOutput, int) {
 		return nil, 0
 	}
 	switch f.actionMetaData.mode {
-	case NotStarted, ToolEnd:
+	case notStarted, toolEnd:
 		return f.HandleBeforeTool(str, f.hasToolCallID)
-	case ToolCallID:
+	case toolCallID:
 		return f.HandleInToolCallID(str)
-	case ToolCallIDEnd:
+	case toolCallIDEnd:
 		return f.HandleToolCallIDEnd(str)
-	case ToolName:
+	case toolName:
 		return f.HandleInToolName(str)
-	case ToolNameEnd:
+	case toolNameEnd:
 		return f.HandleToolNameEnd(str)
-	case RawParam:
+	case rawParam:
 		return f.HandleRawParam(str)
-	case ParamName:
+	case paramName:
 		return f.HandleParamName(str)
-	case ParamNameEnd:
+	case paramNameEnd:
 		return f.HandleEndOfParamName(str)
-	case ParamValue:
+	case paramValue:
 		return f.HandleParamValue(str)
-	case ParamValueEnd:
+	case paramValueEnd:
 		return f.HandleParamValueEnd(str)
 	}
 	return nil, 0
@@ -76,18 +76,18 @@ func (f *filter) ParseActions(str string) ([]FilterOutput, int) {
 // We are waiting for "tool_name": " (or tool_call_id) the regex allows all the whitespace in between
 func (f *filter) HandleBeforeTool(str string, checkCallID bool) ([]FilterOutput, int) {
 	var indices []int
-	var mode ActionMode
+	var mode actionMode
 
 	switch {
 	case f.llamaToolParsing:
 		indices = llamaToolNameRegex.FindStringIndex(str)
-		mode = ToolName
+		mode = toolName
 	case checkCallID:
 		indices = toolCallIDRegex.FindStringIndex(str)
-		mode = ToolCallID
+		mode = toolCallID
 	default:
 		indices = toolNameRegex.FindStringIndex(str)
-		mode = ToolName
+		mode = toolName
 	}
 	if indices == nil {
 		return nil, 0
@@ -106,7 +106,7 @@ func (f *filter) HandleInToolCallID(str string) ([]FilterOutput, int) {
 		return nil, 0
 	}
 	out := f.sendToolCallIDChunk(str[:idx])
-	f.actionMetaData.mode = ToolCallIDEnd
+	f.actionMetaData.mode = toolCallIDEnd
 	o, r := f.ParseActions(str[idx:]) // one for the quote
 	return append(out, o...), r + len(str[:idx]) + 1
 }
@@ -124,7 +124,7 @@ func (f *filter) HandleInToolName(str string) ([]FilterOutput, int) {
 		return nil, 0
 	}
 	out := f.sendToolNameChunk(str[:idx])
-	f.actionMetaData.mode = ToolNameEnd
+	f.actionMetaData.mode = toolNameEnd
 	o, r := f.ParseActions(str[idx:])
 	return append(out, o...), r + len(str[:idx]) + 1 // one for the quote
 }
@@ -137,18 +137,18 @@ func (f *filter) HandleToolNameEnd(str string) ([]FilterOutput, int) {
 		if idx == -1 {
 			return nil, 0
 		}
-		f.actionMetaData.mode = ToolEnd
+		f.actionMetaData.mode = toolEnd
 		f.actionMetaData.curToolIndex++
 		f.actionMetaData.curParamName = ""
 		out, rem := f.ParseActions(str[idx:])
 		return out, rem + len(str[:idx])
 	}
 	if f.streamProcessedParams {
-		f.actionMetaData.mode = ParamName
+		f.actionMetaData.mode = paramName
 		out, rem := f.ParseActions(str[indices[1]:])
 		return out, rem + len(str[:indices[1]])
 	}
-	f.actionMetaData.mode = RawParam
+	f.actionMetaData.mode = rawParam
 	// Without {
 	indices = rawParamRegex.FindStringIndex(str)
 	out, rem := f.ParseActions(str[indices[1]:])
@@ -170,7 +170,7 @@ func (f *filter) HandleRawParam(str string) ([]FilterOutput, int) {
 	out := f.sendRawParamChunkWithoutIndentation(str[:idx])
 	f.actionMetaData.paramValueBuffer = ""
 	f.actionMetaData.curToolIndex++
-	f.actionMetaData.mode = ToolEnd
+	f.actionMetaData.mode = toolEnd
 	o, r := f.ParseActions(str[idx:])
 	return append(out, o...), r + len(str[:idx])
 }
@@ -207,7 +207,7 @@ func (f *filter) HandleParamName(str string) ([]FilterOutput, int) {
 		return nil, 0
 	}
 	out := f.sendParamNameChunk(str[:idx])
-	f.actionMetaData.mode = ParamNameEnd
+	f.actionMetaData.mode = paramNameEnd
 	o, r := f.ParseActions(str[idx:])
 	return append(out, o...), r + len(str[:idx]) + 1 // one for the quote
 }
@@ -218,7 +218,7 @@ func (f *filter) HandleEndOfParamName(str string) ([]FilterOutput, int) {
 	if indices == nil {
 		return nil, 0
 	}
-	f.actionMetaData.mode = ParamValue
+	f.actionMetaData.mode = paramValue
 	out, rem := f.ParseActions(str[indices[1]:])
 	return out, rem + len(str[:indices[1]])
 }
@@ -229,7 +229,7 @@ func (f *filter) HandleParamValueEnd(str string) ([]FilterOutput, int) {
 	if idx == -1 {
 		return nil, 0
 	}
-	f.actionMetaData.mode = ParamName
+	f.actionMetaData.mode = paramName
 	out, rem := f.ParseActions(str[idx+1:])
 	return out, rem + len(str[:idx]) + 1
 }

@@ -684,7 +684,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 	}{
 		{
 			name: "Test with character '’' that is more than one byte",
-			input: "Answer: Fiber is a type of carbohydrate that the body can’t digest." +
+			input: "answer: Fiber is a type of carbohydrate that the body can’t digest." +
 				"Grounded answer: Fiber is a type of <co: 1>carbohydrate</co: 1> that the body can’t <co: 1,2>digest.</co: 1,2>",
 			wantCompleteString: "Fiber is a type of carbohydrate that the body can’t digest.",
 			wantCitations: []FilterCitation{
@@ -704,7 +704,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name: "Two citations, one different document each, with new lines inside answer",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
 				" The tallest penguin is the <co: 0>emperor penguin</co: 0>.\n They are <co: 1>1.2 feet</co: 1> tall.",
 			wantCompleteString: "The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.",
 			wantCitations: []FilterCitation{
@@ -724,7 +724,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name: "Two citations, one document each",
-			input: " Relevant Documents: 0,1\nCited Documents: 1\nAnswer: The tallest penguin is the emperor penguin, which is 1.2 feet tall.\n" +
+			input: " Relevant Documents: 0,1\nCited Documents: 1\nanswer: The tallest penguin is the emperor penguin, which is 1.2 feet tall.\n" +
 				"Grounded answer: The tallest penguin is the <co: 1>emperor penguin</co: 1>, which is <co: 1>1.2 feet</co: 1> tall.\n",
 			wantCompleteString: "The tallest penguin is the emperor penguin, which is 1.2 feet tall.",
 			wantCitations: []FilterCitation{
@@ -754,12 +754,12 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "no citations",
-			input:              "Answer: no citations\nGrounded answer: no citations",
+			input:              "answer: no citations\nGrounded answer: no citations",
 			wantCompleteString: "no citations",
 		},
 		{
 			name:               "single citation, start of answer",
-			input:              "Answer:foo\nGrounded answer:<co: 0>foo</co: 0>",
+			input:              "answer:foo\nGrounded answer:<co: 0>foo</co: 0>",
 			wantCompleteString: "foo",
 			wantCitations: []FilterCitation{
 				{
@@ -783,7 +783,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "single citation, two documents",
-			input:              "Answer: foo\nGrounded answer:<co: 0,1>foo</co: 0,1>",
+			input:              "answer: foo\nGrounded answer:<co: 0,1>foo</co: 0,1>",
 			wantCompleteString: "foo",
 			wantCitations: []FilterCitation{
 				{
@@ -796,7 +796,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "single citation, multiple documents",
-			input:              "Answer: foo\nGrounded answer:<co: 0,1,2,3,4>foo</co: 0,1,2,3,4>",
+			input:              "answer: foo\nGrounded answer:<co: 0,1,2,3,4>foo</co: 0,1,2,3,4>",
 			wantCompleteString: "foo",
 			wantCitations: []FilterCitation{
 				{
@@ -809,7 +809,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "single citation, not start of answer",
-			input:              "Answer: foo bar\nGrounded answer: foo <co: 0>bar</co: 0>",
+			input:              "answer: foo bar\nGrounded answer: foo <co: 0>bar</co: 0>",
 			wantCompleteString: "foo bar",
 			wantCitations: []FilterCitation{
 				{
@@ -822,7 +822,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "single citation, multiple words",
-			input:              "Answer: foo bar\nGrounded answer:<co: 0>foo bar</co: 0>",
+			input:              "answer: foo bar\nGrounded answer:<co: 0>foo bar</co: 0>",
 			wantCompleteString: "foo bar",
 			wantCitations: []FilterCitation{
 				{
@@ -835,7 +835,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "multiple citations, separated by whitespace",
-			input:              "Answer: foo bar baz\nGrounded answer: foo <co: 0>bar</co: 0> <co: 0>baz</co: 0>",
+			input:              "answer: foo bar baz\nGrounded answer: foo <co: 0>bar</co: 0> <co: 0>baz</co: 0>",
 			wantCompleteString: "foo bar baz",
 			wantCitations: []FilterCitation{
 				{
@@ -854,7 +854,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "multiple citations, separated by character",
-			input:              "Answer: foo bar-baz\nGrounded answer: foo <co: 0>bar</co: 0>-<co: 0>baz</co: 0>",
+			input:              "answer: foo bar-baz\nGrounded answer: foo <co: 0>bar</co: 0>-<co: 0>baz</co: 0>",
 			wantCompleteString: "foo bar-baz",
 			wantCitations: []FilterCitation{
 				{
@@ -873,7 +873,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "multiple citations, not separated by whitespace",
-			input:              "Answer: foo barbaz\nGrounded answer: foo <co: 0>bar</co: 0><co: 0>baz</co: 0>",
+			input:              "answer: foo barbaz\nGrounded answer: foo <co: 0>bar</co: 0><co: 0>baz</co: 0>",
 			wantCompleteString: "foo barbaz",
 			wantCitations: []FilterCitation{
 				{
@@ -891,9 +891,9 @@ func TestMessages_Citations_Complete(t *testing.T) {
 			},
 		},
 		{
-			name:               "multiple citations, with 'Answer:' in output",
-			input:              "Answer: foo Answer: bar Answer: baz\nGrounded answer: foo Answer: <co: 0>bar</co: 0> Answer: <co: 0>baz</co: 0>",
-			wantCompleteString: "foo Answer: bar Answer: baz",
+			name:               "multiple citations, with 'answer:' in output",
+			input:              "answer: foo answer: bar answer: baz\nGrounded answer: foo answer: <co: 0>bar</co: 0> answer: <co: 0>baz</co: 0>",
+			wantCompleteString: "foo answer: bar answer: baz",
 			wantCitations: []FilterCitation{
 				{
 					StartIndex: 12,
@@ -921,7 +921,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 		},
 		{
 			name:               "ungrounded answer",
-			input:              "Answer: foo",
+			input:              "answer: foo",
 			wantCompleteString: "foo",
 		},
 	}
@@ -1195,7 +1195,7 @@ func TestMessages_Citations_BadTag(t *testing.T) {
 		},
 		{
 			name:               "Ungrounded answer",
-			input:              "Answer: foo",
+			input:              "answer: foo",
 			wantCompleteString: "",
 		},
 		{
@@ -1259,7 +1259,7 @@ func TestStreamFilter_StopSequencesWithCitations(t *testing.T) {
 	}{
 		{
 			name:  "exclusive stop with accurate citation, stop before answer",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer: foo bar",
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer: foo bar",
 			opts: []FilterOption{
 				HandleRag(),
 				StreamNonGroundedAnswer(),
@@ -1269,7 +1269,7 @@ func TestStreamFilter_StopSequencesWithCitations(t *testing.T) {
 		},
 		{
 			name:  "inclusive stop with accurate citation, stop before answer",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer: foo bar",
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer: foo bar",
 			opts: []FilterOption{
 				HandleRag(),
 				StreamNonGroundedAnswer(),
@@ -1370,7 +1370,7 @@ func TestMessages_Citations_Filter(t *testing.T) {
 	}{
 		{
 			name: "For accurate answer",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
 				" The tallest penguin is the <co: 0>emperor penguin</co: 0>.\n They are <co: 1>1.2 feet</co: 1> tall.",
 			wantCompleteString:   "The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.",
 			wantPostAnswerString: "The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.",
@@ -1395,10 +1395,10 @@ func TestMessages_Citations_Filter(t *testing.T) {
 			},
 		},
 		{
-			name:                 "For answer with 'Answer:' in output",
-			input:                "Answer: foo Answer: bar Answer: baz\nGrounded answer: foo Answer: <co: 0>bar</co: 0> Answer: <co: 0>baz</co: 0>",
-			wantCompleteString:   "foo Answer: bar Answer: baz",
-			wantPostAnswerString: "foo Answer: bar Answer: baz",
+			name:                 "For answer with 'answer:' in output",
+			input:                "answer: foo answer: bar answer: baz\nGrounded answer: foo answer: <co: 0>bar</co: 0> answer: <co: 0>baz</co: 0>",
+			wantCompleteString:   "foo answer: bar answer: baz",
+			wantPostAnswerString: "foo answer: bar answer: baz",
 			wantCitations: []FilterCitation{
 				{
 					StartIndex: 12,
@@ -1470,9 +1470,9 @@ func TestMessages_Citations_Filter(t *testing.T) {
 		},
 		{
 			name: "With no filter",
-			input: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
+			input: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
 				" The tallest penguin is the <co: 0>emperor penguin</co: 0>.\n They are <co: 0>1.2 feet</co: 0> tall.",
-			wantCompleteString: "Relevant Documents: 0\nCited Documents: 0\nAnswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
+			wantCompleteString: "Relevant Documents: 0\nCited Documents: 0\nanswer: The tallest penguin is the emperor penguin.\n They are 1.2 feet tall.Grounded answer:" +
 				" The tallest penguin is the <co: 0>emperor penguin</co: 0>.\n They are <co: 0>1.2 feet</co: 0> tall.",
 			wantCitations: nil,
 			filterOptions: []FilterOption{},
@@ -1857,7 +1857,7 @@ func Test_ParseMultiHopCompletion(t *testing.T) {
 				"Reflection: reflection33",
 				"Relevant Documents: 0,1",
 				"Cited Documents: 0,1",
-				"Answer: foo bar",
+				"answer: foo bar",
 				"Grounded answer: foo <co: 0,1>bar</co: 0,1>",
 			}, "\n"),
 			expectedPlan: "reflection33",
@@ -2298,7 +2298,7 @@ func TestHasHitTokenRepetitionLimit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			actual := HasHitTokenRepetitionLimit(tt.tokens, tt.repetitionLimit, tt.maxSequenceLength)
+			actual := hasHitTokenRepetitionLimit(tt.tokens, tt.repetitionLimit, tt.maxSequenceLength)
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
@@ -2370,7 +2370,7 @@ func BenchmarkHasHitTokenRepetitionLimit(b *testing.B) {
 			// Enable memory profiling
 			b.ReportAllocs()
 			for b.Loop() {
-				_ = HasHitTokenRepetitionLimit(tt.seenTokens, tt.repetitionLimit, tt.maxSequenceLength)
+				_ = hasHitTokenRepetitionLimit(tt.seenTokens, tt.repetitionLimit, tt.maxSequenceLength)
 			}
 		})
 	}

@@ -4,7 +4,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// StreamFilter accepts raw bytes and outputs a filtered stream of strings.
+// StreamFilter is the interface for parsing a cohere model generation through channels.
 type StreamFilter interface {
 	Read() <-chan FilterOutput
 	Write(token int64, likelihood *float32) error
@@ -13,6 +13,7 @@ type StreamFilter interface {
 	GetRawTokens() []int64
 }
 
+// NewStreamFilter creates a new StreamFilter with the given options.
 func NewStreamFilter(logger *zap.Logger, tokenizer Decoder, opts ...FilterOption) StreamFilter {
 	s := &streamFilter{
 		filter: *newF(logger, tokenizer, opts...),

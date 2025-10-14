@@ -1,49 +1,49 @@
 package parsing
 
-var ragTokenMap = map[string]FilterMode{
-	"Grounded answer:": GroundedAnswer,
-	"Answer:":          Answer,
+var ragTokenMap = map[string]filterMode{
+	"Grounded answer:": groundedAnswer,
+	"answer:":          answer,
 }
 
-var multiHopTokenMap = map[string]FilterMode{
-	"Grounded answer:": GroundedAnswer,
-	"Answer:":          Answer,
-	"Plan:":            ToolReason,
-	"Reflection:":      ToolReason,
-	"Action:":          ToolAction,
+var multiHopTokenMap = map[string]filterMode{
+	"Grounded answer:": groundedAnswer,
+	"answer:":          answer,
+	"Plan:":            toolReason,
+	"Reflection:":      toolReason,
+	"Action:":          toolAction,
 	// We ignore Relevant & Cited documents because we do not want to stream them to the user.
 	// They are present in the generation for model performance.
-	"Relevant Documents:": Ignore,
-	"Cited Documents:":    Ignore,
+	"Relevant Documents:": ignore,
+	"Cited Documents:":    ignore,
 }
 
 // TODO add ticket for token change
-var multiHopTokenMapCmd3 = map[string]FilterMode{
-	"<|START_RESPONSE|>": GroundedAnswer,
-	"<|END_RESPONSE|>":   Ignore,
-	"<|START_THINKING|>": ToolReason,
-	"<|END_THINKING|>":   Ignore,
-	"<|START_ACTION|>":   ToolAction,
-	"<|END_ACTION|>":     Ignore,
+var multiHopTokenMapCmd3 = map[string]filterMode{
+	"<|START_RESPONSE|>": groundedAnswer,
+	"<|END_RESPONSE|>":   ignore,
+	"<|START_THINKING|>": toolReason,
+	"<|END_THINKING|>":   ignore,
+	"<|START_ACTION|>":   toolAction,
+	"<|END_ACTION|>":     ignore,
 }
 
-var multiHopTokenMapCmd4 = map[string]FilterMode{
-	"<|START_TEXT|>":     GroundedAnswer,
-	"<|END_TEXT|>":       Ignore,
-	"<|START_THINKING|>": ToolReason,
-	"<|END_THINKING|>":   Ignore,
-	"<|START_ACTION|>":   ToolAction,
-	"<|END_ACTION|>":     Ignore,
+var multiHopTokenMapCmd4 = map[string]filterMode{
+	"<|START_TEXT|>":     groundedAnswer,
+	"<|END_TEXT|>":       ignore,
+	"<|START_THINKING|>": toolReason,
+	"<|END_THINKING|>":   ignore,
+	"<|START_ACTION|>":   toolAction,
+	"<|END_ACTION|>":     ignore,
 }
 
-var searchQueryTokenMap = map[string]FilterMode{
-	"Search:": SearchQuery,
-	"|||":     NextSearchQuery,
-	"\n":      NextSearchQuery,
+var searchQueryTokenMap = map[string]filterMode{
+	"Search:": searchQuery,
+	"|||":     nextSearchQuery,
+	"\n":      nextSearchQuery,
 }
 
-var llamaTokenMap = map[string]FilterMode{
-	"\n\n":           GroundedAnswer,
-	"<|python_tag|>": ToolAction,
-	"<eom_id>":       ExclusiveStop,
+var llamaTokenMap = map[string]filterMode{
+	"\n\n":           groundedAnswer,
+	"<|python_tag|>": toolAction,
+	"<eom_id>":       exclusiveStop,
 }

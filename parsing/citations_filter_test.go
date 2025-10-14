@@ -375,7 +375,7 @@ func Test_HandleCitations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			output, remove := tt.filter.ParseCitations(tt.input, GroundedAnswer)
+			output, remove := tt.filter.ParseCitations(tt.input, groundedAnswer)
 			require.Equal(t, tt.output, output)
 			require.Equal(t, tt.remove, remove)
 		})

@@ -18,7 +18,7 @@ const (
 
 // Input 1. curIndex is the index of the string without citations so far 2. is the string to process e.g. " <co: 1"
 // Output 1. output with text and citations 2. amount to remove from the buffer including citations
-func (f *filter) ParseCitations(str string, mode FilterMode) (*FilterOutput, int) {
+func (f *filter) ParseCitations(str string, mode filterMode) (*FilterOutput, int) {
 	// First try to find the 'first' citation element. For example <co: 1,2,3>
 	startFirstCitationStr := startFirstCit
 	if f.cmd3Citations {
@@ -89,7 +89,7 @@ func (f *filter) ParseCitations(str string, mode FilterMode) (*FilterOutput, int
 			EndIndex:   startIndex + utf8.RuneCountInString(citTxt),
 			Text:       citTxt,
 			DocIndices: docsLast,
-			IsThinking: mode == ToolReason,
+			IsThinking: mode == toolReason,
 		}}
 	// Recurse to find more partial or complete citations
 	moreCits, moreRem := f.ParseCitations(str[endOfCit:], mode)
