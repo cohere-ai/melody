@@ -31,7 +31,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 					},
 				},
 			},
@@ -51,7 +51,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 					},
 				},
 			},
@@ -90,7 +90,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2}}},
 					},
 				},
 			},
@@ -111,7 +111,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{3, 4}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{3, 4}}},
 					},
 				},
 			},
@@ -239,13 +239,13 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 					},
 					{
 						StartIndex: 13,
 						EndIndex:   19,
 						Text:       "barber",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{0}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{0}}},
 					},
 				},
 			},
@@ -265,7 +265,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 					},
 				},
 			},
@@ -285,7 +285,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 					},
 				},
 			},
@@ -305,7 +305,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 					},
 				},
 			},
@@ -325,7 +325,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 					},
 				},
 			},
@@ -345,7 +345,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 					},
 				},
 			},
@@ -365,7 +365,7 @@ func Test_HandleCitations(t *testing.T) {
 						StartIndex: 6,
 						EndIndex:   9,
 						Text:       "foo",
-						DocIndices: []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+						Sources:    []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 					},
 				},
 			},
@@ -391,7 +391,7 @@ func Test_FindAnElement(t *testing.T) {
 		inputEndElement    string
 		expectedStartIndex int
 		expectedEndIndex   int
-		expectedDocs       []DocIndex
+		expectedDocs       []Source
 		cmd3Citations      bool
 	}{
 		{
@@ -401,7 +401,7 @@ func Test_FindAnElement(t *testing.T) {
 			inputEndElement:    ">",
 			expectedStartIndex: 6,
 			expectedEndIndex:   14,
-			expectedDocs:       []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+			expectedDocs:       []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 		},
 		{
 			name:               "no citation",
@@ -455,7 +455,7 @@ func Test_FindAnElement(t *testing.T) {
 			inputEndElement:    ">",
 			expectedStartIndex: 6,
 			expectedEndIndex:   12,
-			expectedDocs:       []DocIndex{{ToolIndex: 0, ResultIndices: []int{1}}},
+			expectedDocs:       []Source{{ToolCallIndex: 0, ToolResultIndices: []int{1}}},
 		},
 		{
 			name:               "two documents",
@@ -464,7 +464,7 @@ func Test_FindAnElement(t *testing.T) {
 			inputEndElement:    ">",
 			expectedStartIndex: 6,
 			expectedEndIndex:   14,
-			expectedDocs:       []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+			expectedDocs:       []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 		},
 		{
 			name:               "trailing comma",
@@ -473,7 +473,7 @@ func Test_FindAnElement(t *testing.T) {
 			inputEndElement:    ">",
 			expectedStartIndex: 6,
 			expectedEndIndex:   13,
-			expectedDocs:       []DocIndex{{ToolIndex: 0, ResultIndices: []int{2}}},
+			expectedDocs:       []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2}}},
 		},
 		{
 			name:               "incorrect documents",
@@ -482,7 +482,7 @@ func Test_FindAnElement(t *testing.T) {
 			inputEndElement:    ">",
 			expectedStartIndex: 6,
 			expectedEndIndex:   16,
-			expectedDocs:       []DocIndex{{ToolIndex: 0, ResultIndices: []int{2}}},
+			expectedDocs:       []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2}}},
 		},
 		{
 			name:               "loads of stuff between start and end",
@@ -491,7 +491,7 @@ func Test_FindAnElement(t *testing.T) {
 			inputEndElement:    ">",
 			expectedStartIndex: 6,
 			expectedEndIndex:   28,
-			expectedDocs:       []DocIndex{{ToolIndex: 0, ResultIndices: []int{2, 1}}},
+			expectedDocs:       []Source{{ToolCallIndex: 0, ToolResultIndices: []int{2, 1}}},
 		},
 		{
 			name:               "two tools cmd3",
@@ -500,7 +500,7 @@ func Test_FindAnElement(t *testing.T) {
 			inputEndElement:    ">",
 			expectedStartIndex: 11,
 			expectedEndIndex:   30,
-			expectedDocs:       []DocIndex{{ToolIndex: 0, ResultIndices: []int{1, 2}}, {ToolIndex: 1, ResultIndices: []int{0}}},
+			expectedDocs:       []Source{{ToolCallIndex: 0, ToolResultIndices: []int{1, 2}}, {ToolCallIndex: 1, ToolResultIndices: []int{0}}},
 			cmd3Citations:      true,
 		},
 	}

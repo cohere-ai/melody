@@ -111,7 +111,7 @@ func (f *filter) HandleParamValueEndType(str string) ([]FilterOutput, int) {
 	if trim[0] == '}' {
 		// end of the all the parameters - end of the tool
 		f.actionMetaData.mode = toolEnd
-		f.actionMetaData.curToolIndex++
+		f.actionMetaData.curToolCallIndex++
 	} else {
 		// end of the parameter - next is the parameter name
 		f.actionMetaData.mode = paramValueEnd
