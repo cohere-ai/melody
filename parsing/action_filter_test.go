@@ -67,8 +67,8 @@ func Test_ParseActions(t *testing.T) {
 			},
 			expectedRemove: 4,
 			metadata: filterAction{
-				curToolIndex: 0,
-				mode:         toolName,
+				curToolCallIndex: 0,
+				mode:             toolName,
 			},
 		},
 		{
@@ -117,8 +117,8 @@ func Test_ParseActions(t *testing.T) {
 				}},
 			expectedRemove: 7,
 			metadata: filterAction{
-				curToolIndex: 0,
-				mode:         paramName,
+				curToolCallIndex: 0,
+				mode:             paramName,
 			},
 		},
 		{
@@ -134,8 +134,8 @@ func Test_ParseActions(t *testing.T) {
 				}},
 			expectedRemove: 9,
 			metadata: filterAction{
-				curToolIndex: 0,
-				mode:         paramName,
+				curToolCallIndex: 0,
+				mode:             paramName,
 			},
 		},
 		{
@@ -152,9 +152,9 @@ func Test_ParseActions(t *testing.T) {
 				}},
 			expectedRemove: 6,
 			metadata: filterAction{
-				curParamName: "param_name",
-				curToolIndex: 0,
-				mode:         paramValue,
+				curParamName:     "param_name",
+				curToolCallIndex: 0,
+				mode:             paramValue,
 			},
 		},
 		{
@@ -171,9 +171,9 @@ func Test_ParseActions(t *testing.T) {
 				}},
 			expectedRemove: 8,
 			metadata: filterAction{
-				curParamName: "param_name",
-				curToolIndex: 0,
-				mode:         paramValue,
+				curParamName:     "param_name",
+				curToolCallIndex: 0,
+				mode:             paramValue,
 			},
 		},
 		{
@@ -427,7 +427,7 @@ func Test_ParseActions(t *testing.T) {
 			},
 			expectedRemove: 60,
 			metadata: filterAction{
-				curToolIndex:     0,
+				curToolCallIndex: 0,
 				curParamName:     "code",
 				mode:             paramValue,
 				curParamState:    complexType,
@@ -505,8 +505,8 @@ func Test_ParseRawActions(t *testing.T) {
 			},
 			expectedRemove: 4,
 			metadata: filterAction{
-				curToolIndex: 0,
-				mode:         toolName,
+				curToolCallIndex: 0,
+				mode:             toolName,
 			},
 		},
 		{
@@ -538,8 +538,8 @@ func Test_ParseRawActions(t *testing.T) {
 				}},
 			expectedRemove: 7,
 			metadata: filterAction{
-				curToolIndex: 0,
-				mode:         paramName,
+				curToolCallIndex: 0,
+				mode:             paramName,
 			},
 		},
 		{
@@ -555,8 +555,8 @@ func Test_ParseRawActions(t *testing.T) {
 				}},
 			expectedRemove: 9,
 			metadata: filterAction{
-				curToolIndex: 0,
-				mode:         paramName,
+				curToolCallIndex: 0,
+				mode:             paramName,
 			},
 		},
 		{
@@ -573,9 +573,9 @@ func Test_ParseRawActions(t *testing.T) {
 				}},
 			expectedRemove: 6,
 			metadata: filterAction{
-				curParamName: "param_name",
-				curToolIndex: 0,
-				mode:         paramValue,
+				curParamName:     "param_name",
+				curToolCallIndex: 0,
+				mode:             paramValue,
 			},
 		},
 		{
@@ -592,9 +592,9 @@ func Test_ParseRawActions(t *testing.T) {
 				}},
 			expectedRemove: 8,
 			metadata: filterAction{
-				curParamName: "param_name",
-				curToolIndex: 0,
-				mode:         paramValue,
+				curParamName:     "param_name",
+				curToolCallIndex: 0,
+				mode:             paramValue,
 			},
 		},
 		{
@@ -817,7 +817,7 @@ func Test_ParseRawActions(t *testing.T) {
 			},
 			expectedRemove: 60,
 			metadata: filterAction{
-				curToolIndex:     0,
+				curToolCallIndex: 0,
 				curParamName:     "code",
 				mode:             paramValue,
 				curParamState:    complexType,

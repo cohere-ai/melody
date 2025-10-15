@@ -23,9 +23,9 @@ var (
 )
 
 type filterAction struct {
-	mode         actionMode
-	curToolIndex int
-	trimLeft     bool
+	mode             actionMode
+	curToolCallIndex int
+	trimLeft         bool
 
 	// Parameter metadata
 	curParamName     string
@@ -138,7 +138,7 @@ func (f *filter) HandleToolNameEnd(str string) ([]FilterOutput, int) {
 			return nil, 0
 		}
 		f.actionMetaData.mode = toolEnd
-		f.actionMetaData.curToolIndex++
+		f.actionMetaData.curToolCallIndex++
 		f.actionMetaData.curParamName = ""
 		out, rem := f.ParseActions(str[idx:])
 		return out, rem + len(str[:idx])
@@ -169,7 +169,7 @@ func (f *filter) HandleRawParam(str string) ([]FilterOutput, int) {
 	// We have a valid JSON value
 	out := f.sendRawParamChunkWithoutIndentation(str[:idx])
 	f.actionMetaData.paramValueBuffer = ""
-	f.actionMetaData.curToolIndex++
+	f.actionMetaData.curToolCallIndex++
 	f.actionMetaData.mode = toolEnd
 	o, r := f.ParseActions(str[idx:])
 	return append(out, o...), r + len(str[:idx])
@@ -240,7 +240,7 @@ func (f *filter) sendToolCallIDChunk(str string) []FilterOutput {
 	}
 	return []FilterOutput{{
 		ToolCalls: &FilterToolCallDelta{
-			Index: f.actionMetaData.curToolIndex,
+			Index: f.actionMetaData.curToolCallIndex,
 			ID:    str,
 		},
 	}}
@@ -252,7 +252,7 @@ func (f *filter) sendToolNameChunk(str string) []FilterOutput {
 	}
 	return []FilterOutput{{
 		ToolCalls: &FilterToolCallDelta{
-			Index: f.actionMetaData.curToolIndex,
+			Index: f.actionMetaData.curToolCallIndex,
 			Name:  str,
 		},
 	}}
@@ -265,7 +265,7 @@ func (f *filter) sendParamNameChunk(str string) []FilterOutput {
 	f.actionMetaData.curParamName = str
 	return []FilterOutput{{
 		ToolCalls: &FilterToolCallDelta{
-			Index: f.actionMetaData.curToolIndex,
+			Index: f.actionMetaData.curToolCallIndex,
 			ParamDelta: &FilterToolParameter{
 				Name: str,
 			},
@@ -279,7 +279,7 @@ func (f *filter) sendRawParamChunk(str string) []FilterOutput {
 	}
 	return []FilterOutput{{
 		ToolCalls: &FilterToolCallDelta{
-			Index:         f.actionMetaData.curToolIndex,
+			Index:         f.actionMetaData.curToolCallIndex,
 			RawParamDelta: str,
 		},
 	}}
@@ -299,7 +299,7 @@ func (f *filter) sendParamValueChunk(str string) ([]FilterOutput, int) {
 	f.actionMetaData.trimLeft = false
 	return []FilterOutput{{
 		ToolCalls: &FilterToolCallDelta{
-			Index: f.actionMetaData.curToolIndex,
+			Index: f.actionMetaData.curToolCallIndex,
 			ParamDelta: &FilterToolParameter{
 				Name:       f.actionMetaData.curParamName,
 				ValueDelta: trimmedStr,

@@ -88,7 +88,7 @@ func (f *filter) ParseCitations(str string, mode filterMode) (*FilterOutput, int
 			StartIndex: startIndex,
 			EndIndex:   startIndex + utf8.RuneCountInString(citTxt),
 			Text:       citTxt,
-			DocIndices: docsLast,
+			Sources:    docsLast,
 			IsThinking: mode == toolReason,
 		}}
 	// Recurse to find more partial or complete citations
@@ -153,7 +153,7 @@ func (f *filter) getPartialOrMalformedCitationText(startFirstID, endFirstID, sta
 // 1. index of the start -  if -1 then doesn't exist
 // 2. index of the end - if -1 and start > 0 then partial, otherwise whole citation
 // 3. the middle of the element
-func (f *filter) findAnElement(str string, start string, end string, cmd3Citations bool) (int, int, []DocIndex) {
+func (f *filter) findAnElement(str string, start string, end string, cmd3Citations bool) (int, int, []Source) {
 	startID, startFound := findPartial(str, []string{start})
 
 	// No citation present
@@ -177,13 +177,13 @@ func (f *filter) findAnElement(str string, start string, end string, cmd3Citatio
 	// Now we have both "<co: " and ">" so we have a full element e.g. <co: 1,2,3>
 	subString := str[startID+len(start) : startID+1+endID]
 
-	var docIndices []DocIndex
+	var docIndices []Source
 	if cmd3Citations {
 		docIndices = f.convertStringToDocIndices(subString)
 	} else {
 		intIndices := convertStringToIntList(subString)
 		if len(intIndices) != 0 {
-			docIndices = []DocIndex{{ToolIndex: 0, ResultIndices: intIndices}} // cmd < 3 always sets tool_index to 0 since it is not returned from the model
+			docIndices = []Source{{ToolCallIndex: 0, ToolResultIndices: intIndices}} // cmd < 3 always sets tool_index to 0 since it is not returned from the model
 		}
 	}
 
@@ -203,10 +203,10 @@ func convertStringToIntList(s string) []int {
 	return intArr
 }
 
-func (f *filter) convertStringToDocIndices(s string) []DocIndex {
+func (f *filter) convertStringToDocIndices(s string) []Source {
 	stringSplits := strings.Split(strings.TrimSpace(s), "]")
 	// TODO(): Handle errors in filter stream
-	docIndices := []DocIndex{}
+	docIndices := []Source{}
 	for _, cit := range stringSplits[:len(stringSplits)-1] {
 		citSplits := strings.Split(strings.TrimLeft(cit, ","), ":")
 		if len(citSplits) != 2 {
@@ -233,7 +233,7 @@ func (f *filter) convertStringToDocIndices(s string) []DocIndex {
 			resultIndices = append(resultIndices, resultIdx)
 		}
 
-		docIndex := DocIndex{ToolIndex: toolIndex, ResultIndices: resultIndices}
+		docIndex := Source{ToolCallIndex: toolIndex, ToolResultIndices: resultIndices}
 		docIndices = append(docIndices, docIndex)
 	}
 	return docIndices

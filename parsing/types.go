@@ -61,17 +61,17 @@ type FilterCitation struct {
 	StartIndex int
 	// The end index of the citation in the larger generation.
 	// E.g. "Hello world" where the citation is "world" would have an EndIndex of 10
-	EndIndex   int
-	Text       string
-	DocIndices []DocIndex
+	EndIndex int
+	Text     string
+	Sources  []Source
 
 	IsThinking bool
 }
 
-// DocIndex indicates which tool and which results from that tool are being cited
-type DocIndex struct {
-	ToolIndex     int
-	ResultIndices []int
+// Source indicates which tool call and which tool results from that tool are being cited
+type Source struct {
+	ToolCallIndex     int
+	ToolResultIndices []int
 }
 
 type filterMode struct{ e uint }
