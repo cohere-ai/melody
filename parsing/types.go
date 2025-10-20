@@ -1,4 +1,3 @@
-// Package parsing contains logic to parse model generations for various Cohere models
 package parsing
 
 // Decoder represents a basic tokenizer interface required for the filter to accept tokens.

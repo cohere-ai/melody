@@ -1,4 +1,3 @@
-// Package cmd3 provides a renderer for the cmd3 prompt template.
 package cmd3
 
 import (

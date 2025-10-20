@@ -1,4 +1,3 @@
-// Package cmd4 provides a renderer for the Cmd4 model.
 package cmd4
 
 import (

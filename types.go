@@ -1,4 +1,3 @@
-// Package melody is a templating and parsing library for Cohere models
 package melody
 
 import (

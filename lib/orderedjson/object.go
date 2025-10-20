@@ -1,5 +1,7 @@
 package orderedjson
 
+import "iter"
+
 type Pair struct {
 	Key   string
 	Value any
@@ -31,17 +33,17 @@ func New(opts ...InitOption) Object {
 	return *obj
 }
 
-// Pairs returns an iterator, enable when we upgrade to Go 1.23
-// func (o *Object) Pairs() iter.Seq2[string, any] {
-//	return func(yield func(string, any) bool) {
-//		for _, key := range o.order {
-//			pair := o.pairs[key]
-//			if !yield(key, pair.Value) {
-//				return
-//			}
-//		}
-//	}
-// }
+// Pairs returns an iterator
+func (o *Object) Pairs() iter.Seq2[string, any] {
+	return func(yield func(string, any) bool) {
+		for _, key := range o.order {
+			pair := o.pairs[key]
+			if !yield(key, pair.Value) {
+				return
+			}
+		}
+	}
+}
 
 func (o *Object) Keys() []string {
 	return o.order
