@@ -1,3 +1,6 @@
+# github.com/buger/jsonparser v1.1.1
+## explicit; go 1.13
+github.com/buger/jsonparser
 # github.com/cohere-ai/tokenizers v0.9.1
 ## explicit; go 1.18
 github.com/cohere-ai/tokenizers
@@ -6,6 +9,22 @@ github.com/cohere-ai/tokenizers
 github.com/davecgh/go-spew/spew
 # github.com/kr/pretty v0.1.0
 ## explicit
+# github.com/mailru/easyjson v0.9.1
+## explicit; go 1.20
+github.com/mailru/easyjson/buffer
+github.com/mailru/easyjson/jwriter
+# github.com/osteele/liquid v1.7.0
+## explicit; go 1.23
+github.com/osteele/liquid
+github.com/osteele/liquid/expressions
+github.com/osteele/liquid/filters
+github.com/osteele/liquid/parser
+github.com/osteele/liquid/render
+github.com/osteele/liquid/tags
+github.com/osteele/liquid/values
+# github.com/osteele/tuesday v1.0.3
+## explicit
+github.com/osteele/tuesday
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
@@ -38,6 +57,9 @@ go.uber.org/zap/zaptest
 golang.org/x/exp/constraints
 # gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 ## explicit
+# gopkg.in/yaml.v2 v2.4.0
+## explicit; go 1.15
+gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
