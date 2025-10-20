@@ -108,6 +108,7 @@ type templateMessage struct {
 func messageToMap(ms []templateMessage) []map[string]any {
 	mapped := make([]map[string]any, len(ms))
 	for i, m := range ms {
+		mapped[i] = make(map[string]any)
 		maps.Copy(mapped[i], SafeLiquidSubstitutions(m.AdditionalFields))
 		maps.Copy(mapped[i], map[string]any{
 			"role":         m.Role,

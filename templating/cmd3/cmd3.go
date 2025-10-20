@@ -1,12 +1,14 @@
 package cmd3
 
 import (
+	_ "embed"
 	"maps"
 
 	"github.com/osteele/liquid"
 
 	"github.com/cohere-ai/melody"
 	"github.com/cohere-ai/melody/templating"
+	"github.com/cohere-ai/melody/templating/prompts"
 )
 
 var (
@@ -14,7 +16,10 @@ var (
 )
 
 func Render(m []melody.Message, os ...Option) (string, error) {
-	r := options{escapedSpecialTokens: make(map[string]string)}
+	r := options{
+		escapedSpecialTokens: make(map[string]string),
+		template:             prompts.Command3,
+	}
 	for _, o := range os {
 		err := o(&r)
 		if err != nil {
