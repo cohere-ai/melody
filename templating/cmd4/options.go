@@ -6,7 +6,6 @@ import (
 	"github.com/cohere-ai/melody"
 )
 
-// Add fields to options for each parameter
 type options struct {
 	template string
 
