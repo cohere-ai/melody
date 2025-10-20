@@ -6,3 +6,14 @@ install-tokenizers:
 	@curl -fsSL https://github.com/cohere-ai/tokenizers/releases/download/${TOKENIZERS_VERSION}/libtokenizers.${UNAME}-${ARCH}.tar.gz | tar xvz
 	@mv libtokenizers.a vendor/github.com/cohere-ai/tokenizers/
 	@echo "-- installed libtokenizers.a"
+
+check-install-tokenizers:
+	@if [ ! -e "vendor/github.com/cohere-ai/tokenizers/libtokenizers.a" ]; then \
+  		$(MAKE) install-tokenizers; \
+	fi;
+
+lint:
+	golangci-lint run --config=.golangci.yaml .
+
+test: check-install-tokenizers
+	go test ./...
