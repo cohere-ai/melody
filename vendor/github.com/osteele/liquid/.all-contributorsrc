@@ -1,0 +1,103 @@
+{
+  "projectName": "liquid",
+  "projectOwner": "osteele",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": true,
+  "contributors": [
+    {
+      "login": "osteele",
+      "name": "Oliver Steele",
+      "avatar_url": "https://avatars2.githubusercontent.com/u/674?v=4",
+      "profile": "https://osteele.com/",
+      "contributions": [
+        "code",
+        "doc",
+        "ideas",
+        "infra",
+        "review",
+        "test"
+      ]
+    },
+    {
+      "login": "thessem",
+      "name": "James Littlejohn",
+      "avatar_url": "https://avatars0.githubusercontent.com/u/973593?v=4",
+      "profile": "https://github.com/thessem",
+      "contributions": [
+        "code",
+        "doc",
+        "test"
+      ]
+    },
+    {
+      "login": "nsf",
+      "name": "nsf",
+      "avatar_url": "https://avatars2.githubusercontent.com/u/12567?v=4",
+      "profile": "http://nosmileface.ru",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "Eun",
+      "name": "Tobias Salzmann",
+      "avatar_url": "https://avatars.githubusercontent.com/u/796084?v=4",
+      "profile": "https://tobias.salzmann.berlin/",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "bendoerr",
+      "name": "Ben Doerr",
+      "avatar_url": "https://avatars.githubusercontent.com/u/253068?v=4",
+      "profile": "https://github.com/bendoerr",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "danog",
+      "name": "Daniil Gentili",
+      "avatar_url": "https://avatars.githubusercontent.com/u/7339644?v=4",
+      "profile": "https://daniil.it/",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "carolynvs",
+      "name": "Carolyn Van Slyck",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1368985?v=4",
+      "profile": "https://github.com/carolynvs",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "kke",
+      "name": "Kimmo Lehto",
+      "avatar_url": "https://avatars.githubusercontent.com/u/224971?v=4",
+      "profile": "https://github.com/kke",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "heyvito",
+      "name": "Victor \"Vito\" Gama",
+      "avatar_url": "https://avatars.githubusercontent.com/u/77198?v=4",
+      "profile": "https://vito.io/",
+      "contributions": [
+        "code"
+      ]
+    }
+  ],
+  "commitConvention": "none"
+}

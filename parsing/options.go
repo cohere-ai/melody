@@ -139,19 +139,19 @@ func HandleLlama() FilterOption {
 	}
 }
 
-func StreamNonGroundedAnswer() FilterOption { //nolint:revive
+func StreamNonGroundedAnswer() FilterOption {
 	return func(f *filter) {
 		f.streamNonGroundedAnswer = true
 	}
 }
 
-func StreamToolActions() FilterOption { //nolint:revive
+func StreamToolActions() FilterOption {
 	return func(f *filter) {
 		f.streamToolActions = true
 	}
 }
 
-func StreamProcessedParams() FilterOption { //nolint:revive
+func StreamProcessedParams() FilterOption {
 	return func(f *filter) {
 		f.streamProcessedParams = true
 	}
