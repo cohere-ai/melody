@@ -1,4 +1,4 @@
-package cmd3
+package cmd4
 
 import (
 	"fmt"
@@ -11,7 +11,10 @@ import (
 	"github.com/cohere-ai/melody"
 )
 
-func TestCmd3(t *testing.T) {
+func ptr[T any](val T) *T {
+	return &val
+}
+func TestCmd4(t *testing.T) {
 	tests := []struct {
 		name     string
 		messages []melody.Message
@@ -22,9 +25,7 @@ func TestCmd3(t *testing.T) {
 			messages: []melody.Message{
 				{Role: melody.UserRole, Content: []melody.Content{{Type: melody.TextContentType, Text: "Hello."}}},
 			},
-			options: []Option{
-				WithSkipPreamble(true),
-			},
+			options: []Option{},
 		},
 	}
 	for _, tt := range tests {
