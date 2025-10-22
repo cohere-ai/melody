@@ -2,22 +2,17 @@
 package templating
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/cohere-ai/melody"
 	"github.com/cohere-ai/melody/lib/orderedjson"
 )
-
-const DocumentIDKey = "id"
-const ExcludesFieldKey = "_excludes"
 
 // SafeLiquidSubstitutions converts any null pointer to a null interface.
 // An interface = nil is not the same as an interface = variable_of_type_pointer_that_is_nil
@@ -172,9 +167,10 @@ func MessagesToTemplate(messages []melody.Message, docsPresent bool, specialToke
 
 			toolCallTemplateID, ok := toolCallIDToPromptID[toolCallID]
 			if !ok {
-				// Really this should be an error but v1 tool use didn't enforce this so we have to create a prompt id
+				// Really this should be an error but v1 tool use didn't enforce this so we have to create a prompt id.
 				// return nil, fmt.Errorf("tool message[%d] has unknown tool_call_id: %s", i, toolCallID)
-				toolCallID = strconv.Itoa(runningToolCallIdx)
+				toolCallTemplateID = runningToolCallIdx
+				toolCallIDToPromptID[toolCallID] = runningToolCallIdx
 				runningToolCallIdx++
 			}
 
@@ -301,46 +297,6 @@ func toolCallToTemplate(tc melody.ToolCall, tcIndex int) (string, error) {
 	}
 
 	return AddSpacesToJSONEncoding(string(toolCallRendered)), nil
-}
-
-func DocumentMapToString(d map[string]any) (string, error) {
-	// Build exclude set of document
-	excludeSet := map[string]struct{}{DocumentIDKey: {}}
-	excludesField, ok := d[ExcludesFieldKey]
-	if ok {
-		excludes, ok := excludesField.([]string)
-		if ok {
-			for _, e := range excludes {
-				excludeSet[e] = struct{}{}
-			}
-		}
-	}
-	// sort keys
-	var keys []string
-	for k := range d {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	// Exclude fields
-	fieldsToRender := map[string]any{}
-	for _, k := range keys {
-		if _, exclude := excludeSet[k]; !exclude {
-			fieldsToRender[k] = d[k]
-		}
-	}
-	// Render
-	buf := new(bytes.Buffer)
-	enc := json.NewEncoder(buf)
-	enc.SetEscapeHTML(false)
-	err := enc.Encode(&fieldsToRender)
-	if err != nil {
-		return "", err
-	}
-	docJSON := buf.String()
-	// Encode adds newline by default, so must be removed before template rendering
-	docJSON = strings.TrimRight(docJSON, "\n")
-	return AddSpacesToJSONEncoding(docJSON), nil
 }
 
 func ToolsToTemplate(tools []melody.Tool) ([]map[string]any, error) {
