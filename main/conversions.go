@@ -18,7 +18,7 @@ func roleToObject(Py py.Py, o any) (py.Object, error) {
 	if r, ok := o.(melody.Role); ok {
 		return Py.GoToObject(r.String())
 	}
-	return py.None, nil
+	return py.None, fmt.Errorf("trying to convert non-Role Go Object to a Python Role")
 }
 func roleFromObject(Py py.Py, o py.Object, a any) error {
 	v := a.(*melody.Role)
@@ -44,7 +44,7 @@ func contentTypeToObject(Py py.Py, o any) (py.Object, error) {
 	if ct, ok := o.(melody.ContentType); ok {
 		return Py.GoToObject(ct.String())
 	}
-	return py.None, nil
+	return py.None, fmt.Errorf("trying to convert non-ContentType Go Object to a Python ContentType")
 }
 func contentTypeFromObject(Py py.Py, o py.Object, a any) error {
 	v := a.(*melody.ContentType)
@@ -70,7 +70,7 @@ func citationQualityToObject(Py py.Py, o any) (py.Object, error) {
 	if cq, ok := o.(melody.CitationQuality); ok {
 		return Py.GoToObject(cq.String())
 	}
-	return py.None, nil
+	return py.None, fmt.Errorf("trying to convert non-CitationQuality Go Object to a Python CitationQuality")
 }
 func citationQualityFromObject(Py py.Py, o py.Object, a any) error {
 	v := a.(*melody.CitationQuality)
@@ -96,7 +96,7 @@ func groundingToObject(Py py.Py, o any) (py.Object, error) {
 	if g, ok := o.(melody.Grounding); ok {
 		return Py.GoToObject(g.String())
 	}
-	return py.None, nil
+	return py.None, fmt.Errorf("trying to convert non-Grounding Go Object to a Python Grounding")
 }
 func groundingFromObject(Py py.Py, o py.Object, a any) error {
 	v := a.(*melody.Grounding)
@@ -122,7 +122,7 @@ func safetyModeToObject(Py py.Py, o any) (py.Object, error) {
 	if sm, ok := o.(melody.SafetyMode); ok {
 		return Py.GoToObject(sm.String())
 	}
-	return py.None, nil
+	return py.None, fmt.Errorf("trying to convert non-SafetyMode Go Object to a Python SafetyMode")
 }
 func safetyModeFromObject(Py py.Py, o py.Object, a any) error {
 	v := a.(*melody.SafetyMode)
@@ -148,7 +148,7 @@ func reasoningTypeToObject(Py py.Py, o any) (py.Object, error) {
 	if rt, ok := o.(melody.ReasoningType); ok {
 		return Py.GoToObject(rt.String())
 	}
-	return py.None, nil
+	return py.None, fmt.Errorf("trying to convert non-ReasoningType Go Object to a Python ReasoningType")
 }
 func reasoningTypeFromObject(Py py.Py, o py.Object, a any) error {
 	v := a.(*melody.ReasoningType)

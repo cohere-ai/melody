@@ -10,7 +10,7 @@ type options struct {
 	template string
 
 	devInstruction           *string
-	documents                []melody.Document
+	documents                []string
 	availableTools           []melody.Tool
 	safetyMode               melody.SafetyMode
 	citationQuality          melody.CitationQuality
@@ -38,7 +38,7 @@ func WithDeveloperInstruction(devInstruction *string) Option {
 	}
 }
 
-func WithDocuments(documents []melody.Document) Option {
+func WithDocuments(documents []string) Option {
 	return func(c *options) error {
 		c.documents = documents
 		return nil

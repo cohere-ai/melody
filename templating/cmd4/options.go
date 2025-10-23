@@ -11,7 +11,7 @@ type options struct {
 
 	devInstruction           *string
 	platformInstruction      string
-	documents                []melody.Document
+	documents                []string
 	availableTools           []melody.Tool
 	grounding                melody.Grounding
 	responsePrefix           string
@@ -43,7 +43,7 @@ func WithPlatformInstruction(platformInstruction string) Option {
 	}
 }
 
-func WithDocuments(documents []melody.Document) Option {
+func WithDocuments(documents []string) Option {
 	return func(c *options) error {
 		c.documents = documents
 		return nil

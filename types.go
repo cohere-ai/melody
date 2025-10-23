@@ -20,8 +20,6 @@ type Encoding interface {
 	ProcessToken(int64) error
 }
 
-type Document = string
-
 type Tool struct {
 	Name        string
 	Description string
