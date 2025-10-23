@@ -18,5 +18,5 @@ lint:
 test: check-install-tokenizers
 	go test ./...
 
-build-pygolo:
-	go build -tags py_ext -buildmode=c-shared -o melody.so main/main.go
+build-python:
+	go build -tags py_ext -buildmode=c-shared -o melody.so main/*.go
