@@ -1,0 +1,15 @@
+__pycache__
+
+.go-version
+.hypothesis
+.python-version
+
+examples/console
+examples/hello
+examples/info
+
+test/ext.h
+test/ext.so
+test/ext.pyd
+
+test.test

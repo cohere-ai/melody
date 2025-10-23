@@ -1,0 +1,331 @@
+stages:
+  - test
+  - lint
+  - maintenance
+
+variables:
+  PYTHON: python3
+
+.test:
+  stage: test
+  script:
+    - export TMP_DIR=$(mktemp -d $CI_BUILDS_DIR/tmp-XXXXXXXX | tee tmp_dir.txt)
+    - export GOPATH=$TMP_DIR/go
+    - export GOCACHE=$GOPATH/.cache
+    - mkdir -p $GOPATH/src/gitlab.com/pygolo
+    - ln -s $PWD $GOPATH/src/gitlab.com/pygolo/py
+    - cd $GOPATH/src/gitlab.com/pygolo/py
+    - export PYENV_ROOT=$TMP_DIR/pyenv
+    - export PATH=$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH
+    - 'if [ -n "$PYENV_VER" ]; then
+        curl https://pyenv.run | bash;
+        pyenv --version;
+        pyenv install -g $PYENV_VER;
+        pyenv local $PYENV_VER;
+        pip install -r requirements.txt;
+      fi'
+    - command -v $PYTHON
+    - command -v go
+    - '[ -n "$PYENV_VER" ] || make test-matrix-check'
+    - '(cd $HOME && make -C $GOPATH/src/gitlab.com/pygolo/py pygolo-diags PWD=$(pwd))'
+    - 'make test-embed V=1 || ([ -n "$(command -v gdb)" ] && make test-embed-debug; false)'
+    - '[ "$SKIP_TEST_EXTEND" = yes ] || make test-extend V=1'
+    - '$PYTHON -c "import sys; sys.exit(0 if sys.version_info < (3, 9) else 1)" || make benchmark-embed V=1 GOFLAGS=-count=3'
+    - '[ "$SKIP_TEST_EXTEND" = yes ] || make benchmark-extend V=1'
+    - make examples RUN=1
+    - '(cd $HOME && make -C $GOPATH/src/gitlab.com/pygolo/py pygolo-diags PWD=$(pwd))'
+  after_script:
+    - export TMP_DIR=$(cat tmp_dir.txt)
+    - rm -rf $TMP_DIR tmp_dir.txt
+
+.apk:
+  before_script:
+    - apk add --update --no-cache build-base python3-dev py3-pip go make pkgconfig git gdb
+
+.apt:
+  variables:
+    DEBIAN_FRONTEND: noninteractive
+  before_script:
+    - apt-get update
+    - apt-get install -y python3-dev python3-pytest python3-pytest-benchmark python3-hypothesis golang make pkg-config git curl gdb libc6-dbg python3-dbg
+    - '[ -z "$PYENV_VER" ] || apt-get install -y patch zlib1g-dev libbz2-dev liblzma-dev libssl-dev'
+
+.dnf:
+  before_script:
+    - dnf -y install python3-devel go make pkg-config git gdb
+    - dnf -y debuginfo-install glibc python3-libs
+    - '[ -z "$PYENV_VER" ] || dnf -y install patch zlib-devel bzip2-devel xz-devel openssl-devel'
+
+.zypper:
+  before_script:
+    - zypper install -y python3-devel python3-pip go make pkg-config git awk tar gzip
+    - $PYTHON -m pip install -r requirements.txt
+    - '[ -z "$PYENV_VER" ] || zypper install -y patch zlib bzip2 xz-devel libopenssl-devel'
+
+alpine:
+  extends:
+    - .apk
+    - .test
+  image: $ARCH/alpine:$VERSION
+  parallel:
+    matrix:
+      - VERSION: "3.20"
+        ARCH: riscv64
+      - VERSION: "3.19"
+        ARCH: amd64
+        PYGOLO_FLAGS: -race
+      - VERSION: "3.18"
+        ARCH: amd64
+        PYGOLO_FLAGS: -race
+      - VERSION: "3.17"
+        ARCH: ppc64le
+      - VERSION: "3.16"
+        ARCH: arm64v8
+      - VERSION: "3.15"
+        ARCH: arm32v7
+  variables:
+    TEST_MATRIX_NAME: "Alpine $VERSION"
+    # https://github.com/golang/go/issues/13492
+    SKIP_TEST_EXTEND: "yes"
+
+debian:
+  extends:
+    - .apt
+    - .test
+  image: debian:$VERSION
+  parallel:
+    matrix:
+      - VERSION: 12
+      - VERSION: 11
+      - VERSION: 10
+      - VERSION: 11
+        PYENV_VER: "3.13.0rc1"
+      - VERSION: 11
+        PYENV_VER: "3.13.0rc1"
+        PYTHON_CONFIGURE_OPTS: "--disable-gil"
+  variables:
+    TEST_MATRIX_NAME: "Debian $VERSION"
+    PYGOLO_FLAGS_EMBED: -race
+
+fedora:
+  extends:
+    - .dnf
+    - .test
+  image: fedora:$VERSION
+  parallel:
+    matrix:
+      - VERSION: 40
+      - VERSION: 39
+      - VERSION: 38
+      - VERSION: 37
+      - VERSION: 36
+      - VERSION: 35
+  variables:
+    TEST_MATRIX_NAME: "Fedora $VERSION"
+    PYGOLO_FLAGS_EMBED: -race
+  before_script:
+    - !reference [.dnf, before_script]
+    - dnf -y install python3-pytest python3-pytest-benchmark python3-hypothesis
+
+freebsd:
+  extends: .test
+  tags:
+    - freebsd-$VERSION
+    - pygolo
+  parallel:
+    matrix:
+      - VERSION: 14
+  variables:
+    TEST_MATRIX_NAME: "FreeBSD $VERSION"
+
+macos:
+  extends: .test
+  image: macos-$VERSION-xcode-$XCODE
+  tags:
+    - saas-macos-medium-m1
+  parallel:
+    matrix:
+      - VERSION: 14
+        XCODE: 15
+      - VERSION: 13
+        XCODE: 14
+      - VERSION: 12
+        XCODE: 14
+      - VERSION: 12
+        XCODE: 14
+        GOARCH: amd64
+        PYTHON: arch -x86_64 /usr/bin/python3
+      - VERSION: 12
+        XCODE: 14
+        PYENV_VER: 3
+        PYTHON: python3
+  variables:
+    TEST_MATRIX_NAME: "macOS $VERSION xc-$XCODE"
+    PYTHON: /usr/bin/python3
+    PYGOLO_FLAGS: -race
+  before_script:
+    - brew install pkg-config
+    - $PYTHON -m pip install -r requirements.txt
+
+netbsd:
+  extends: .test
+  tags:
+    - netbsd-$VERSION
+    - pygolo
+  parallel:
+    matrix:
+      - VERSION: 10
+  variables:
+    TEST_MATRIX_NAME: "NetBSD $VERSION"
+    SKIP_TEST_EXTEND: "yes"
+    PYGOLO_FLAGS: -race
+
+openbsd:
+  extends: .test
+  tags:
+    - openbsd-$VERSION
+    - pygolo
+  parallel:
+    matrix:
+      - VERSION: 7
+  variables:
+    TEST_MATRIX_NAME: "OpenBSD $VERSION"
+    SKIP_TEST_EXTEND: "yes"
+    GDB: "gdb"
+
+opensuse:
+  extends:
+    - .zypper
+    - .test
+  image: opensuse/leap:$VERSION
+  parallel:
+    matrix:
+      - VERSION: 15
+  variables:
+    TEST_MATRIX_NAME: "openSUSE Leap $VERSION"
+  before_script:
+    - !reference [.zypper, before_script]
+    - zypper modifyrepo -e repo-debug
+    - zypper install -y gdb glibc-debuginfo python3-base-debuginfo python3-debuginfo libpython3_6m1_0-debuginfo
+
+rhel:
+  extends:
+    - .dnf
+    - .test
+  image: redhat/$BASE_IMG$VERSION
+  parallel:
+    matrix:
+      - BASE_IMG: ubi
+        VERSION: 9
+      - BASE_IMG: ubi
+        VERSION: 8
+  variables:
+    TEST_MATRIX_NAME: "RHEL UBI $VERSION"
+    PYGOLO_FLAGS_EMBED: -race
+  before_script:
+    - !reference [.dnf, before_script]
+    - $PYTHON -m pip install -r requirements.txt
+
+sle:
+  extends:
+    - .zypper
+    - .test
+  image: registry.suse.com/bci/$BASE_IMG:$VERSION
+  parallel:
+    matrix:
+      - BASE_IMG: bci-base
+        VERSION: "15.4"
+      - BASE_IMG: bci-base
+        VERSION: "15.4"
+        PYENV_VER: "3.6"
+  variables:
+    TEST_MATRIX_NAME: "SLE BCI $VERSION"
+
+ubuntu:
+  extends:
+    - .apt
+    - .test
+  image: ubuntu:$VERSION
+  parallel:
+    matrix:
+      - VERSION: "24.04"
+      - VERSION: "22.04"
+      - VERSION: "20.04"
+      - VERSION: "18.04"
+  variables:
+    TEST_MATRIX_NAME: "Ubuntu $VERSION"
+    PYGOLO_FLAGS_EMBED: -race
+
+windows:
+  tags:
+    - saas-windows-medium-amd64
+  parallel:
+    matrix:
+      - TOOLCHAIN: "gcc-msys64-ucrt"
+      - TOOLCHAIN: "llvm-mingw-ucrt"
+  before_script:
+    - wget.exe -nv -O msys2.exe "$env:MSYS2_URL"
+    - ./msys2.exe -y -oC:\
+    - Remove-Item msys2.exe
+    - C:/msys64/usr/bin/bash -lc 'pacman --sync --refresh --noconfirm git make pkg-config unzip'
+    - C:/msys64/usr/bin/bash -lc 'if [ "$TOOLCHAIN" == "gcc-msys64-ucrt" ]; then pacman --sync --noconfirm mingw-w64-ucrt-x86_64-gcc; fi'
+    - C:/msys64/usr/bin/bash -lc 'if [ "$TOOLCHAIN" == "llvm-mingw-ucrt" ]; then curl -L -o $TOOLCHAIN.zip $LLVM_MINGW_UCRT_URL && unzip -q $TOOLCHAIN.zip -d /$TOOLCHAIN; fi'
+    - nuget install python -Version 3.12.3 -ExcludeVersion -OutputDirectory C:\
+    - C:/python/tools/python -m pip install -r requirements.txt
+  script:
+    - 'if ( $env:TOOLCHAIN -like "llvm-mingw-*" ) { $env:Path += ";" + (Resolve-Path C:/msys64/$env:TOOLCHAIN/*/bin).Path }'
+    - $env:Path += ";C:/python/tools;C:/msys64/usr/bin;C:/msys64/ucrt64/bin"
+    - $env:PKG_CONFIG_PATH += ";$PWD"
+    - make pkg-config
+    - make test-matrix-check
+    - make pygolo-diags PWD="$PWD"
+    - make test V=1
+    - make benchmark-embed V=1 GOFLAGS=-count=3
+    - make benchmark-extend V=1
+    - make examples RUN=1
+    - make pygolo-diags PWD="$PWD"
+  variables:
+    TEST_MATRIX_NAME: "Windows"
+    PYTHON: "python"
+    MSYSTEM: "UCRT64"
+    MSYS2_URL: "https://github.com/msys2/msys2-installer/releases/download/2024-01-13/msys2-base-x86_64-20240113.sfx.exe"
+    LLVM_MINGW_UCRT_URL: "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt-x86_64.zip"
+    PYGOLO_FLAGS_EMBED: -race
+
+code-lint:
+  stage: lint
+  extends: .apk
+  image: alpine:latest
+  script:
+    - python3 -m venv .venv
+    - make lint-prereq
+    - make lint
+  variables:
+    PYTHON: .venv/bin/python3
+
+license-check:
+  stage: lint
+  script:
+    - make license-check
+
+spell-check:
+  stage: lint
+  image: alpine:latest
+  script:
+    - apk add --update --no-cache git hunspell make
+    - wget -nv
+        "https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/en_GB.aff"
+        "https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/en_GB.dic"
+        "https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/en_US.aff"
+        "https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/en_US.dic"
+    - make spell-check CHECK_ONLY=1
+
+delete-old-pipelines:
+  stage: maintenance
+  image: python:3
+  rules:
+    - if: $OLD_PIPELINE_WEEKS != null
+      when: always
+  script:
+    - python3 -m pip install python-gitlab pyyaml
+    - ./scripts/delete-old-pipelines.py $CI_PROJECT_ID --token=$OLD_PIPELINE_TOKEN --weeks=$OLD_PIPELINE_WEEKS

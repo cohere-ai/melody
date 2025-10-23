@@ -9,6 +9,7 @@ require (
 	github.com/osteele/liquid v1.7.0
 	github.com/stretchr/testify v1.11.1
 	github.com/x448/float16 v0.8.4
+	gitlab.com/pygolo/py v0.3.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b
 )

@@ -1,0 +1,4 @@
+comment on exported var Exc_ArithmeticError should be of the form
+don't use underscores in Go names
+exported var Exc_.* should have comment or be unexported
+func parameter o_ should be o
