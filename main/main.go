@@ -9,22 +9,12 @@ import (
 	"github.com/cohere-ai/melody"
 )
 
-func Test(r melody.Role) int {
-	if r == melody.UserRole {
-		return 1
-	}
-	return 0
-}
-
 func myext(Py py.Py, m py.Object) error {
-	// here goes the extension initialization code
+	// Doc string
 	if err := Py.Module_SetDocString(m, "Melody provides templating and parsing for Cohere models."); err != nil {
 		return err
 	}
 	// Register funcs
-	if err := Py.Object_SetAttr(m, "Test", Test); err != nil {
-		return err
-	}
 
 	// Register Structs
 	if err := Py.GoRegisterStruct(melody.Message{}); err != nil {
@@ -35,11 +25,27 @@ func myext(Py py.Py, m py.Object) error {
 		return err
 	}
 
+	// Register Conversions for enums
 	if err := py.GoRegisterConversions(roleConversion); err != nil {
 		return err
 	}
+	if err := py.GoRegisterConversions(contentTypeConversion); err != nil {
+		return err
+	}
+	if err := py.GoRegisterConversions(citationQualityConversion); err != nil {
+		return err
+	}
+	if err := py.GoRegisterConversions(groundingConversion); err != nil {
+		return err
+	}
+	if err := py.GoRegisterConversions(safetyModeConversion); err != nil {
+		return err
+	}
+	if err := py.GoRegisterConversions(reasoningTypeConversion); err != nil {
+		return err
+	}
 
-	/* Register Enums */
+	// Register enums
 	if err := Py.Object_SetAttr(m, "UserRole", melody.UserRole); err != nil {
 		return err
 	}
@@ -52,42 +58,42 @@ func myext(Py py.Py, m py.Object) error {
 	if err := Py.Object_SetAttr(m, "SystemRole", melody.SystemRole); err != nil {
 		return err
 	}
-	//if err := Py.Object_SetAttr(m, "TextContentType", melody.TextContentType); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "ThinkingContentType", melody.ThinkingContentType); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "ImageContentType", melody.ImageContentType); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "OnCitationQuality", melody.OnCitationQuality); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "OffCitationQuality", melody.OffCitationQuality); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "EnabledGrounding", melody.EnabledGrounding); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "DisabledGrounding", melody.DisabledGrounding); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "NoneSafetyMode", melody.NoneSafetyMode); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "StrictSafetyMode", melody.StrictSafetyMode); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "ContextualSafetyMode", melody.ContextualSafetyMode); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "EnabledReasoningType", melody.EnabledReasoningType); err != nil {
-	//	return err
-	//}
-	//if err := Py.Object_SetAttr(m, "DisabledReasoningType", melody.DisabledReasoningType); err != nil {
-	//	return err
-	//}
+	if err := Py.Object_SetAttr(m, "TextContentType", melody.TextContentType); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "ThinkingContentType", melody.ThinkingContentType); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "ImageContentType", melody.ImageContentType); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "OnCitationQuality", melody.OnCitationQuality); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "OffCitationQuality", melody.OffCitationQuality); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "EnabledGrounding", melody.EnabledGrounding); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "DisabledGrounding", melody.DisabledGrounding); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "NoneSafetyMode", melody.NoneSafetyMode); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "StrictSafetyMode", melody.StrictSafetyMode); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "ContextualSafetyMode", melody.ContextualSafetyMode); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "EnabledReasoningType", melody.EnabledReasoningType); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "DisabledReasoningType", melody.DisabledReasoningType); err != nil {
+		return err
+	}
 	return nil
 }
 
