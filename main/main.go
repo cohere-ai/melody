@@ -29,8 +29,8 @@ func myext(Py py.Py, m py.Object) error {
 	return nil
 }
 
-//export PyInit_myext
-func PyInit_myext() unsafe.Pointer {
+//export PyInit_melody
+func PyInit_melody() unsafe.Pointer {
 	return py.GoExtend(myext)
 }
 
