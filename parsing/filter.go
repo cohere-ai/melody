@@ -13,7 +13,7 @@ import (
 // Filter is the interface used to parse the output of a cohere model
 type Filter interface {
 	Write(token int64, likelihood *float32) ([]FilterOutput, error)
-	WriteDecoded(decodedToken string) []FilterOutput
+	WriteDecoded(decodedToken string, prob TokenIDsWithLogProb) []FilterOutput
 	FlushPartials() []FilterOutput
 	GetRawTokens() []int64
 }
@@ -182,8 +182,8 @@ func (f *filter) Write(token int64, tokenLogProb *float32) ([]FilterOutput, erro
 	}
 	return f.writeText(t.Text, t.Logprobs), nil
 }
-func (f *filter) WriteDecoded(decodedToken string) []FilterOutput {
-	return f.writeText([]byte(decodedToken), TokenIDsWithLogProb{TokenIDs: []int64{}, Logprobs: []float32{}}) // no logprobs for decoded tokens
+func (f *filter) WriteDecoded(decodedToken string, l TokenIDsWithLogProb) []FilterOutput {
+	return f.writeText([]byte(decodedToken), l)
 }
 
 func (f *filter) writeText(text []byte, logprobs TokenIDsWithLogProb) (out []FilterOutput) {

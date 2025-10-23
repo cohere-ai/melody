@@ -8,7 +8,7 @@ import (
 type StreamFilter interface {
 	Read() <-chan FilterOutput
 	Write(token int64, likelihood *float32) error
-	WriteDecoded(decodedToken string)
+	WriteDecoded(decodedToken string, prob TokenIDsWithLogProb)
 	Close()
 	GetRawTokens() []int64
 }
@@ -64,9 +64,10 @@ func (s *streamFilter) Write(token int64, likelihood *float32) error {
 	return nil
 }
 
-func (s *streamFilter) WriteDecoded(decodedToken string) {
+func (s *streamFilter) WriteDecoded(decodedToken string, l TokenIDsWithLogProb) {
 	s.in <- fulltextwithlogprobs{
-		Text: []byte(decodedToken),
+		Text:     []byte(decodedToken),
+		Logprobs: l,
 	}
 }
 
