@@ -15,9 +15,6 @@ func myext(Py py.Py, m py.Object) error {
 		return err
 	}
 	// Register funcs
-	if err := Py.Object_SetAttr(m, "test", Test); err != nil {
-		return err
-	}
 
 	// Register Structs
 	{
