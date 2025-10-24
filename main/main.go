@@ -15,17 +15,27 @@ func myext(Py py.Py, m py.Object) error {
 		return err
 	}
 	// Register funcs
+	if err := Py.Object_SetAttr(m, "test", Test); err != nil {
+		return err
+	}
 
 	// Register Structs
-	if err := Py.GoRegisterStruct(melody.Message{}); err != nil {
-		return err
+	{
+		if err := Py.GoRegisterStruct(melody.Message{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(melody.Message{})
+		if err := Py.Object_SetAttr(m, "Message", t); err != nil {
+			return err
+		}
 	}
-	t, _ := Py.GoGetStructType(melody.Message{})
-	if err := Py.Object_SetAttr(m, "Message", t); err != nil {
+
+	// Conversion for ordered json
+	if err := py.GoRegisterConversions(orderedJSONObjectConversion); err != nil {
 		return err
 	}
 
-	// Register Conversions for enums
+	// Register conversions
 	if err := py.GoRegisterConversions(roleConversion); err != nil {
 		return err
 	}
