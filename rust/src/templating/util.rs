@@ -1,6 +1,6 @@
 use super::melody_types::*;
 use liquid::model::{Object as LiquidObject, Value as LiquidValue};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 
 /// SafeLiquidSubstitutions converts any null values appropriately.
@@ -340,19 +340,28 @@ fn tool_call_to_template(
 }
 
 /// ToolsToTemplate converts tools to template format
-pub fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, Box<dyn std::error::Error>> {
+pub fn tools_to_template(
+    tools: &[Tool],
+) -> Result<Vec<Map<String, Value>>, Box<dyn std::error::Error>> {
     let mut template_tools = Vec::new();
 
     for tool in tools {
         let formatted_json_schema = marshal_json_formatted(&Value::Object(
-            tool.parameters.map.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+            tool.parameters
+                .map
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
         ))?;
 
         let mut tool_map = Map::new();
         tool_map.insert("name".to_string(), json!(json_escape_string(&tool.name)));
 
         let mut definition = Map::new();
-        definition.insert("description".to_string(), json!(json_escape_string(&tool.description)));
+        definition.insert(
+            "description".to_string(),
+            json!(json_escape_string(&tool.description)),
+        );
         definition.insert("json_schema".to_string(), json!(formatted_json_schema));
 
         tool_map.insert("definition".to_string(), Value::Object(definition));

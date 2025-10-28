@@ -3,7 +3,7 @@ use crate::templating::prompts;
 use crate::templating::util::*;
 use liquid::ParserBuilder;
 use regex::Regex;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 
 /// Options for cmd4 rendering

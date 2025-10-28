@@ -155,7 +155,6 @@ impl fmt::Display for CitationQuality {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Grounding {
     #[serde(rename = "unknown")]
@@ -187,7 +186,6 @@ impl fmt::Display for Grounding {
         write!(f, "{}", s)
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum SafetyMode {
@@ -225,7 +223,6 @@ impl fmt::Display for SafetyMode {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ReasoningType {
     #[serde(rename = "unknown")]
@@ -257,4 +254,3 @@ impl fmt::Display for ReasoningType {
         write!(f, "{}", s)
     }
 }
-
