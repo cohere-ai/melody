@@ -10,8 +10,11 @@ fn main() {
     // Example 1: Basic filter with plain text
     println!("Example 1: Basic Filter");
     {
-        let tokenizer =
-            Tokenizer::from_pretrained("CohereLabs/command-a-reasoning-08-2025", None).ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
 
         let mut filter = FilterImpl::new(tokenizer);
         let options = FilterOptions::new()
@@ -44,8 +47,11 @@ fn main() {
     // Example 2: Filter with citations
     println!("Example 2: Citation Parsing");
     {
-        let tokenizer =
-            Tokenizer::from_pretrained("CohereLabs/command-a-reasoning-08-2025", None).ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
 
         let options = FilterOptions::new()
             .handle_multi_hop_cmd3()
@@ -78,8 +84,11 @@ fn main() {
     // Example 3: Search query handling
     println!("Example 3: Search Query");
     {
-        let tokenizer =
-            Tokenizer::from_pretrained("CohereLabs/command-a-reasoning-08-2025", None).ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
 
         let options = FilterOptions::new().handle_search_query();
 
@@ -105,8 +114,11 @@ fn main() {
     // Example 4: Stop tokens
     println!("Example 4: Stop Tokens");
     {
-        let tokenizer =
-            Tokenizer::from_pretrained("CohereLabs/command-a-reasoning-08-2025", None).ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
 
         let options = FilterOptions::new()
             .with_inclusive_stops(vec!["<|END|>".to_string()])

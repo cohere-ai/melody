@@ -20,7 +20,7 @@ pub trait Filter {
 }
 
 pub struct FilterImpl {
-    pub(crate) tokenizer: Option<tokenizers::Tokenizer>,
+    pub(crate) tokenizer: tokenizers::Tokenizer,
     pub(crate) token_buf: Vec<u32>,
     pub(crate) log_prob_buf: Vec<f32>,
     pub(crate) raw_tokens: Vec<u32>,
@@ -64,7 +64,7 @@ pub struct FilterImpl {
 }
 
 impl FilterImpl {
-    pub fn new(tokenizer: Option<tokenizers::Tokenizer>) -> Self {
+    pub fn new(tokenizer: tokenizers::Tokenizer) -> Self {
         Self {
             tokenizer,
             token_buf: Vec::new(),
@@ -109,11 +109,7 @@ impl FilterImpl {
     ) -> Result<String, Box<dyn Error>> {
         self.token_buf.push(token);
 
-        let text = if let Some(ref tokenizer) = self.tokenizer {
-            tokenizer.decode(&self.token_buf, false).unwrap()
-        } else {
-            String::new()
-        };
+        let text = self.tokenizer.decode(&self.token_buf, false).unwrap();
 
         if let Some(prob) = token_log_prob {
             self.log_prob_buf.push(prob);

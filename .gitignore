@@ -33,6 +33,7 @@ go.work.sum
 
 # Rust build artifacts
 rust/target/
+target/
 **/*.rs.bk
 Cargo.lock
 

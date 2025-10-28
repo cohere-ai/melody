@@ -27,8 +27,11 @@ mod tests {
 
     #[test]
     fn test_citations_standard_case() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
 
         let mut filter = FilterImpl::new(tokenizer);
         filter.stream_non_grounded_answer = true;
@@ -55,8 +58,11 @@ mod tests {
 
     #[test]
     fn test_citations_no_document() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
@@ -77,8 +83,11 @@ mod tests {
 
     #[test]
     fn test_citations_multiple() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
@@ -102,8 +111,11 @@ mod tests {
 
     #[test]
     fn test_trim_space_left() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
         filter.left_trimmed = true;
 
@@ -115,8 +127,11 @@ mod tests {
 
     #[test]
     fn test_trim_space_right() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
         filter.right_trimmed = true;
 
@@ -127,8 +142,11 @@ mod tests {
 
     #[test]
     fn test_trim_space_both() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
         filter.left_trimmed = true;
         filter.right_trimmed = true;
@@ -140,8 +158,11 @@ mod tests {
 
     #[test]
     fn test_trim_prefix() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
         filter.trim_prefix = "prefix:".to_string();
 
@@ -153,8 +174,11 @@ mod tests {
 
     #[test]
     fn test_trim_prefix_partial() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
         filter.trim_prefix = "prefix:".to_string();
 
@@ -194,8 +218,11 @@ mod tests {
 
     #[test]
     fn test_process_text_with_logprobs() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
 
         let text = "hello world";
@@ -214,8 +241,11 @@ mod tests {
 
     #[test]
     fn test_process_search_query() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
         filter.curr_search_query_idx = 0;
 
@@ -231,8 +261,11 @@ mod tests {
 
     #[test]
     fn test_handle_inclusive_stop() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let filter = FilterImpl::new(tokenizer);
 
         let outputs = filter.handle_inclusive_stop("hello<|END|>", 5, "<|END|>");
@@ -242,8 +275,11 @@ mod tests {
 
     #[test]
     fn test_handle_exclusive_stop() {
-        let tokenizer =
-            Tokenizer::from_file("./multilingual+255k+bos+eos+sptok+fim+agents3.json").ok();
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
         let mut filter = FilterImpl::new(tokenizer);
 
         let outputs = filter.handle_exclusive_stop("hello<|END|>", 5);
