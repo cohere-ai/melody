@@ -1,5 +1,4 @@
 use melody_parsing::{Filter, FilterImpl, FilterOptions, TokenIDsWithLogProb};
-use tokenizers::Tokenizer;
 
 fn main() {
     // Initialize logging
@@ -10,35 +9,29 @@ fn main() {
     // Example 1: Basic filter with plain text
     println!("Example 1: Basic Filter");
     {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         let options = FilterOptions::new()
             .with_left_trimmed()
             .with_right_trimmed();
 
         options.apply_to_filter(&mut filter);
 
-        // Write tokens
-        let tokens = vec![1, 2, 3, 4];
-        let logprobs = vec![0.1, 0.2, 0.3, 0.4];
+        // Simulate citation text
+        let citation_text = "Hello World!";
+        let logprobs = TokenIDsWithLogProb {
+            token_ids: vec![1, 2, 3],
+            logprobs: vec![0.1, 0.2, 0.3],
+        };
 
-        for (token, logprob) in tokens.iter().zip(logprobs.iter()) {
-            if let Ok(outputs) = filter.write(*token, Some(*logprob)) {
-                for output in outputs {
-                    println!("  Output: {}", output.text);
-                }
+        let outputs = filter.write_decoded(citation_text, logprobs);
+        for output in outputs {
+            println!("  Text: {}", output.text);
+            for citation in output.citations {
+                println!(
+                    "    Citation: {} (indices {}-{})",
+                    citation.text, citation.start_index, citation.end_index
+                );
             }
-        }
-
-        // Flush any remaining tokens
-        let final_outputs = filter.flush_partials();
-        for output in final_outputs {
-            println!("  Final: {}", output.text);
         }
     }
 
@@ -47,17 +40,11 @@ fn main() {
     // Example 2: Filter with citations
     println!("Example 2: Citation Parsing");
     {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
         let options = FilterOptions::new()
             .handle_multi_hop_cmd3()
             .stream_tool_actions();
 
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         options.apply_to_filter(&mut filter);
 
         // Simulate citation text
@@ -84,15 +71,9 @@ fn main() {
     // Example 3: Search query handling
     println!("Example 3: Search Query");
     {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
         let options = FilterOptions::new().handle_search_query();
 
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         options.apply_to_filter(&mut filter);
 
         let search_text = "Search: machine learning";
@@ -114,17 +95,11 @@ fn main() {
     // Example 4: Stop tokens
     println!("Example 4: Stop Tokens");
     {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
         let options = FilterOptions::new()
             .with_inclusive_stops(vec!["<|END|>".to_string()])
             .with_exclusive_stops(vec!["</s>".to_string()]);
 
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         options.apply_to_filter(&mut filter);
 
         let text_with_stop = "Hello world<|END|>";

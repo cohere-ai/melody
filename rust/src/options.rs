@@ -241,8 +241,8 @@ impl FilterOptions {
     }
 }
 
-pub fn new_filter(tokenizer: tokenizers::Tokenizer, options: FilterOptions) -> FilterImpl {
-    let mut filter = FilterImpl::new(tokenizer);
+pub fn new_filter(options: FilterOptions) -> FilterImpl {
+    let mut filter = FilterImpl::new();
     options.apply_to_filter(&mut filter);
     filter
 }

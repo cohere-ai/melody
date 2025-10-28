@@ -1,39 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use crate::filter::{Filter, FilterImpl, find_partial};
+    use crate::filter::{Filter, FilterImpl};
     use crate::options::FilterOptions;
     use crate::types::*;
 
     use tokenizers::Tokenizer;
 
     #[test]
-    fn test_find_partial() {
-        let stops = vec!["<co: ".to_string(), "</co: ".to_string()];
-
-        // Test full match
-        let (idx, found) = find_partial("hello <co: ", &stops);
-        assert_eq!(idx, 6);
-        assert_eq!(found, "<co: ");
-
-        // Test partial match
-        let (idx, found) = find_partial("hello <c", &stops);
-        assert_eq!(idx, 6);
-        assert_eq!(found, "");
-
-        // Test no match
-        let (idx, _) = find_partial("hello world", &stops);
-        assert_eq!(idx, usize::MAX);
-    }
-
-    #[test]
     fn test_citations_standard_case() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -58,12 +33,7 @@ mod tests {
 
     #[test]
     fn test_citations_no_document() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -83,12 +53,7 @@ mod tests {
 
     #[test]
     fn test_citations_multiple() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -111,12 +76,7 @@ mod tests {
 
     #[test]
     fn test_trim_space_left() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.left_trimmed = true;
 
         let (result, rem) = filter.trim_space("   hello");
@@ -127,12 +87,7 @@ mod tests {
 
     #[test]
     fn test_trim_space_right() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.right_trimmed = true;
 
         let (result, rem) = filter.trim_space("hello   ");
@@ -142,12 +97,7 @@ mod tests {
 
     #[test]
     fn test_trim_space_both() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.left_trimmed = true;
         filter.right_trimmed = true;
 
@@ -158,12 +108,7 @@ mod tests {
 
     #[test]
     fn test_trim_prefix() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.trim_prefix = "prefix:".to_string();
 
         let (result, rem) = filter.trim_space("prefix:hello");
@@ -174,12 +119,7 @@ mod tests {
 
     #[test]
     fn test_trim_prefix_partial() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.trim_prefix = "prefix:".to_string();
 
         let (result, rem) = filter.trim_space("pre");
@@ -218,12 +158,7 @@ mod tests {
 
     #[test]
     fn test_process_text_with_logprobs() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
 
         let text = "hello world";
         let logprobs = TokenIDsWithLogProb {
@@ -241,12 +176,7 @@ mod tests {
 
     #[test]
     fn test_process_search_query() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.curr_search_query_idx = 0;
 
         let (outputs, remove) = filter.process_search_query(b"test query");
@@ -261,12 +191,7 @@ mod tests {
 
     #[test]
     fn test_handle_inclusive_stop() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let filter = FilterImpl::new(tokenizer);
+        let filter = FilterImpl::new();
 
         let outputs = filter.handle_inclusive_stop("hello<|END|>", 5, "<|END|>");
         assert_eq!(outputs.len(), 1);
@@ -275,12 +200,7 @@ mod tests {
 
     #[test]
     fn test_handle_exclusive_stop() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
 
         let outputs = filter.handle_exclusive_stop("hello<|END|>", 5);
         assert_eq!(outputs.len(), 1);
@@ -303,25 +223,6 @@ mod tests {
 
         assert_eq!(logprobs1.token_ids, vec![1, 2, 3, 4]);
         assert_eq!(logprobs1.logprobs, vec![0.1, 0.2, 0.3, 0.4]);
-    }
-
-    #[test]
-    fn test_repetition_detection() {
-        use crate::filter::hash_tokens_for_repetition_check;
-
-        // Test hash function produces consistent results
-        let seq1 = vec![1, 2, 3];
-        let seq2 = vec![1, 2, 3];
-        let seq3 = vec![1, 2, 4];
-
-        assert_eq!(
-            hash_tokens_for_repetition_check(&seq1),
-            hash_tokens_for_repetition_check(&seq2)
-        );
-        assert_ne!(
-            hash_tokens_for_repetition_check(&seq1),
-            hash_tokens_for_repetition_check(&seq3)
-        );
     }
 
     #[test]
@@ -1067,24 +968,8 @@ mod tests {
             ))
             .unwrap();
 
-            let mut filter = crate::options::new_filter(tokenizer, tt.options.clone());
-
-            let tokenizer_for_encode = Tokenizer::from_file(format!(
-                "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-                env!("CARGO_MANIFEST_DIR")
-            ))
-            .unwrap();
-
-            let encoding = tokenizer_for_encode.encode(tt.input, false).unwrap();
+            let encoding = tokenizer.encode(tt.input, false).unwrap();
             let tokens = encoding.get_ids();
-
-            let mut out: Vec<FilterOutput> = Vec::new();
-            for (i, &token) in tokens.iter().enumerate() {
-                let o = filter.write(token, Some(test_likelihoods[i])).unwrap();
-                out.extend(o);
-            }
-
-            assert_eq!(out, tt.want, "Test case '{}' failed", tt.name);
 
             // Duplicate the test by writing the raw strings instead
             let mut text_chunks: Vec<String> = Vec::new();
@@ -1096,7 +981,7 @@ mod tests {
                 buffer.push(token);
                 likelihood_buffer.push(test_likelihoods[i]);
 
-                let decoded = tokenizer_for_encode.decode(&buffer, false).unwrap();
+                let decoded = tokenizer.decode(&buffer, false).unwrap();
 
                 if decoded.ends_with('\u{fffd}') {
                     continue;
@@ -1111,13 +996,7 @@ mod tests {
                 likelihood_buffer.clear();
             }
 
-            let tokenizer_for_decode = Tokenizer::from_file(format!(
-                "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-                env!("CARGO_MANIFEST_DIR")
-            ))
-            .unwrap();
-
-            let mut filter = crate::options::new_filter(tokenizer_for_decode, tt.options);
+            let mut filter = crate::options::new_filter(tt.options);
             let mut out: Vec<FilterOutput> = Vec::new();
             for (i, chunk) in text_chunks.iter().enumerate() {
                 out.extend(filter.write_decoded(chunk, likelihoods_chunks[i].clone()));

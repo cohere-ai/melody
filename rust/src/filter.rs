@@ -1,30 +1,24 @@
 use crate::action_filter::FilterAction;
 use crate::types::*;
 use std::collections::HashMap;
-use std::error::Error;
 
 /// Filter is the interface used to parse the output of a cohere model.
 pub trait Filter {
-    fn write(
-        &mut self,
-        token: u32,
-        likelihood: Option<f32>,
-    ) -> Result<Vec<FilterOutput>, Box<dyn Error>>;
     fn write_decoded(
         &mut self,
         decoded_token: &str,
         prob: TokenIDsWithLogProb,
     ) -> Vec<FilterOutput>;
     fn flush_partials(&mut self) -> Vec<FilterOutput>;
-    fn get_raw_tokens(&self) -> &[u32];
+}
+
+impl Default for FilterImpl {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct FilterImpl {
-    pub(crate) tokenizer: tokenizers::Tokenizer,
-    pub(crate) token_buf: Vec<u32>,
-    pub(crate) log_prob_buf: Vec<f32>,
-    pub(crate) raw_tokens: Vec<u32>,
-
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,
     pub(crate) trim_prefix: String,
@@ -64,12 +58,8 @@ pub struct FilterImpl {
 }
 
 impl FilterImpl {
-    pub fn new(tokenizer: tokenizers::Tokenizer) -> Self {
+    pub fn new() -> Self {
         Self {
-            tokenizer,
-            token_buf: Vec::new(),
-            log_prob_buf: Vec::new(),
-            raw_tokens: Vec::new(),
             left_trimmed: false,
             right_trimmed: false,
             trim_prefix: String::new(),
@@ -100,69 +90,6 @@ impl FilterImpl {
             special_token_keys: Vec::new(),
             done: false,
         }
-    }
-
-    fn decode_token(
-        &mut self,
-        token: u32,
-        token_log_prob: Option<f32>,
-    ) -> Result<String, Box<dyn Error>> {
-        self.token_buf.push(token);
-
-        let text = self.tokenizer.decode(&self.token_buf, false).unwrap();
-
-        if let Some(prob) = token_log_prob {
-            self.log_prob_buf.push(prob);
-        }
-
-        Ok(text)
-    }
-
-    fn get_full_text_with_log_probs(
-        &mut self,
-        token: u32,
-        token_log_prob: Option<f32>,
-    ) -> Result<Option<FullTextWithLogprobs>, Box<dyn Error>> {
-        self.raw_tokens.push(token);
-
-        // Check if the token is repeated too many times
-        let has_repetition_limits =
-            self.max_repetition_limit > 0 && self.max_repetition_sequence_length > 0;
-        if has_repetition_limits
-            && has_hit_token_repetition_limit(
-                &self.raw_tokens,
-                self.max_repetition_limit,
-                self.max_repetition_sequence_length,
-            )
-        {
-            return Err("saw too many repeated tokens".into());
-        }
-
-        let text = self.decode_token(token, token_log_prob)?;
-
-        // Multi-token characters will decode into this string
-        if text.ends_with('\u{fffd}') {
-            return Ok(None);
-        }
-
-        let token_buf_copy = self.token_buf.clone();
-        self.token_buf.clear();
-
-        let log_probs_copy = if !self.log_prob_buf.is_empty() {
-            let copy = self.log_prob_buf.clone();
-            self.log_prob_buf.clear();
-            copy
-        } else {
-            Vec::new()
-        };
-
-        Ok(Some(FullTextWithLogprobs {
-            text: text.into_bytes(),
-            logprobs: TokenIDsWithLogProb {
-                token_ids: token_buf_copy,
-                logprobs: log_probs_copy,
-            },
-        }))
     }
 
     pub(crate) fn write_text(
@@ -475,19 +402,6 @@ impl FilterImpl {
 }
 
 impl Filter for FilterImpl {
-    fn write(
-        &mut self,
-        token: u32,
-        likelihood: Option<f32>,
-    ) -> Result<Vec<FilterOutput>, Box<dyn Error>> {
-        let t = self.get_full_text_with_log_probs(token, likelihood)?;
-        if let Some(t) = t {
-            Ok(self.write_text(&t.text, t.logprobs))
-        } else {
-            Ok(Vec::new())
-        }
-    }
-
     fn write_decoded(&mut self, decoded_token: &str, l: TokenIDsWithLogProb) -> Vec<FilterOutput> {
         self.write_text(decoded_token.as_bytes(), l)
     }
@@ -505,10 +419,6 @@ impl Filter for FilterImpl {
             return o;
         }
         Vec::new()
-    }
-
-    fn get_raw_tokens(&self) -> &[u32] {
-        &self.raw_tokens
     }
 }
 
@@ -550,49 +460,26 @@ pub(crate) fn find_partial(s: &str, stops: &[String]) -> (usize, String) {
     )
 }
 
-/// hashTokensForRepetitionCheck is essentially a DJB2 hash function
-pub(crate) fn hash_tokens_for_repetition_check(seq: &[u32]) -> u64 {
-    let mut hash: u64 = 5381;
-    for &v in seq {
-        hash = hash.wrapping_mul(33).wrapping_add(v as u64);
+#[cfg(test)]
+mod tests {
+    use crate::filter::find_partial;
+
+    #[test]
+    fn test_find_partial() {
+        let stops = vec!["<co: ".to_string(), "</co: ".to_string()];
+
+        // Test full match
+        let (idx, found) = find_partial("hello <co: ", &stops);
+        assert_eq!(idx, 6);
+        assert_eq!(found, "<co: ");
+
+        // Test partial match
+        let (idx, found) = find_partial("hello <c", &stops);
+        assert_eq!(idx, 6);
+        assert_eq!(found, "");
+
+        // Test no match
+        let (idx, _) = find_partial("hello world", &stops);
+        assert_eq!(idx, usize::MAX);
     }
-    hash
-}
-
-fn has_hit_token_repetition_limit(
-    seen_tokens: &[u32],
-    repetition_limit: usize,
-    max_sequence_length: usize,
-) -> bool {
-    if seen_tokens.len() <= repetition_limit {
-        return false;
-    }
-
-    let max_possible_seq_len = seen_tokens.len() / repetition_limit;
-    let max_sequence_length = max_sequence_length.min(max_possible_seq_len);
-
-    for seq_len in 1..=max_sequence_length {
-        let start = seen_tokens.len() - repetition_limit * seq_len;
-        let tokens = &seen_tokens[start..];
-
-        let mut first_hash = 0u64;
-        let mut mismatch = false;
-
-        for i in 0..repetition_limit {
-            let offset = i * seq_len;
-            let h = hash_tokens_for_repetition_check(&tokens[offset..offset + seq_len]);
-            if i == 0 {
-                first_hash = h;
-            } else if h != first_hash {
-                mismatch = true;
-                break;
-            }
-        }
-
-        if !mismatch {
-            return true;
-        }
-    }
-
-    false
 }

@@ -350,17 +350,10 @@ fn convert_string_to_int_list(s: &str) -> Vec<usize> {
 mod tests {
     use super::*;
     use crate::filter::FilterImpl;
-    use tokenizers::Tokenizer;
 
     #[test]
     fn test_handle_citations_standard_case() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -385,13 +378,7 @@ mod tests {
 
     #[test]
     fn test_handle_citations_standard_case_no_stream() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = false;
         filter.cur_citation_byte_index = -1;
 
@@ -416,13 +403,7 @@ mod tests {
 
     #[test]
     fn test_handle_citations_no_document() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -442,13 +423,7 @@ mod tests {
 
     #[test]
     fn test_handle_citations_non_int_document() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -470,13 +445,7 @@ mod tests {
 
     #[test]
     fn test_handle_citations_different_documents() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -501,13 +470,7 @@ mod tests {
 
     #[test]
     fn test_handle_citations_no_citation() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -522,13 +485,7 @@ mod tests {
 
     #[test]
     fn test_handle_citations_incomplete_first_citation() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -541,13 +498,7 @@ mod tests {
 
     #[test]
     fn test_handle_citations_multiple_citations() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
         filter.cur_citation_byte_index = -1;
 
@@ -579,13 +530,7 @@ mod tests {
 
     #[test]
     fn test_find_an_element_standard_case() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let filter = FilterImpl::new(tokenizer);
+        let filter = FilterImpl::new();
 
         let input = "hello <co: 2,1> foo </co: 2,1>";
         let (start_index, end_index, docs) = filter.find_an_element(input, "<co: ", ">", false);
@@ -599,13 +544,7 @@ mod tests {
 
     #[test]
     fn test_find_an_element_no_citation() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let filter = FilterImpl::new(tokenizer);
+        let filter = FilterImpl::new();
 
         let input = "hello";
         let (start_index, end_index, docs) = filter.find_an_element(input, "<co: ", ">", false);
@@ -617,13 +556,7 @@ mod tests {
 
     #[test]
     fn test_find_an_element_cmd3_two_tools() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let filter = FilterImpl::new(tokenizer);
+        let filter = FilterImpl::new();
 
         let input = "<co> hello </co: 0:[1,2],1:[0]>";
         let (start_index, end_index, docs) = filter.find_an_element(input, "</co: ", ">", true);

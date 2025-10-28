@@ -133,7 +133,6 @@ mod tests {
     use super::*;
     use crate::action_filter::FilterAction;
     use crate::filter::FilterImpl;
-    use tokenizers::Tokenizer;
 
     fn starting_metadata() -> FilterAction {
         FilterAction {
@@ -148,13 +147,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_empty() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -167,13 +160,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_basic_with_next_parameter() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -194,13 +181,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_basic_with_end_of_tool() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -221,13 +202,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_null_with_end_of_tool() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -248,13 +223,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_boolean_with_end_of_tool() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -275,13 +244,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_partial_string() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -302,13 +265,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_whole_string() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -329,13 +286,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_whole_object() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -356,13 +307,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_partial_object() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -383,13 +328,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_whole_array() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 
@@ -410,13 +349,7 @@ mod tests {
 
     #[test]
     fn test_handle_param_value_partial_array() {
-        let tokenizer = Tokenizer::from_file(format!(
-            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap();
-
-        let mut filter = FilterImpl::new(tokenizer);
+        let mut filter = FilterImpl::new();
         filter.action_metadata = starting_metadata();
         filter.stream_tool_actions = true;
 

@@ -5,7 +5,6 @@
 
 pub mod filter;
 pub mod options;
-pub mod stream_filter;
 pub mod templating;
 pub mod types;
 
@@ -18,7 +17,6 @@ mod tests;
 
 pub use filter::{Filter, FilterImpl};
 pub use options::{FilterOptions, new_filter};
-pub use stream_filter::StreamFilter;
 pub use types::{
     FilterCitation, FilterOutput, FilterSearchQueryDelta, FilterToolCallDelta, FilterToolParameter,
     Source, TokenIDsWithLogProb,

@@ -25,12 +25,6 @@ impl Default for TokenIDsWithLogProb {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct FullTextWithLogprobs {
-    pub text: Vec<u8>,
-    pub logprobs: TokenIDsWithLogProb,
-}
-
 /// FilterOutput represents a partial parsed output from a model generation.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FilterOutput {
