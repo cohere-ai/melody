@@ -7,7 +7,20 @@ import (
 	"gitlab.com/pygolo/py"
 
 	"github.com/cohere-ai/melody"
+	"github.com/cohere-ai/melody/parsing"
 )
+
+type PointerTest struct {
+	A *Nested
+}
+type Nested struct {
+	A int
+}
+
+func ModifyPointer(m PointerTest) int {
+	m.A.A = m.A.A + 1
+	return m.A.A
+}
 
 func myext(Py py.Py, m py.Object) error {
 	// Doc string
@@ -15,14 +28,124 @@ func myext(Py py.Py, m py.Object) error {
 		return err
 	}
 	// Register funcs
+	if err := Py.Object_SetAttr(m, "ModifyPointer", ModifyPointer); err != nil {
+		return err
+	}
 
 	// Register Structs
+	{
+		if err := Py.GoRegisterStruct(PointerTest{}); err != nil {
+			return err
+		}
+		if err := Py.GoRegisterStruct(Nested{}); err != nil {
+			return err
+		}
+	}
 	{
 		if err := Py.GoRegisterStruct(melody.Message{}); err != nil {
 			return err
 		}
 		t, _ := Py.GoGetStructType(melody.Message{})
 		if err := Py.Object_SetAttr(m, "Message", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(melody.Tool{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(melody.Tool{})
+		if err := Py.Object_SetAttr(m, "Tool", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(melody.Content{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(melody.Content{})
+		if err := Py.Object_SetAttr(m, "Content", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(melody.Image{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(melody.Image{})
+		if err := Py.Object_SetAttr(m, "Image", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(melody.ToolCall{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(melody.ToolCall{})
+		if err := Py.Object_SetAttr(m, "ToolCall", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(parsing.TokenIDsWithLogProb{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(parsing.TokenIDsWithLogProb{})
+		if err := Py.Object_SetAttr(m, "TokenIDsWithLogProb", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(parsing.FilterOutput{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(parsing.FilterOutput{})
+		if err := Py.Object_SetAttr(m, "FilterOutput", t); err != nil {
+			return err
+		}
+	}
+	{ // deprecated: remove pls
+		if err := Py.GoRegisterStruct(parsing.FilterSearchQueryDelta{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(parsing.FilterSearchQueryDelta{})
+		if err := Py.Object_SetAttr(m, "FilterSearchQueryDelta", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(parsing.FilterToolCallDelta{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(parsing.FilterToolCallDelta{})
+		if err := Py.Object_SetAttr(m, "FilterToolCallDelta", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(parsing.FilterToolParameter{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(parsing.FilterToolParameter{})
+		if err := Py.Object_SetAttr(m, "FilterToolParameter", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(parsing.FilterCitation{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(parsing.FilterCitation{})
+		if err := Py.Object_SetAttr(m, "FilterCitation", t); err != nil {
+			return err
+		}
+	}
+	{
+		if err := Py.GoRegisterStruct(parsing.Source{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(parsing.Source{})
+		if err := Py.Object_SetAttr(m, "Source", t); err != nil {
 			return err
 		}
 	}

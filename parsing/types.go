@@ -25,11 +25,12 @@ type fulltextwithlogprobs struct {
 type FilterOutput struct {
 	Text          string
 	Logprobs      TokenIDsWithLogProb
-	SearchQuery   *FilterSearchQueryDelta
 	Citations     []FilterCitation
 	ToolCalls     *FilterToolCallDelta
-	IsPostAnswer  bool
-	IsToolsReason bool
+	IsToolsReason bool // also used to mark thinking
+
+	SearchQuery  *FilterSearchQueryDelta // deprecated
+	IsPostAnswer bool                    // deprecated
 }
 
 // FilterSearchQueryDelta represents a change to a search query
