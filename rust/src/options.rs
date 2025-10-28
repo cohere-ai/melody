@@ -2,6 +2,7 @@ use crate::filter::FilterImpl;
 use crate::types::*;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct FilterOptions {
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,

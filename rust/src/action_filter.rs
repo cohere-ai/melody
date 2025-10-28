@@ -347,3 +347,422 @@ fn find_non_escaped_char(s: &str, ch: char) -> Option<usize> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filter::FilterImpl;
+    use tokenizers::Tokenizer;
+
+    fn starting_metadata() -> FilterAction {
+        FilterAction {
+            mode: ActionMode::NotStarted,
+            cur_tool_call_index: 0,
+            trim_left: false,
+            cur_param_name: String::new(),
+            cur_param_state: ParamState::Beginning,
+            param_value_buffer: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_parse_actions_no_tool_name() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+
+        let completion = "Action: ```json\n\t\t[\n\t\t   {\"";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 0);
+        assert_eq!(out.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_actions_no_tool_name_cmd3() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+        filter.has_tool_call_id = true;
+
+        let completion = "<|START_ACTION|>\n\t\t[\n\t\t   {\"";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 0);
+        assert_eq!(out.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_actions_just_tool_name_marker() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+
+        let completion = "Action: ```json\n\t\t[\n\t\t   {\n\t\t       \"tool_name\": \"";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 50);
+        assert_eq!(out.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_actions_just_tool_call_id_key_cmd3() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+        filter.has_tool_call_id = true;
+
+        let completion = "<|START_ACTION|>\n\t\t[\n\t\t   {\n\t\t       \"tool_call_id\": \"";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 54);
+        assert_eq!(out.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_actions_just_tool_name() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = FilterAction {
+            mode: ActionMode::ToolName,
+            cur_tool_call_index: 0,
+            trim_left: false,
+            cur_param_name: String::new(),
+            cur_param_state: ParamState::Beginning,
+            param_value_buffer: String::new(),
+        };
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+
+        let completion = "int\"";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 4);
+        assert_eq!(out.len(), 1);
+        assert!(out[0].tool_calls.is_some());
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "int");
+    }
+
+    #[test]
+    fn test_parse_actions_till_tool_name() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+
+        let completion =
+            "Action: ```json\n\t\t\t[\n\t\t\t   {\n\t\t\t\t   \"tool_name\": \"internet_search\",";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 66);
+        assert_eq!(out.len(), 1);
+        assert!(out[0].tool_calls.is_some());
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "internet_search");
+    }
+
+    #[test]
+    fn test_parse_actions_till_tool_call_id_cmd3() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+        filter.has_tool_call_id = true;
+
+        let completion = "Action:\n\t\t\t[\n\t\t\t   {\n\t\t\t\t   \"tool_call_id\": \"0\",";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 47);
+        assert_eq!(out.len(), 1);
+        assert!(out[0].tool_calls.is_some());
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().id, "0");
+    }
+
+    #[test]
+    fn test_parse_actions_just_param_name() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = FilterAction {
+            mode: ActionMode::ParamName,
+            cur_tool_call_index: 0,
+            trim_left: false,
+            cur_param_name: String::new(),
+            cur_param_state: ParamState::Beginning,
+            param_value_buffer: String::new(),
+        };
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+
+        let completion = "query2\"";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 7);
+        assert_eq!(out.len(), 1);
+        assert!(out[0].tool_calls.is_some());
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
+        assert!(out[0].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert_eq!(
+            out[0]
+                .tool_calls
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .as_ref()
+                .unwrap()
+                .name,
+            "query2"
+        );
+    }
+
+    #[test]
+    fn test_parse_actions_param_name_with_escaped_quote() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = FilterAction {
+            mode: ActionMode::ParamName,
+            cur_tool_call_index: 0,
+            trim_left: false,
+            cur_param_name: String::new(),
+            cur_param_state: ParamState::Beginning,
+            param_value_buffer: String::new(),
+        };
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+
+        let completion = "que\\\"ry2\"";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 9);
+        assert_eq!(out.len(), 1);
+        assert!(out[0].tool_calls.is_some());
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
+        assert!(out[0].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert_eq!(
+            out[0]
+                .tool_calls
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .as_ref()
+                .unwrap()
+                .name,
+            "que\\\"ry2"
+        );
+    }
+
+    #[test]
+    fn test_parse_actions_whole_thing_one_tool_one_parameter() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+
+        let completion = "Action: ```json\n\t\t\t[\n\t\t\t   {\n\t\t\t\t   \"tool_name\": \"internet_search\",\n\t\t\t\t   \"parameters\": {\n\t\t\t\t\t   \"query\": \"query1\"\n\t\t\t\t   }\n\t\t\t   }\n\t\t\t]```";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 119);
+        assert_eq!(out.len(), 3);
+
+        // Tool name
+        assert!(out[0].tool_calls.is_some());
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "internet_search");
+
+        // Param name
+        assert!(out[1].tool_calls.is_some());
+        assert_eq!(out[1].tool_calls.as_ref().unwrap().index, 0);
+        assert!(out[1].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert_eq!(
+            out[1]
+                .tool_calls
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .as_ref()
+                .unwrap()
+                .name,
+            "query"
+        );
+
+        // Param value
+        assert!(out[2].tool_calls.is_some());
+        assert_eq!(out[2].tool_calls.as_ref().unwrap().index, 0);
+        assert!(out[2].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert_eq!(
+            out[2]
+                .tool_calls
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .as_ref()
+                .unwrap()
+                .name,
+            "query"
+        );
+        assert_eq!(
+            out[2]
+                .tool_calls
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .as_ref()
+                .unwrap()
+                .value_delta,
+            "\"query1\""
+        );
+    }
+
+    #[test]
+    fn test_parse_raw_actions_whole_thing_one_tool_one_parameter() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        // stream_processed_params is false for raw param tests
+
+        let completion = "Action: ```json\n\t\t\t[\n\t\t\t   {\n\t\t\t\t   \"tool_name\": \"internet_search\",\n\t\t\t\t   \"parameters\": {\n\t\t\t\t\t   \"query\": \"query1\"\n\t\t\t\t   }\n\t\t\t   }\n\t\t\t]```";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 126);
+        assert_eq!(out.len(), 2);
+
+        // Tool name
+        assert!(out[0].tool_calls.is_some());
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "internet_search");
+
+        // Raw params
+        assert!(out[1].tool_calls.is_some());
+        assert_eq!(out[1].tool_calls.as_ref().unwrap().index, 0);
+        assert_eq!(
+            out[1].tool_calls.as_ref().unwrap().raw_param_delta,
+            "{\n\"query\": \"query1\"\n}"
+        );
+    }
+
+    #[test]
+    fn test_handle_llama_tools() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+        filter.llama_tool_parsing = true;
+
+        let completion = "\\n\\n<|python_tag|>{\"name\": \"internet_search\", \"parameters\": {\"query\": \"Sound of Music company S&P 500 year\"}}<|eom_id|>";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 110);
+        assert_eq!(out.len(), 3);
+
+        // Tool name
+        assert!(out[0].tool_calls.is_some());
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
+        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "internet_search");
+
+        // Param name
+        assert!(out[1].tool_calls.is_some());
+        assert_eq!(out[1].tool_calls.as_ref().unwrap().index, 0);
+        assert!(out[1].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert_eq!(
+            out[1]
+                .tool_calls
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .as_ref()
+                .unwrap()
+                .name,
+            "query"
+        );
+
+        // Param value
+        assert!(out[2].tool_calls.is_some());
+        assert_eq!(out[2].tool_calls.as_ref().unwrap().index, 0);
+        assert!(out[2].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert_eq!(
+            out[2]
+                .tool_calls
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .as_ref()
+                .unwrap()
+                .value_delta,
+            "\"Sound of Music company S&P 500 year\""
+        );
+    }
+}

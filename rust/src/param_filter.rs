@@ -127,3 +127,311 @@ pub(crate) fn find_valid_json_value(buffer: &str, s: &str) -> usize {
 
     usize::MAX
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::action_filter::FilterAction;
+    use crate::filter::FilterImpl;
+    use tokenizers::Tokenizer;
+
+    fn starting_metadata() -> FilterAction {
+        FilterAction {
+            mode: ActionMode::NotStarted,
+            cur_tool_call_index: 0,
+            trim_left: false,
+            cur_param_name: String::new(),
+            cur_param_state: ParamState::Beginning,
+            param_value_buffer: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_handle_param_value_empty() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 0);
+        assert_eq!(out.len(), 0);
+    }
+
+    #[test]
+    fn test_handle_param_value_basic_with_next_parameter() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "30   ,";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 6);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "30");
+    }
+
+    #[test]
+    fn test_handle_param_value_basic_with_end_of_tool() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "1.2   \n}";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 8);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "1.2");
+    }
+
+    #[test]
+    fn test_handle_param_value_null_with_end_of_tool() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "null   \n}";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 9);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "null");
+    }
+
+    #[test]
+    fn test_handle_param_value_boolean_with_end_of_tool() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "true   \n}";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 9);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "true");
+    }
+
+    #[test]
+    fn test_handle_param_value_partial_string() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "\"testing";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 8);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "\"testing");
+    }
+
+    #[test]
+    fn test_handle_param_value_whole_string() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "\"testing string\"   \n}";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 17);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "\"testing string\"");
+    }
+
+    #[test]
+    fn test_handle_param_value_whole_object() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "{\"tes t\": [\"}\"]}   \n,";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 17);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "{\"tes t\": [\"}\"]}");
+    }
+
+    #[test]
+    fn test_handle_param_value_partial_object() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "{\"tes t\": [\"}    ,";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 18);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "{\"tes t\": [\"}    ,");
+    }
+
+    #[test]
+    fn test_handle_param_value_whole_array() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "[{\"test\",[\"}\",\"]\"]}]   }";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 24);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "[{\"test\",[\"}\",\"]\"]}]   }");
+    }
+
+    #[test]
+    fn test_handle_param_value_partial_array() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+
+        let input = "[{\"test\",[\"}\",\"]    ,";
+        let (out, actual_remove) = filter.handle_param_value(input);
+
+        assert_eq!(actual_remove, 21);
+        let mut result = String::new();
+        for o in out {
+            if let Some(tool_calls) = o.tool_calls {
+                if let Some(param_delta) = tool_calls.param_delta {
+                    result.push_str(&param_delta.value_delta);
+                }
+            }
+        }
+        assert_eq!(result, "[{\"test\",[\"}\",\"]    ,");
+    }
+}

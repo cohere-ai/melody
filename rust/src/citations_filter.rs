@@ -42,7 +42,13 @@ impl FilterImpl {
 
         let mut res_out = res_out.unwrap();
         res_out.is_post_answer = self.stream_non_grounded_answer && mode != FilterMode::ToolReason;
-        res_out.is_tools_reason = mode == FilterMode::ToolReason;
+
+        // Citation outputs (empty text with citations) are metadata, not tool reasoning text
+        if res_out.text.is_empty() && !res_out.citations.is_empty() {
+            res_out.is_tools_reason = false;
+        } else {
+            res_out.is_tools_reason = mode == FilterMode::ToolReason;
+        }
 
         // Don't send logprobs for citations if there's no corresponding text.
         if let Some(probs) = token_log_probs
@@ -183,12 +189,17 @@ impl FilterImpl {
         let start_idx = if self.cur_citation_byte_index == -1 {
             end_first_id + 1
         } else {
-            self.cur_citation_byte_index as usize
+            let idx_as_usize = self.cur_citation_byte_index as usize;
+            // If we've already processed all of this string, return early
+            if idx_as_usize >= s.len() {
+                return (text_before_citation.to_string(), text_before_citation.len());
+            }
+            idx_as_usize
         };
 
         self.cur_citation_byte_index = (s.len() - text_before_citation.len()) as isize;
 
-        let end_idx = if start_last_id > 0 {
+        let end_idx = if start_last_id != usize::MAX && start_last_id > 0 {
             start_last_id
         } else {
             s.len()
@@ -215,7 +226,7 @@ impl FilterImpl {
             return self.get_partial_citation_text(start_first_id, end_first_id, start_last_id, s);
         }
 
-        let txt = if start_last_id > 0 {
+        let txt = if start_last_id != usize::MAX && start_last_id > 0 {
             &s[..start_last_id]
         } else {
             s
@@ -333,4 +344,309 @@ fn convert_string_to_int_list(s: &str) -> Vec<usize> {
     }
 
     int_arr
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filter::FilterImpl;
+    use tokenizers::Tokenizer;
+
+    #[test]
+    fn test_handle_citations_standard_case() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.stream_non_grounded_answer = true;
+        filter.cur_citation_byte_index = -1;
+
+        let input = "hello <co: 2,1>foo</co: 2,1>";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hello foo");
+        assert_eq!(output.citations.len(), 1);
+        assert_eq!(output.citations[0].start_index, 6);
+        assert_eq!(output.citations[0].end_index, 9);
+        assert_eq!(output.citations[0].text, "foo");
+        assert_eq!(output.citations[0].sources.len(), 1);
+        assert_eq!(output.citations[0].sources[0].tool_call_index, 0);
+        assert_eq!(
+            output.citations[0].sources[0].tool_result_indices,
+            vec![2, 1]
+        );
+        assert_eq!(remove, 28);
+    }
+
+    #[test]
+    fn test_handle_citations_standard_case_no_stream() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.stream_non_grounded_answer = false;
+        filter.cur_citation_byte_index = -1;
+
+        let input = "hello <co: 2,1>foo</co: 2,1>";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hello foo");
+        assert_eq!(output.citations.len(), 1);
+        assert_eq!(output.citations[0].start_index, 6);
+        assert_eq!(output.citations[0].end_index, 9);
+        assert_eq!(output.citations[0].text, "foo");
+        assert_eq!(output.citations[0].sources.len(), 1);
+        assert_eq!(output.citations[0].sources[0].tool_call_index, 0);
+        assert_eq!(
+            output.citations[0].sources[0].tool_result_indices,
+            vec![2, 1]
+        );
+        assert_eq!(remove, 28);
+    }
+
+    #[test]
+    fn test_handle_citations_no_document() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.stream_non_grounded_answer = true;
+        filter.cur_citation_byte_index = -1;
+
+        let input = "hello <co: >foo</co: >";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hello foo");
+        assert_eq!(output.citations.len(), 1);
+        assert_eq!(output.citations[0].start_index, 6);
+        assert_eq!(output.citations[0].end_index, 9);
+        assert_eq!(output.citations[0].text, "foo");
+        assert_eq!(output.citations[0].sources.len(), 0);
+        assert_eq!(remove, 22);
+    }
+
+    #[test]
+    fn test_handle_citations_non_int_document() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.stream_non_grounded_answer = true;
+        filter.cur_citation_byte_index = -1;
+
+        let input = "hello <co: 2, foo>foo</co: 2, foo>";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hello foo");
+        assert_eq!(output.citations.len(), 1);
+        assert_eq!(output.citations[0].start_index, 6);
+        assert_eq!(output.citations[0].end_index, 9);
+        assert_eq!(output.citations[0].text, "foo");
+        assert_eq!(output.citations[0].sources.len(), 1);
+        assert_eq!(output.citations[0].sources[0].tool_call_index, 0);
+        assert_eq!(output.citations[0].sources[0].tool_result_indices, vec![2]);
+        assert_eq!(remove, 34);
+    }
+
+    #[test]
+    fn test_handle_citations_different_documents() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.stream_non_grounded_answer = true;
+        filter.cur_citation_byte_index = -1;
+
+        let input = "hello <co: 1,2>foo</co: 3,4>";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hello foo");
+        assert_eq!(output.citations.len(), 1);
+        assert_eq!(output.citations[0].start_index, 6);
+        assert_eq!(output.citations[0].end_index, 9);
+        assert_eq!(output.citations[0].text, "foo");
+        assert_eq!(output.citations[0].sources.len(), 1);
+        assert_eq!(output.citations[0].sources[0].tool_call_index, 0);
+        assert_eq!(
+            output.citations[0].sources[0].tool_result_indices,
+            vec![3, 4]
+        );
+        assert_eq!(remove, 28);
+    }
+
+    #[test]
+    fn test_handle_citations_no_citation() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.stream_non_grounded_answer = true;
+        filter.cur_citation_byte_index = -1;
+
+        let input = "hello coo";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hello coo");
+        assert_eq!(remove, 9);
+    }
+
+    #[test]
+    fn test_handle_citations_incomplete_first_citation() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.stream_non_grounded_answer = true;
+        filter.cur_citation_byte_index = -1;
+
+        let input = "<";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        assert!(output.is_none());
+        assert_eq!(remove, 0);
+    }
+
+    #[test]
+    fn test_handle_citations_multiple_citations() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let mut filter = FilterImpl::new(tokenizer);
+        filter.stream_non_grounded_answer = true;
+        filter.cur_citation_byte_index = -1;
+
+        let input = "hello <co: 2,1>foo</co: 2,1> hi <co: 0>barber</co: 0>";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hello foo hi barber");
+        assert_eq!(output.citations.len(), 2);
+
+        assert_eq!(output.citations[0].start_index, 6);
+        assert_eq!(output.citations[0].end_index, 9);
+        assert_eq!(output.citations[0].text, "foo");
+        assert_eq!(output.citations[0].sources.len(), 1);
+        assert_eq!(
+            output.citations[0].sources[0].tool_result_indices,
+            vec![2, 1]
+        );
+
+        assert_eq!(output.citations[1].start_index, 13);
+        assert_eq!(output.citations[1].end_index, 19);
+        assert_eq!(output.citations[1].text, "barber");
+        assert_eq!(output.citations[1].sources.len(), 1);
+        assert_eq!(output.citations[1].sources[0].tool_result_indices, vec![0]);
+
+        assert_eq!(remove, 53);
+    }
+
+    #[test]
+    fn test_find_an_element_standard_case() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let filter = FilterImpl::new(tokenizer);
+
+        let input = "hello <co: 2,1> foo </co: 2,1>";
+        let (start_index, end_index, docs) = filter.find_an_element(input, "<co: ", ">", false);
+
+        assert_eq!(start_index, 6);
+        assert_eq!(end_index, 14);
+        assert_eq!(docs.len(), 1);
+        assert_eq!(docs[0].tool_call_index, 0);
+        assert_eq!(docs[0].tool_result_indices, vec![2, 1]);
+    }
+
+    #[test]
+    fn test_find_an_element_no_citation() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let filter = FilterImpl::new(tokenizer);
+
+        let input = "hello";
+        let (start_index, end_index, docs) = filter.find_an_element(input, "<co: ", ">", false);
+
+        assert_eq!(start_index, usize::MAX);
+        assert_eq!(end_index, usize::MAX);
+        assert_eq!(docs.len(), 0);
+    }
+
+    #[test]
+    fn test_find_an_element_cmd3_two_tools() {
+        let tokenizer = Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+
+        let filter = FilterImpl::new(tokenizer);
+
+        let input = "<co> hello </co: 0:[1,2],1:[0]>";
+        let (start_index, end_index, docs) = filter.find_an_element(input, "</co: ", ">", true);
+
+        assert_eq!(start_index, 11);
+        assert_eq!(end_index, 30);
+        assert_eq!(docs.len(), 2);
+        assert_eq!(docs[0].tool_call_index, 0);
+        assert_eq!(docs[0].tool_result_indices, vec![1, 2]);
+        assert_eq!(docs[1].tool_call_index, 1);
+        assert_eq!(docs[1].tool_result_indices, vec![0]);
+    }
+
+    #[test]
+    fn test_convert_string_to_int_list() {
+        assert_eq!(convert_string_to_int_list("0"), vec![0]);
+        assert_eq!(convert_string_to_int_list("0,"), vec![0]);
+        assert_eq!(convert_string_to_int_list("0,1"), vec![0, 1]);
+        assert_eq!(convert_string_to_int_list("1,0"), vec![1, 0]);
+        assert_eq!(convert_string_to_int_list(""), Vec::<usize>::new());
+        assert_eq!(convert_string_to_int_list("foo"), Vec::<usize>::new());
+        assert_eq!(convert_string_to_int_list("foo,0"), vec![0]);
+        assert_eq!(convert_string_to_int_list("999"), vec![999]);
+        assert_eq!(convert_string_to_int_list("-1"), Vec::<usize>::new());
+    }
 }
