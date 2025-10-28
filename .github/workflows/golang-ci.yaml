@@ -15,7 +15,7 @@ env:
   bucket_name: "main"
 
 jobs:
-  lint:
+  go-lint:
     runs-on: depot-ubuntu-24.04-16
     permissions:
       contents: "read"

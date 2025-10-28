@@ -10,8 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test
+  rust-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,8 +35,7 @@ jobs:
         working-directory: ./rust
         run: cargo test --verbose
 
-  lint:
-    name: Lint
+  rust-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,8 +62,7 @@ jobs:
         working-directory: ./rust
         run: cargo clippy -- -D warnings
 
-  format:
-    name: Format
+  rust-format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,8 +74,7 @@ jobs:
         working-directory: ./rust
         run: cargo fmt -- --check
 
-  build:
-    name: Build
+  rust-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
