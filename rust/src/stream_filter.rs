@@ -47,7 +47,7 @@ impl<D: Send + 'static> StreamFilter<D> {
 
     pub fn write(
         &self,
-        _token: i64,
+        _token: u32,
         _likelihood: Option<f32>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // We need to decode the token first

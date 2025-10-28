@@ -42,7 +42,7 @@ pub struct FilterImpl {
 
     pub(crate) cur_text_index: usize,
     pub(crate) cur_text_byte_index: usize,
-    pub(crate) cur_citation_byte_index: i64,
+    pub(crate) cur_citation_byte_index: isize,
     pub(crate) action_metadata: FilterAction,
 
     pub(crate) curr_search_query_idx: usize,

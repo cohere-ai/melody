@@ -186,7 +186,7 @@ impl FilterImpl {
             self.cur_citation_byte_index as usize
         };
 
-        self.cur_citation_byte_index = (s.len() - text_before_citation.len()) as i64;
+        self.cur_citation_byte_index = (s.len() - text_before_citation.len()) as isize;
 
         let end_idx = if start_last_id > 0 {
             start_last_id
