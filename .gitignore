@@ -30,3 +30,12 @@ go.work.sum
 # Editor/IDE
 .idea/
 .vscode/
+
+# Rust build artifacts
+rust/target/
+target/
+**/*.rs.bk
+Cargo.lock
+
+# OS
+.DS_Store

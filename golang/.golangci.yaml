@@ -1,0 +1,99 @@
+version: "2"
+run:
+  modules-download-mode: vendor
+  allow-parallel-runners: true
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errorlint
+    - forbidigo
+    - gocritic
+    - gocyclo
+    - goprintffuncname
+    - govet
+    - nakedret
+    - nilerr
+    - nolintlint
+    - paralleltest
+    - perfsprint
+    - revive
+    - rowserrcheck
+    - staticcheck
+    - testifylint
+    - thelper
+    - unparam
+    - unused
+    - whitespace
+  settings:
+    revive:
+      severity: "warning"
+      confidence: 0.8
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+        - name: unreachable-code
+        - name: redefines-builtin-id
+    dupl:
+      threshold: 300
+    forbidigo:
+      forbid:
+        - pattern: fmt\.Print.*(# Do not commit print statements\.)?
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    gocritic:
+      disabled-checks:
+        - unnamedResult
+        - paramTypeCombine
+        - whyNoLint
+      enabled-tags:
+        - diagnostic
+        - opinionated
+        - performance
+        - style
+      settings:
+        hugeParam:
+          sizeThreshold: 512
+        rangeValCopy:
+          sizeThreshold: 512
+    gocyclo:
+      min-complexity: 100
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/cohere-ai/melody
+  exclusions:
+    generated: lax
+    paths:
+      - .github/
