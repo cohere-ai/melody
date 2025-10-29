@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/buger/jsonparser v1.1.1
 	github.com/cohere-ai/tokenizers v0.9.1
+	github.com/google/uuid v1.6.0
 	github.com/mailru/easyjson v0.9.1
 	github.com/osteele/liquid v1.7.0
 	github.com/stretchr/testify v1.11.1

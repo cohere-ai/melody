@@ -1,5 +1,18 @@
 package parsing
 
+import (
+	"fmt"
+	"strings"
+)
+
+func reverse[A comparable, B comparable](m map[A]B) map[B]A {
+	reversed := make(map[B]A)
+	for k, v := range m {
+		reversed[v] = k
+	}
+	return reversed
+}
+
 // Decoder represents a basic tokenizer interface required for the filter to accept tokens.
 type Decoder interface {
 	Decode(tokens []int64, skipSpecialTokens bool) (string, error)
@@ -29,7 +42,7 @@ type FilterOutput struct {
 	ToolCalls     *FilterToolCallDelta
 	IsToolsReason bool // also used to mark thinking
 
-	SearchQuery  *FilterSearchQueryDelta // deprecated
+	SearchQuery  *FilterSearchQueryDelta `python:",omit"` // deprecated
 	IsPostAnswer bool                    // deprecated
 }
 
@@ -74,17 +87,44 @@ type Source struct {
 	ToolResultIndices []int
 }
 
-type filterMode struct{ e uint }
+type FilterMode struct{ e uint }
 
 var (
-	plainText       = filterMode{0}
-	ignore          = filterMode{1}
-	toolAction      = filterMode{2}
-	toolReason      = filterMode{3}
-	answer          = filterMode{4}
-	groundedAnswer  = filterMode{5}
-	inclusiveStop   = filterMode{6}
-	exclusiveStop   = filterMode{7}
-	searchQuery     = filterMode{8}
-	nextSearchQuery = filterMode{9}
+	unknownFilterMode = FilterMode{e: 0}
+	plainText         = FilterMode{1}
+	ignore            = FilterMode{2}
+	toolAction        = FilterMode{3}
+	toolReason        = FilterMode{4}
+	answer            = FilterMode{5}
+	groundedAnswer    = FilterMode{6}
+	inclusiveStop     = FilterMode{7}
+	exclusiveStop     = FilterMode{8}
+	searchQuery       = FilterMode{9}
+	nextSearchQuery   = FilterMode{10}
 )
+
+var filterModeToString = map[FilterMode]string{
+	plainText:       "plaintext",
+	ignore:          "ignore",
+	toolAction:      "toolaction",
+	toolReason:      "toolreason",
+	answer:          "answer",
+	groundedAnswer:  "groundedanswer",
+	inclusiveStop:   "inclusivestop",
+	exclusiveStop:   "exclusivestop",
+	searchQuery:     "searchquery",
+	nextSearchQuery: "nextsearchquery",
+}
+
+var stringToFilterMode = reverse(filterModeToString)
+
+func FilterModeFromString(s string) (FilterMode, error) {
+	if fm, ok := stringToFilterMode[strings.ToLower(s)]; ok {
+		return fm, nil
+	}
+	return unknownFilterMode, fmt.Errorf("unknown filter mode: %s", s)
+}
+
+func (f FilterMode) String() string {
+	return filterModeToString[f]
+}

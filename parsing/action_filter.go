@@ -50,7 +50,7 @@ func (f *filter) ParseActions(str string) ([]FilterOutput, int) {
 	}
 	switch f.actionMetaData.mode {
 	case notStarted, toolEnd:
-		return f.HandleBeforeTool(str, f.hasToolCallID)
+		return f.HandleBeforeTool(str, f.o.HasToolCallID)
 	case toolCallID:
 		return f.HandleInToolCallID(str)
 	case toolCallIDEnd:
@@ -79,7 +79,7 @@ func (f *filter) HandleBeforeTool(str string, checkCallID bool) ([]FilterOutput,
 	var mode actionMode
 
 	switch {
-	case f.llamaToolParsing:
+	case f.o.LlamaToolParsing:
 		indices = llamaToolNameRegex.FindStringIndex(str)
 		mode = toolName
 	case checkCallID:
@@ -143,7 +143,7 @@ func (f *filter) HandleToolNameEnd(str string) ([]FilterOutput, int) {
 		out, rem := f.ParseActions(str[idx:])
 		return out, rem + len(str[:idx])
 	}
-	if f.streamProcessedParams {
+	if f.o.StreamProcessedParams {
 		f.actionMetaData.mode = paramName
 		out, rem := f.ParseActions(str[indices[1]:])
 		return out, rem + len(str[:indices[1]])
@@ -235,7 +235,7 @@ func (f *filter) HandleParamValueEnd(str string) ([]FilterOutput, int) {
 }
 
 func (f *filter) sendToolCallIDChunk(str string) []FilterOutput {
-	if str == "" || !f.streamToolActions {
+	if str == "" || !f.o.StreamToolActions {
 		return nil
 	}
 	return []FilterOutput{{
@@ -247,7 +247,7 @@ func (f *filter) sendToolCallIDChunk(str string) []FilterOutput {
 }
 
 func (f *filter) sendToolNameChunk(str string) []FilterOutput {
-	if str == "" || !f.streamToolActions {
+	if str == "" || !f.o.StreamToolActions {
 		return nil
 	}
 	return []FilterOutput{{
@@ -259,7 +259,7 @@ func (f *filter) sendToolNameChunk(str string) []FilterOutput {
 }
 
 func (f *filter) sendParamNameChunk(str string) []FilterOutput {
-	if str == "" || !f.streamToolActions {
+	if str == "" || !f.o.StreamToolActions {
 		return nil
 	}
 	f.actionMetaData.curParamName = str
@@ -274,7 +274,7 @@ func (f *filter) sendParamNameChunk(str string) []FilterOutput {
 }
 
 func (f *filter) sendRawParamChunk(str string) []FilterOutput {
-	if str == "" || !f.streamToolActions {
+	if str == "" || !f.o.StreamToolActions {
 		return nil
 	}
 	return []FilterOutput{{
@@ -292,7 +292,7 @@ func (f *filter) sendParamValueChunk(str string) ([]FilterOutput, int) {
 	if f.actionMetaData.trimLeft {
 		trimmedStr = strings.TrimLeftFunc(trimmedStr, unicode.IsSpace)
 	}
-	if trimmedStr == "" || !f.streamToolActions {
+	if trimmedStr == "" || !f.o.StreamToolActions {
 		return nil, 0
 	}
 	// We have seen a value so stop trimming left

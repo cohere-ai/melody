@@ -7,6 +7,9 @@ github.com/cohere-ai/tokenizers
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/google/uuid v1.6.0
+## explicit
+github.com/google/uuid
 # github.com/kr/pretty v0.1.0
 ## explicit
 # github.com/mailru/easyjson v0.9.1

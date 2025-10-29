@@ -1,11 +1,11 @@
 package parsing
 
-var ragTokenMap = map[string]filterMode{
+var ragTokenMap = map[string]FilterMode{
 	"Grounded answer:": groundedAnswer,
 	"Answer:":          answer,
 }
 
-var multiHopTokenMap = map[string]filterMode{
+var multiHopTokenMap = map[string]FilterMode{
 	"Grounded answer:": groundedAnswer,
 	"Answer:":          answer,
 	"Plan:":            toolReason,
@@ -18,7 +18,7 @@ var multiHopTokenMap = map[string]filterMode{
 }
 
 // TODO add ticket for token change
-var multiHopTokenMapCmd3 = map[string]filterMode{
+var multiHopTokenMapCmd3 = map[string]FilterMode{
 	"<|START_RESPONSE|>": groundedAnswer,
 	"<|END_RESPONSE|>":   ignore,
 	"<|START_THINKING|>": toolReason,
@@ -27,7 +27,7 @@ var multiHopTokenMapCmd3 = map[string]filterMode{
 	"<|END_ACTION|>":     ignore,
 }
 
-var multiHopTokenMapCmd4 = map[string]filterMode{
+var multiHopTokenMapCmd4 = map[string]FilterMode{
 	"<|START_TEXT|>":     groundedAnswer,
 	"<|END_TEXT|>":       ignore,
 	"<|START_THINKING|>": toolReason,
@@ -36,13 +36,13 @@ var multiHopTokenMapCmd4 = map[string]filterMode{
 	"<|END_ACTION|>":     ignore,
 }
 
-var searchQueryTokenMap = map[string]filterMode{
+var searchQueryTokenMap = map[string]FilterMode{
 	"Search:": searchQuery,
 	"|||":     nextSearchQuery,
 	"\n":      nextSearchQuery,
 }
 
-var llamaTokenMap = map[string]filterMode{
+var llamaTokenMap = map[string]FilterMode{
 	"\n\n":           groundedAnswer,
 	"<|python_tag|>": toolAction,
 	"<eom_id>":       exclusiveStop,

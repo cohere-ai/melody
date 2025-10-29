@@ -7,7 +7,30 @@ import (
 
 	"github.com/cohere-ai/melody"
 	"github.com/cohere-ai/melody/lib/orderedjson"
+	"github.com/cohere-ai/melody/parsing"
 )
+
+func pythonFilterToObject(Py py.Py, o any) (py.Object, error) {
+	if pf, ok := o.(PythonFilter); ok {
+		return Py.GoToObject(pf.ID)
+	}
+	return py.Object{}, fmt.Errorf("trying to convert non-PythonFilter Go Object to a PythonFilter")
+}
+func pythonFilterFromObject(Py py.Py, o py.Object, a any) error {
+	v := a.(*PythonFilter)
+	var s string
+	if err := Py.GoFromObject(o, &s); err != nil {
+		return fmt.Errorf("PythonFilter must be a string ID: %w", err)
+	}
+	*v = PythonFilter{ID: s}
+	return nil
+}
+
+var pythonFilterConversion = py.GoConvConf{
+	TypeOf:     PythonFilter{},
+	ToObject:   pythonFilterToObject,
+	FromObject: pythonFilterFromObject,
+}
 
 var roleConversion = py.GoConvConf{
 	TypeOf:     melody.Role{},
@@ -165,6 +188,32 @@ func reasoningTypeFromObject(Py py.Py, o py.Object, a any) error {
 	return nil
 }
 
+var filterModeConversion = py.GoConvConf{
+	TypeOf:     parsing.FilterMode{},
+	ToObject:   filterModeToObject,
+	FromObject: filterModeFromObject,
+}
+
+func filterModeToObject(Py py.Py, o any) (py.Object, error) {
+	if rt, ok := o.(parsing.FilterMode); ok {
+		return Py.GoToObject(rt.String())
+	}
+	return py.Object{}, fmt.Errorf("trying to convert non-FilterMode Go Object to a Python FilterMode")
+}
+func filterModeFromObject(Py py.Py, o py.Object, a any) error {
+	v := a.(*parsing.FilterMode)
+	var s string
+	if err := Py.GoFromObject(o, &s); err != nil {
+		return fmt.Errorf("filter mode must be a string: %w", err)
+	}
+	rt, err := parsing.FilterModeFromString(s)
+	if err != nil {
+		return err
+	}
+	*v = rt
+	return nil
+}
+
 var orderedJSONObjectConversion = py.GoConvConf{
 	TypeOf:     orderedjson.Object{},
 	ToObject:   orderedJSONObjectToObject,
@@ -237,5 +286,65 @@ func orderedJSONObjectFromObject(Py py.Py, o py.Object, a any) error {
 		}
 		v.Set(key, value)
 	}
+	return nil
+}
+
+var filterToolCallDeltaPointerConversion = py.GoConvConf{
+	TypeOf:     &parsing.FilterToolCallDelta{},
+	ToObject:   filterToolCallDeltaToObject,
+	FromObject: filterToolCallDeltaFromObject,
+}
+
+func filterToolCallDeltaToObject(Py py.Py, o any) (py.Object, error) {
+	if fo, ok := o.(*parsing.FilterToolCallDelta); ok {
+		if fo == nil {
+			return py.None, nil
+		}
+		return Py.GoToObject(*fo)
+	}
+	return py.Object{}, fmt.Errorf("trying to convert non-FilterToolCallDelta Go Object to a Python FilterToolCallDelta")
+}
+
+func filterToolCallDeltaFromObject(Py py.Py, o py.Object, a any) error {
+	v := a.(**parsing.FilterToolCallDelta)
+	if o == py.None {
+		*v = nil
+		return nil
+	}
+	var fo parsing.FilterToolCallDelta
+	if err := Py.GoFromObject(o, &fo); err != nil {
+		return fmt.Errorf("FilterToolCallDelta must be a FilterToolCallDelta: %w", err)
+	}
+	*v = &fo
+	return nil
+}
+
+var filterToolParameterPointerConversion = py.GoConvConf{
+	TypeOf:     &parsing.FilterToolParameter{},
+	ToObject:   filterToolParameterToObject,
+	FromObject: filterToolParameterFromObject,
+}
+
+func filterToolParameterToObject(Py py.Py, o any) (py.Object, error) {
+	if fo, ok := o.(*parsing.FilterToolParameter); ok {
+		if fo == nil {
+			return py.None, nil
+		}
+		return Py.GoToObject(*fo)
+	}
+	return py.Object{}, fmt.Errorf("trying to convert non-FilterOutput Go Object to a Python FilterOutput")
+}
+
+func filterToolParameterFromObject(Py py.Py, o py.Object, a any) error {
+	v := a.(**parsing.FilterToolParameter)
+	if o == py.None {
+		*v = nil
+		return nil
+	}
+	var fo parsing.FilterToolParameter
+	if err := Py.GoFromObject(o, &fo); err != nil {
+		return fmt.Errorf("FilterToolParameter must be a FilterToolParameter: %w", err)
+	}
+	*v = &fo
 	return nil
 }

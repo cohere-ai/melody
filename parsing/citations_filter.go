@@ -18,13 +18,13 @@ const (
 
 // Input 1. curIndex is the index of the string without citations so far 2. is the string to process e.g. " <co: 1"
 // Output 1. output with text and citations 2. amount to remove from the buffer including citations
-func (f *filter) ParseCitations(str string, mode filterMode) (*FilterOutput, int) {
+func (f *filter) ParseCitations(str string, mode FilterMode) (*FilterOutput, int) {
 	// First try to find the 'first' citation element. For example <co: 1,2,3>
 	startFirstCitationStr := startFirstCit
-	if f.cmd3Citations {
+	if f.o.Cmd3Citations {
 		startFirstCitationStr = startFirstCitCmd3
 	}
-	startFirstID, endFirstID, _ := f.findAnElement(str, startFirstCitationStr, endOfCit, f.cmd3Citations)
+	startFirstID, endFirstID, _ := f.findAnElement(str, startFirstCitationStr, endOfCit, f.o.Cmd3Citations)
 
 	// No citation was found so send the plain text and remove from buffer
 	if startFirstID < 0 {
@@ -41,11 +41,11 @@ func (f *filter) ParseCitations(str string, mode filterMode) (*FilterOutput, int
 	}
 
 	// Then try to find the 'last' citation element. For example </co: 1,2,3>
-	startLastID, endLastID, docsLast := f.findAnElement(str, startLastCit, endOfCit, f.cmd3Citations)
+	startLastID, endLastID, docsLast := f.findAnElement(str, startLastCit, endOfCit, f.o.Cmd3Citations)
 
 	//  Only partial citation found so we need to wait for the complete citation.
 	if startLastID < 0 || endLastID < 0 {
-		if !f.streamNonGroundedAnswer && endLastID == -1 {
+		if !f.o.StreamNonGroundedAnswer && endLastID == -1 {
 			// Send anything before the citation + the inside of the citation
 			txt, remove := f.getPartialOrMalformedCitationText(startFirstID, endFirstID, startLastID, str)
 			if txt != "" {
@@ -131,7 +131,7 @@ func (f *filter) getPartialCitationText(startFirstID int, endFirstID int, startL
 
 func (f *filter) getPartialOrMalformedCitationText(startFirstID, endFirstID, startLastID int, str string) (string, int) {
 	// Send anything before the citation + the inside of the citation if the citation is complete and real
-	if !f.cmd3Citations || (f.cmd3Citations && len(startFirstCitCmd3)+startFirstID == endFirstID) {
+	if !f.o.Cmd3Citations || (f.o.Cmd3Citations && len(startFirstCitCmd3)+startFirstID == endFirstID) {
 		return f.getPartialCitationText(startFirstID, endFirstID, startLastID, str)
 	}
 	// otherwise we have a malformed citation, we should send the entire text up to start of the closing citation tag

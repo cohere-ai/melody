@@ -2,24 +2,53 @@ package main
 
 import (
 	"C"
+	"sync"
 	"unsafe"
 
+	"github.com/google/uuid"
 	"gitlab.com/pygolo/py"
 
 	"github.com/cohere-ai/melody"
 	"github.com/cohere-ai/melody/parsing"
 )
 
-type PointerTest struct {
-	A *Nested
-}
-type Nested struct {
-	A int
+var registry sync.Map
+
+type PythonFilter struct {
+	ID string
 }
 
-func ModifyPointer(m PointerTest) int {
-	m.A.A = m.A.A + 1
-	return m.A.A
+func NewFilter(o parsing.Options) PythonFilter {
+	id := uuid.New().String()
+	parsing.HandleMultiHopCmd3()(&o)
+	parsing.StreamToolActions()(&o)
+	registry.Store(id, parsing.NewFromOptions(nil, nil, o))
+	return PythonFilter{ID: id}
+}
+
+func CloseFilter(p PythonFilter) []parsing.FilterOutput {
+	fAny, ok := registry.Load(p.ID)
+	if !ok {
+		return nil
+	}
+	f, ok := fAny.(parsing.Filter)
+	if !ok {
+		return nil
+	}
+	registry.Delete(p.ID)
+	return f.FlushPartials()
+}
+
+func WriteDecoded(p PythonFilter, decodedToken string) []parsing.FilterOutput {
+	fAny, ok := registry.Load(p.ID)
+	if !ok {
+		return nil
+	}
+	f, ok := fAny.(parsing.Filter)
+	if !ok {
+		return nil
+	}
+	return f.WriteDecoded(decodedToken, parsing.TokenIDsWithLogProb{})
 }
 
 func myext(Py py.Py, m py.Object) error {
@@ -28,19 +57,20 @@ func myext(Py py.Py, m py.Object) error {
 		return err
 	}
 	// Register funcs
-	if err := Py.Object_SetAttr(m, "ModifyPointer", ModifyPointer); err != nil {
+	if err := Py.Object_SetAttr(m, "NewFilter", NewFilter); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "CloseFilter", CloseFilter); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "WriteDecoded", WriteDecoded); err != nil {
+		return err
+	}
+	if err := Py.Object_SetAttr(m, "NewOptions", parsing.NewOptions); err != nil {
 		return err
 	}
 
 	// Register Structs
-	{
-		if err := Py.GoRegisterStruct(PointerTest{}); err != nil {
-			return err
-		}
-		if err := Py.GoRegisterStruct(Nested{}); err != nil {
-			return err
-		}
-	}
 	{
 		if err := Py.GoRegisterStruct(melody.Message{}); err != nil {
 			return err
@@ -149,6 +179,15 @@ func myext(Py py.Py, m py.Object) error {
 			return err
 		}
 	}
+	{
+		if err := Py.GoRegisterStruct(parsing.Options{}); err != nil {
+			return err
+		}
+		t, _ := Py.GoGetStructType(parsing.Options{})
+		if err := Py.Object_SetAttr(m, "Options", t); err != nil {
+			return err
+		}
+	}
 
 	// Conversion for ordered json
 	if err := py.GoRegisterConversions(orderedJSONObjectConversion); err != nil {
@@ -156,6 +195,9 @@ func myext(Py py.Py, m py.Object) error {
 	}
 
 	// Register conversions
+	if err := py.GoRegisterConversions(pythonFilterConversion); err != nil {
+		return err
+	}
 	if err := py.GoRegisterConversions(roleConversion); err != nil {
 		return err
 	}
@@ -172,6 +214,15 @@ func myext(Py py.Py, m py.Object) error {
 		return err
 	}
 	if err := py.GoRegisterConversions(reasoningTypeConversion); err != nil {
+		return err
+	}
+	if err := py.GoRegisterConversions(filterModeConversion); err != nil {
+		return err
+	}
+	if err := py.GoRegisterConversions(filterToolCallDeltaPointerConversion); err != nil {
+		return err
+	}
+	if err := py.GoRegisterConversions(filterToolParameterPointerConversion); err != nil {
 		return err
 	}
 

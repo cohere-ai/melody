@@ -892,7 +892,7 @@ func TestHandleLlamaTools(t *testing.T) {
 				actionMetaData:        tc.metadata,
 				streamToolActions:     true,
 				streamProcessedParams: true,
-				specialTokenMap:       map[string]filterMode{},
+				specialTokenMap:       map[string]FilterMode{},
 			}
 			HandleLlama()(&f)
 			out, actualRemove := f.ParseActions(tc.completion)
