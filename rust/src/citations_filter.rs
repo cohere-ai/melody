@@ -42,13 +42,7 @@ impl FilterImpl {
 
         let mut res_out = res_out.unwrap();
         res_out.is_post_answer = self.stream_non_grounded_answer && mode != FilterMode::ToolReason;
-
-        // Citation outputs (empty text with citations) are metadata, not tool reasoning text
-        if res_out.text.is_empty() && !res_out.citations.is_empty() {
-            res_out.is_tools_reason = false;
-        } else {
-            res_out.is_tools_reason = mode == FilterMode::ToolReason;
-        }
+        res_out.is_tools_reason = mode == FilterMode::ToolReason;
 
         // Don't send logprobs for citations if there's no corresponding text.
         if let Some(probs) = token_log_probs

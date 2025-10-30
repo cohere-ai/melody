@@ -4,9 +4,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/cohere-ai/melody"
 	"github.com/cohere-ai/melody/_internal/tokenizers"
-	"github.com/stretchr/testify/require"
 )
 
 func TestFilter_Command3(t *testing.T) {
@@ -92,8 +93,7 @@ func TestFilter_Command3(t *testing.T) {
 				{IsToolsReason: true, Text: "emoji", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{104150}, Logprobs: []float32{0.008}}},
 				{IsToolsReason: true, Text: ":", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{33}, Logprobs: []float32{0.009}}},
 				{IsToolsReason: true, Text: " 🌈", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{11254, 242, 238}, Logprobs: []float32{0.01, 0.011, 0.012}}},
-				// TODO: this was true in the pure golang implementation. why?
-				{IsToolsReason: false, Citations: []melody.FilterCitation{{
+				{IsToolsReason: true, Citations: []melody.FilterCitation{{
 					StartIndex: 18,
 					EndIndex:   26,
 					Text:       "emoji: 🌈",

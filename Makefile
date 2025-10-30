@@ -1,6 +1,12 @@
 TOKENIZERS_VERSION = v0.9.1
 UNAME := $(shell uname)
 ARCH := $(shell uname -m)
+mod-install-tokenizers:
+	@echo "-- installing libtokenizers.a at ~/go/pkg/mod/github.com/cohere-ai/tokenizers@${TOKENIZERS_VERSION}/libtokenizers.a..."
+	@curl -fsSL https://github.com/cohere-ai/tokenizers/releases/download/${TOKENIZERS_VERSION}/libtokenizers.${UNAME}-${ARCH}.tar.gz | tar xvz
+	@mv libtokenizers.a ~/go/pkg/mod/github.com/cohere-ai/tokenizers@${TOKENIZERS_VERSION}/
+	@echo "-- installed libtokenizers.a"
+
 install-tokenizers:
 	@echo "-- installing libtokenizers.a at ./golang/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a..."
 	@curl -fsSL https://github.com/cohere-ai/tokenizers/releases/download/${TOKENIZERS_VERSION}/libtokenizers.${UNAME}-${ARCH}.tar.gz | tar xvz
