@@ -18,6 +18,9 @@ golang-lint:
 golang-test: check-install-tokenizers
 	cd golang && go test ./...
 
+golang-bindings-test: check-install-tokenizers
+	cd go-bindings && go test -v ./...
+
 rust-test:
 	cd rust && cargo test --verbose
 
