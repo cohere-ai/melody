@@ -24,7 +24,7 @@ golang-lint:
 golang-test: check-install-tokenizers
 	cd golang && go test ./...
 
-golang-bindings-test: check-install-tokenizers
+golang-bindings-test: check-install-tokenizers rust-build
 	cd go-bindings && go test -v ./...
 
 rust-test:
@@ -37,4 +37,4 @@ rust-format:
 	cd rust && cargo fmt
 
 rust-build:
-	cd rust && cargo build --release
+	cd rust && cargo clean && cargo build --release
