@@ -64,9 +64,7 @@ impl FilterImpl {
     }
 
     fn handle_before_tool(&mut self, s: &str, check_call_id: bool) -> (Vec<FilterOutput>, usize) {
-        let (regex, mode) = if self.llama_tool_parsing {
-            (Regex::new(r#""name":\s*""#).unwrap(), ActionMode::ToolName)
-        } else if check_call_id {
+        let (regex, mode) = if check_call_id {
             (
                 Regex::new(r#""tool_call_id":\s*""#).unwrap(),
                 ActionMode::ToolCallID,
@@ -638,58 +636,6 @@ mod tests {
         assert_eq!(
             out[1].tool_calls.as_ref().unwrap().raw_param_delta,
             "{\n\"query\": \"query1\"\n}"
-        );
-    }
-
-    #[test]
-    fn test_handle_llama_tools() {
-        let mut filter = FilterImpl::new();
-        filter.action_metadata = starting_metadata();
-        filter.stream_tool_actions = true;
-        filter.stream_processed_params = true;
-        filter.llama_tool_parsing = true;
-
-        let completion = "\\n\\n<|python_tag|>{\"name\": \"internet_search\", \"parameters\": {\"query\": \"Sound of Music company S&P 500 year\"}}<|eom_id|>";
-        let (out, actual_remove) = filter.parse_actions(completion);
-
-        assert_eq!(actual_remove, 110);
-        assert_eq!(out.len(), 3);
-
-        // Tool name
-        assert!(out[0].tool_calls.is_some());
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "internet_search");
-
-        // Param name
-        assert!(out[1].tool_calls.is_some());
-        assert_eq!(out[1].tool_calls.as_ref().unwrap().index, 0);
-        assert!(out[1].tool_calls.as_ref().unwrap().param_delta.is_some());
-        assert_eq!(
-            out[1]
-                .tool_calls
-                .as_ref()
-                .unwrap()
-                .param_delta
-                .as_ref()
-                .unwrap()
-                .name,
-            "query"
-        );
-
-        // Param value
-        assert!(out[2].tool_calls.is_some());
-        assert_eq!(out[2].tool_calls.as_ref().unwrap().index, 0);
-        assert!(out[2].tool_calls.as_ref().unwrap().param_delta.is_some());
-        assert_eq!(
-            out[2]
-                .tool_calls
-                .as_ref()
-                .unwrap()
-                .param_delta
-                .as_ref()
-                .unwrap()
-                .value_delta,
-            "\"Sound of Music company S&P 500 year\""
         );
     }
 }

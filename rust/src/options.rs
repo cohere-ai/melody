@@ -19,7 +19,6 @@ pub struct FilterOptions {
     pub(crate) stream_processed_params: bool,
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
-    pub(crate) llama_tool_parsing: bool,
 }
 
 impl Default for FilterOptions {
@@ -40,7 +39,6 @@ impl Default for FilterOptions {
             stream_processed_params: false,
             has_tool_call_id: false,
             cmd3_citations: false,
-            llama_tool_parsing: false,
         }
     }
 }
@@ -168,19 +166,6 @@ impl FilterOptions {
         self
     }
 
-    pub fn handle_llama(mut self) -> Self {
-        self.default_mode = FilterMode::GroundedAnswer;
-        self.right_trimmed = true;
-        self.llama_tool_parsing = true;
-        self.special_token_map
-            .insert("\n\n".to_string(), FilterMode::GroundedAnswer);
-        self.special_token_map
-            .insert("<|python_tag|>".to_string(), FilterMode::ToolAction);
-        self.special_token_map
-            .insert("<eom_id>".to_string(), FilterMode::ExclusiveStop);
-        self
-    }
-
     pub fn stream_non_grounded_answer(mut self) -> Self {
         self.stream_non_grounded_answer = true;
         self
@@ -206,14 +191,11 @@ impl FilterOptions {
         filter.right_trimmed = self.right_trimmed;
         filter.trim_prefix = self.trim_prefix;
         filter.chunk_size = self.chunk_size;
-        filter.max_repetition_limit = self.repetition_limit;
-        filter.max_repetition_sequence_length = self.max_sequence_length;
         filter.stream_non_grounded_answer = self.stream_non_grounded_answer;
         filter.stream_tool_actions = self.stream_tool_actions;
         filter.stream_processed_params = self.stream_processed_params;
         filter.has_tool_call_id = self.has_tool_call_id;
         filter.cmd3_citations = self.cmd3_citations;
-        filter.llama_tool_parsing = self.llama_tool_parsing;
         filter.default_mode = self.default_mode;
         filter.mode = self.default_mode;
 
