@@ -14,6 +14,12 @@ pub struct CFilter {
     _private: [u8; 0],
 }
 
+/// Opaque pointer to FilterOptions
+#[repr(C)]
+pub struct CFilterOptions {
+    _private: [u8; 0],
+}
+
 /// C-compatible representation of FilterOutput
 #[repr(C)]
 pub struct CFilterOutput {
@@ -68,57 +74,300 @@ pub struct CFilterOutputArray {
     pub len: usize,
 }
 
+// ============================================================================
+// FilterOptions FFI functions
+// ============================================================================
+
+/// Creates a new FilterOptions instance
+///
+/// # Safety
+/// The returned pointer must be freed with melody_filter_options_free
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_new() -> *mut CFilterOptions {
+    let options = Box::new(FilterOptions::new());
+    Box::into_raw(options) as *mut CFilterOptions
+}
+
+/// Frees a FilterOptions instance
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_free(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let _ = Box::from_raw(options as *mut FilterOptions);
+        }
+    }
+}
+
+/// Configures options for multi-hop CMD3 format
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_handle_multi_hop_cmd3(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().handle_multi_hop_cmd3();
+        }
+    }
+}
+
+/// Configures options for multi-hop CMD4 format
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_handle_multi_hop_cmd4(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().handle_multi_hop_cmd4();
+        }
+    }
+}
+
+/// Configures options for RAG format
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_handle_rag(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().handle_rag();
+        }
+    }
+}
+
+/// Configures options for search query format
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_handle_search_query(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().handle_search_query();
+        }
+    }
+}
+
+/// Configures options for multi-hop format
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_handle_multi_hop(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().handle_multi_hop();
+        }
+    }
+}
+
+/// Enables streaming of non-grounded answers
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_stream_non_grounded_answer(
+    options: *mut CFilterOptions,
+) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().stream_non_grounded_answer();
+        }
+    }
+}
+
+/// Enables streaming of tool actions
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_stream_tool_actions(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().stream_tool_actions();
+        }
+    }
+}
+
+/// Enables streaming of processed parameters
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_stream_processed_params(
+    options: *mut CFilterOptions,
+) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().stream_processed_params();
+        }
+    }
+}
+
+/// Sets left trimming
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_with_left_trimmed(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().with_left_trimmed();
+        }
+    }
+}
+
+/// Sets right trimming
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_with_right_trimmed(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().with_right_trimmed();
+        }
+    }
+}
+
+/// Sets prefix trim
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+/// prefix must be a valid null-terminated C string
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_with_prefix_trim(
+    options: *mut CFilterOptions,
+    prefix: *const c_char,
+) {
+    if !options.is_null() && !prefix.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            let prefix_str = CStr::from_ptr(prefix).to_string_lossy().into_owned();
+            *opts = opts.clone().with_prefix_trim(prefix_str);
+        }
+    }
+}
+
+/// Sets chunk size
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_with_chunk_size(
+    options: *mut CFilterOptions,
+    size: usize,
+) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            *opts = opts.clone().with_chunk_size(size);
+        }
+    }
+}
+
+/// Adds inclusive stops
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+/// stops must be valid null-terminated C strings
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_with_inclusive_stops(
+    options: *mut CFilterOptions,
+    stops: *const *const c_char,
+    stops_len: usize,
+) {
+    if !options.is_null() && !stops.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            let stops_slice = slice::from_raw_parts(stops, stops_len);
+            let stop_strings: Vec<String> = stops_slice
+                .iter()
+                .map(|&s| CStr::from_ptr(s).to_string_lossy().into_owned())
+                .collect();
+            *opts = opts.clone().with_inclusive_stops(stop_strings);
+        }
+    }
+}
+
+/// Adds exclusive stops
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+/// stops must be valid null-terminated C strings
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_with_exclusive_stops(
+    options: *mut CFilterOptions,
+    stops: *const *const c_char,
+    stops_len: usize,
+) {
+    if !options.is_null() && !stops.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            let stops_slice = slice::from_raw_parts(stops, stops_len);
+            let stop_strings: Vec<String> = stops_slice
+                .iter()
+                .map(|&s| CStr::from_ptr(s).to_string_lossy().into_owned())
+                .collect();
+            *opts = opts.clone().with_exclusive_stops(stop_strings);
+        }
+    }
+}
+
+/// Removes a token from the special token map
+///
+/// # Safety
+/// options must be a valid pointer returned from melody_filter_options_new
+/// token must be a valid null-terminated C string
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_remove_token(
+    options: *mut CFilterOptions,
+    token: *const c_char,
+) {
+    if !options.is_null() && !token.is_null() {
+        unsafe {
+            let opts = &mut *(options as *mut FilterOptions);
+            let token_str = CStr::from_ptr(token).to_string_lossy().into_owned();
+            *opts = opts.clone().remove_token(token_str);
+        }
+    }
+}
+
+// ============================================================================
+// Filter FFI functions
+// ============================================================================
+
 /// Creates a new filter with the given options
 ///
 /// # Safety
-/// The returned pointer must be freed with melody_filter_free
+/// - options can be null for default options, or must be a valid pointer from melody_filter_options_new
+/// - The returned pointer must be freed with melody_filter_free
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_new() -> *mut CFilter {
-    let filter = Box::new(FilterImpl::new());
-    Box::into_raw(filter) as *mut CFilter
-}
-
-/// Creates a new filter with multi-hop CMD3 options
-///
-/// # Safety
-/// The returned pointer must be freed with melody_filter_free
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_new_multi_hop_cmd3(
-    stream_tool_actions: bool,
-) -> *mut CFilter {
-    let mut options = FilterOptions::new().handle_multi_hop_cmd3();
-    if stream_tool_actions {
-        options = options.stream_tool_actions();
+pub unsafe extern "C" fn melody_filter_new(options: *const CFilterOptions) -> *mut CFilter {
+    unsafe {
+        let filter = if options.is_null() {
+            Box::new(FilterImpl::new())
+        } else {
+            let opts = &*(options as *const FilterOptions);
+            Box::new(new_filter(opts.clone()))
+        };
+        Box::into_raw(filter) as *mut CFilter
     }
-    let filter = Box::new(new_filter(options));
-    Box::into_raw(filter) as *mut CFilter
-}
-
-/// Creates a new filter with multi-hop CMD4 options
-///
-/// # Safety
-/// The returned pointer must be freed with melody_filter_free
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_new_multi_hop_cmd4(
-    stream_tool_actions: bool,
-) -> *mut CFilter {
-    let mut options = FilterOptions::new().handle_multi_hop_cmd4();
-    if stream_tool_actions {
-        options = options.stream_tool_actions();
-    }
-    let filter = Box::new(new_filter(options));
-    Box::into_raw(filter) as *mut CFilter
-}
-
-/// Creates a new filter with RAG options
-///
-/// # Safety
-/// The returned pointer must be freed with melody_filter_free
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_new_rag() -> *mut CFilter {
-    let options = FilterOptions::new().handle_rag();
-    let filter = Box::new(new_filter(options));
-    Box::into_raw(filter) as *mut CFilter
 }
 
 /// Frees a filter instance

@@ -12,12 +12,6 @@ pub trait Filter {
     fn flush_partials(&mut self) -> Vec<FilterOutput>;
 }
 
-impl Default for FilterImpl {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 pub struct FilterImpl {
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,
@@ -55,7 +49,7 @@ pub struct FilterImpl {
 }
 
 impl FilterImpl {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             left_trimmed: false,
             right_trimmed: false,

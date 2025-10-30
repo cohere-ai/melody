@@ -92,6 +92,7 @@ func TestFilter_Command3(t *testing.T) {
 				{IsToolsReason: true, Text: "emoji", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{104150}, Logprobs: []float32{0.008}}},
 				{IsToolsReason: true, Text: ":", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{33}, Logprobs: []float32{0.009}}},
 				{IsToolsReason: true, Text: " 🌈", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{11254, 242, 238}, Logprobs: []float32{0.01, 0.011, 0.012}}},
+				// TODO: this was true in the pure golang implementation. why?
 				{IsToolsReason: false, Citations: []melody.FilterCitation{{
 					StartIndex: 18,
 					EndIndex:   26,

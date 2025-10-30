@@ -10,8 +10,6 @@ pub struct FilterOptions {
     pub(crate) inclusive_stops: Vec<String>,
     pub(crate) exclusive_stops: Vec<String>,
     pub(crate) chunk_size: usize,
-    pub(crate) repetition_limit: usize,
-    pub(crate) max_sequence_length: usize,
     pub(crate) special_token_map: HashMap<String, FilterMode>,
     pub(crate) default_mode: FilterMode,
     pub(crate) stream_non_grounded_answer: bool,
@@ -30,8 +28,6 @@ impl Default for FilterOptions {
             inclusive_stops: Vec::new(),
             exclusive_stops: Vec::new(),
             chunk_size: 1,
-            repetition_limit: 0,
-            max_sequence_length: 0,
             special_token_map: HashMap::new(),
             default_mode: FilterMode::PlainText,
             stream_non_grounded_answer: false,
@@ -75,12 +71,6 @@ impl FilterOptions {
 
     pub fn with_chunk_size(mut self, size: usize) -> Self {
         self.chunk_size = size;
-        self
-    }
-
-    pub fn with_repetition_limit(mut self, limit: usize, max_sequence_length: usize) -> Self {
-        self.repetition_limit = limit;
-        self.max_sequence_length = max_sequence_length;
         self
     }
 
@@ -186,7 +176,7 @@ impl FilterOptions {
         self
     }
 
-    pub fn apply_to_filter(self, filter: &mut FilterImpl) {
+    pub(crate) fn apply_to_filter(self, filter: &mut FilterImpl) {
         filter.left_trimmed = self.left_trimmed;
         filter.right_trimmed = self.right_trimmed;
         filter.trim_prefix = self.trim_prefix;

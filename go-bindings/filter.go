@@ -22,17 +22,17 @@ func NewFilter(options ...FilterOption) Filter {
 		opt(cfg)
 	}
 
-	var cfilter *cFilter
-	if cfg.multiHopCmd3 {
-		cfilter = newCFilterMultiHopCmd3(cfg.streamToolActions)
-	} else if cfg.multiHopCmd4 {
-		cfilter = newCFilterMultiHopCmd4(cfg.streamToolActions)
-	} else if cfg.rag {
-		cfilter = newCFilterRAG()
-	} else {
-		cfilter = newCFilter()
+	// Build FilterOptions using the builder pattern
+	opts := NewFilterOptions()
+	if opts == nil {
+		return nil
 	}
 
+	// Apply configuration
+	cfg.apply(opts)
+
+	// Create filter with configured options
+	cfilter := newCFilter(opts)
 	if cfilter == nil {
 		return nil
 	}

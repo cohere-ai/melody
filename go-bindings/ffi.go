@@ -9,47 +9,177 @@ import (
 	"unsafe"
 )
 
+// FilterOptions is the Go wrapper around CFilterOptions
+type FilterOptions struct {
+	ptr *C.CFilterOptions
+}
+
+// NewFilterOptions creates a new FilterOptions instance
+func NewFilterOptions() *FilterOptions {
+	ptr := C.melody_filter_options_new()
+	if ptr == nil {
+		return nil
+	}
+	opts := &FilterOptions{ptr: ptr}
+	runtime.SetFinalizer(opts, (*FilterOptions).Free)
+	return opts
+}
+
+// Free releases the FilterOptions resources
+func (opts *FilterOptions) Free() {
+	if opts.ptr != nil {
+		C.melody_filter_options_free(opts.ptr)
+		opts.ptr = nil
+	}
+}
+
+// HandleMultiHopCmd3 configures options for multi-hop CMD3 format
+func (opts *FilterOptions) HandleMultiHopCmd3() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_handle_multi_hop_cmd3(opts.ptr)
+	}
+	return opts
+}
+
+// HandleMultiHopCmd4 configures options for multi-hop CMD4 format
+func (opts *FilterOptions) HandleMultiHopCmd4() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_handle_multi_hop_cmd4(opts.ptr)
+	}
+	return opts
+}
+
+// HandleRAG configures options for RAG format
+func (opts *FilterOptions) HandleRAG() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_handle_rag(opts.ptr)
+	}
+	return opts
+}
+
+// HandleSearchQuery configures options for search query handling
+func (opts *FilterOptions) HandleSearchQuery() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_handle_search_query(opts.ptr)
+	}
+	return opts
+}
+
+// HandleMultiHop configures options for multi-hop format
+func (opts *FilterOptions) HandleMultiHop() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_handle_multi_hop(opts.ptr)
+	}
+	return opts
+}
+
+// StreamNonGroundedAnswer enables streaming of non-grounded answer
+func (opts *FilterOptions) StreamNonGroundedAnswer() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_stream_non_grounded_answer(opts.ptr)
+	}
+	return opts
+}
+
+// StreamToolActions enables streaming of tool actions
+func (opts *FilterOptions) StreamToolActions() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_stream_tool_actions(opts.ptr)
+	}
+	return opts
+}
+
+// StreamProcessedParams enables streaming of processed parameters
+func (opts *FilterOptions) StreamProcessedParams() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_stream_processed_params(opts.ptr)
+	}
+	return opts
+}
+
+// WithLeftTrimmed enables left trimming
+func (opts *FilterOptions) WithLeftTrimmed() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_with_left_trimmed(opts.ptr)
+	}
+	return opts
+}
+
+// WithRightTrimmed enables right trimming
+func (opts *FilterOptions) WithRightTrimmed() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_with_right_trimmed(opts.ptr)
+	}
+	return opts
+}
+
+// WithPrefixTrim sets a prefix to trim
+func (opts *FilterOptions) WithPrefixTrim(prefix string) *FilterOptions {
+	if opts.ptr != nil {
+		cPrefix := C.CString(prefix)
+		defer C.free(unsafe.Pointer(cPrefix))
+		C.melody_filter_options_with_prefix_trim(opts.ptr, cPrefix)
+	}
+	return opts
+}
+
+// WithChunkSize sets the chunk size
+func (opts *FilterOptions) WithChunkSize(size int) *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_with_chunk_size(opts.ptr, C.size_t(size))
+	}
+	return opts
+}
+
+// WithInclusiveStops sets inclusive stop sequences
+func (opts *FilterOptions) WithInclusiveStops(stops []string) *FilterOptions {
+	if opts.ptr != nil && len(stops) > 0 {
+		cStops := make([]*C.char, len(stops))
+		for i, stop := range stops {
+			cStops[i] = C.CString(stop)
+			defer C.free(unsafe.Pointer(cStops[i]))
+		}
+		C.melody_filter_options_with_inclusive_stops(opts.ptr, (**C.char)(unsafe.Pointer(&cStops[0])), C.size_t(len(stops)))
+	}
+	return opts
+}
+
+// WithExclusiveStops sets exclusive stop sequences
+func (opts *FilterOptions) WithExclusiveStops(stops []string) *FilterOptions {
+	if opts.ptr != nil && len(stops) > 0 {
+		cStops := make([]*C.char, len(stops))
+		for i, stop := range stops {
+			cStops[i] = C.CString(stop)
+			defer C.free(unsafe.Pointer(cStops[i]))
+		}
+		C.melody_filter_options_with_exclusive_stops(opts.ptr, (**C.char)(unsafe.Pointer(&cStops[0])), C.size_t(len(stops)))
+	}
+	return opts
+}
+
+// RemoveToken removes a specific token from the output
+func (opts *FilterOptions) RemoveToken(token string) *FilterOptions {
+	if opts.ptr != nil {
+		cToken := C.CString(token)
+		defer C.free(unsafe.Pointer(cToken))
+		C.melody_filter_options_remove_token(opts.ptr, cToken)
+	}
+	return opts
+}
+
 // cFilter is the internal CGO wrapper around the Rust filter
 type cFilter struct {
 	ptr *C.CFilter
 }
 
-// newCFilter creates a new C filter
-func newCFilter() *cFilter {
-	ptr := C.melody_filter_new()
-	if ptr == nil {
-		return nil
+// newCFilter creates a new C filter with the given options
+func newCFilter(options *FilterOptions) *cFilter {
+	var ptr *C.CFilter
+	if options == nil {
+		ptr = C.melody_filter_new(nil)
+	} else {
+		ptr = C.melody_filter_new(options.ptr)
 	}
-	f := &cFilter{ptr: ptr}
-	runtime.SetFinalizer(f, (*cFilter).free)
-	return f
-}
-
-// newCFilterMultiHopCmd3 creates a new C filter with multi-hop CMD3 options
-func newCFilterMultiHopCmd3(streamToolActions bool) *cFilter {
-	ptr := C.melody_filter_new_multi_hop_cmd3(C.bool(streamToolActions))
-	if ptr == nil {
-		return nil
-	}
-	f := &cFilter{ptr: ptr}
-	runtime.SetFinalizer(f, (*cFilter).free)
-	return f
-}
-
-// newCFilterMultiHopCmd4 creates a new C filter with multi-hop CMD4 options
-func newCFilterMultiHopCmd4(streamToolActions bool) *cFilter {
-	ptr := C.melody_filter_new_multi_hop_cmd4(C.bool(streamToolActions))
-	if ptr == nil {
-		return nil
-	}
-	f := &cFilter{ptr: ptr}
-	runtime.SetFinalizer(f, (*cFilter).free)
-	return f
-}
-
-// newCFilterRAG creates a new C filter with RAG options
-func newCFilterRAG() *cFilter {
-	ptr := C.melody_filter_new_rag()
 	if ptr == nil {
 		return nil
 	}

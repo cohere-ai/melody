@@ -1,4 +1,4 @@
-use melody_parsing::{Filter, FilterImpl, FilterOptions, TokenIDsWithLogProb};
+use melody_parsing::{Filter, FilterOptions, TokenIDsWithLogProb, new_filter};
 
 fn main() {
     // Initialize logging
@@ -9,12 +9,11 @@ fn main() {
     // Example 1: Basic filter with plain text
     println!("Example 1: Basic Filter");
     {
-        let mut filter = FilterImpl::new();
         let options = FilterOptions::new()
             .with_left_trimmed()
             .with_right_trimmed();
 
-        options.apply_to_filter(&mut filter);
+        let mut filter = new_filter(options);
 
         // Simulate citation text
         let citation_text = "Hello World!";
@@ -44,8 +43,7 @@ fn main() {
             .handle_multi_hop_cmd3()
             .stream_tool_actions();
 
-        let mut filter = FilterImpl::new();
-        options.apply_to_filter(&mut filter);
+        let mut filter = new_filter(options);
 
         // Simulate citation text
         let citation_text = "Hello <co: 1>world</co: 1>!";
@@ -73,8 +71,7 @@ fn main() {
     {
         let options = FilterOptions::new().handle_search_query();
 
-        let mut filter = FilterImpl::new();
-        options.apply_to_filter(&mut filter);
+        let mut filter = new_filter(options);
 
         let search_text = "Search: machine learning";
         let logprobs = TokenIDsWithLogProb {
@@ -99,8 +96,7 @@ fn main() {
             .with_inclusive_stops(vec!["<|END|>".to_string()])
             .with_exclusive_stops(vec!["</s>".to_string()]);
 
-        let mut filter = FilterImpl::new();
-        options.apply_to_filter(&mut filter);
+        let mut filter = new_filter(options);
 
         let text_with_stop = "Hello world<|END|>";
         let logprobs = TokenIDsWithLogProb::new();
