@@ -208,7 +208,7 @@ func (f *filter) HandleParamName(str string) ([]FilterOutput, int) {
 	}
 	out := f.sendParamNameChunk(str[:idx])
 	f.actionMetaData.mode = paramNameEnd
-	o, r := f.ParseActions(str[idx:])
+	o, r := f.ParseActions(str[idx+1:])              // don't include quote
 	return append(out, o...), r + len(str[:idx]) + 1 // one for the quote
 }
 

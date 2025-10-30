@@ -233,6 +233,9 @@ func (f *filter) writeText(text []byte, logprobs TokenIDsWithLogProb) (out []Fil
 		}
 		o, remove := f.handleToken(f.mode, f.buf.Bytes(), false, f.chunkLogProbs)
 		out = append(out, o...)
+		if remove > f.buf.Len() {
+			panic("removing more bytes than in buffer")
+		}
 		_, _ = f.buf.Read(make([]byte, remove))
 		f.numTokensInChunk = 0
 		f.chunkLogProbs = TokenIDsWithLogProb{}

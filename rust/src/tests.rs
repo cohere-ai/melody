@@ -895,7 +895,7 @@ mod tests {
                         }],
                         tool_calls: None,
                         is_post_answer: false,
-                        is_tools_reason: false,
+                        is_tools_reason: true,
                     },
                     FilterOutput {
                         text: "foo".to_string(),
@@ -958,6 +958,32 @@ mod tests {
                         is_tools_reason: false,
                     },
                 ],
+            },
+            TestCase {
+                name: "tool action cmd2",
+                input: "Action: ```json\n[\n    {\n        \"tool_name\": \"internet_search\",\n        \"parameters\": {\n            \"query\": \"query1\"\n        }\n    }\n]```",
+                options: FilterOptions::new()
+                    .handle_multi_hop()
+                    .stream_tool_actions()
+                    .stream_processed_params(),
+                want: vec![FilterOutput {
+                    text: "".to_string(),
+                    logprobs: TokenIDsWithLogProb {
+                        token_ids: vec![],
+                        logprobs: vec![],
+                    },
+                    search_query: None,
+                    citations: vec![],
+                    tool_calls: Some(FilterToolCallDelta {
+                        index: 0,
+                        id: "".to_string(),
+                        name: "internet_search`,".to_string(), // this is wrong
+                        param_delta: None,
+                        raw_param_delta: "".to_string(),
+                    }),
+                    is_post_answer: false,
+                    is_tools_reason: false,
+                }],
             },
         ];
 

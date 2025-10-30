@@ -216,7 +216,7 @@ func Test_ParseActions(t *testing.T) {
 					},
 				}},
 			},
-			expectedRemove: 113,
+			expectedRemove: 112,
 			metadata:       startingMetadata,
 		},
 		{
@@ -249,7 +249,7 @@ func Test_ParseActions(t *testing.T) {
 					},
 				}},
 			},
-			expectedRemove: 119,
+			expectedRemove: 118,
 			metadata:       startingMetadata,
 		},
 		{
@@ -319,7 +319,7 @@ func Test_ParseActions(t *testing.T) {
 					},
 				}},
 			},
-			expectedRemove: 232,
+			expectedRemove: 229,
 			metadata:       startingMetadata,
 		},
 		{
@@ -399,7 +399,7 @@ func Test_ParseActions(t *testing.T) {
 					},
 				}},
 			},
-			expectedRemove: 292,
+			expectedRemove: 289,
 			metadata:       startingMetadata,
 			cmd3:           true,
 		},
@@ -861,7 +861,7 @@ func TestHandleLlamaTools(t *testing.T) {
 			name:           "tool generation",
 			completion:     `\n\n<|python_tag|>{"name": "internet_search", "parameters": {"query": "Sound of Music company S&P 500 year"}}<|eom_id|>`,
 			metadata:       startingMetadata,
-			expectedRemove: 110,
+			expectedRemove: 109,
 			expected: []FilterOutput{
 				{ToolCalls: &FilterToolCallDelta{
 					Index: 0,

@@ -3,8 +3,10 @@ module github.com/cohere-ai/melody
 go 1.25
 
 require (
-	github.com/stretchr/testify v1.11.1
 	github.com/cohere-ai/tokenizers v0.9.1
+	github.com/stretchr/testify v1.11.1
+	github.com/x448/float16 v0.8.4
+	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546
 )
 
 require (

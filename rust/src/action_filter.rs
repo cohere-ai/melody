@@ -200,7 +200,7 @@ impl FilterImpl {
         if let Some(idx) = find_non_escaped_char(s, '"') {
             let out = self.send_param_name_chunk(&s[..idx]);
             self.action_metadata.mode = ActionMode::ParamNameEnd;
-            let (o, r) = self.parse_actions(&s[idx..]);
+            let (o, r) = self.parse_actions(&s[idx + 1..]);
             let mut result = out;
             result.extend(o);
             (result, r + idx + 1)
