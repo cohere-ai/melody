@@ -1581,15 +1581,15 @@ func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
 		}
 	})
 	var gotToolCalls []testGeneratedToolInput
-	var gotText, gotPlan string
+	var gotText, gotPlan strings.Builder
 	var citations []FilterCitation
 	for s := range f.Read() {
 		require.NotEmpty(t, s)
 		if s.Text != "" {
 			if s.IsToolsReason {
-				gotPlan += s.Text
+				gotPlan.WriteString(s.Text)
 			} else {
-				gotText += s.Text
+				gotText.WriteString(s.Text)
 			}
 		}
 		if s.ToolCalls != nil {
@@ -1599,8 +1599,8 @@ func (tt *MultiHopTestCase) RunTest(t *testing.T, cmd3 bool) {
 			citations = append(citations, s.Citations...)
 		}
 	}
-	require.Equal(t, tt.expectedPlan, gotPlan)
-	require.Equal(t, tt.expectedText, gotText)
+	require.Equal(t, tt.expectedPlan, gotPlan.String())
+	require.Equal(t, tt.expectedText, gotText.String())
 	require.Equal(t, tt.expected, gotToolCalls)
 	require.Equal(t, tt.expectedCitations, citations)
 
@@ -2403,11 +2403,11 @@ func TestStreamFilterSpecialTokenMapMerging(t *testing.T) {
 			}
 		}
 	})
-	actual := ""
+	actual := strings.Builder{}
 	for s := range f.Read() {
-		actual += s.Text
+		actual.WriteString(s.Text)
 	}
-	require.Equal(t, "should see title", actual)
+	require.Equal(t, "should see title", actual.String())
 }
 
 func TestStreamFilterChunkSize(t *testing.T) {
