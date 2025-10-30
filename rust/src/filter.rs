@@ -483,3 +483,442 @@ mod tests {
         assert_eq!(idx, usize::MAX);
     }
 }
+
+// --- C FFI for FilterImpl ---
+
+#[repr(C)]
+pub struct CTokenIDsWithLogProb {
+    token_ids: *const u32,
+    logprobs: *const f32,
+    len: usize,
+}
+
+#[repr(C)]
+pub struct CFilterSearchQueryDelta {
+    index: usize,
+    text: *const std::os::raw::c_char,
+}
+
+#[repr(C)]
+pub struct CFilterToolParameter {
+    name: *const std::os::raw::c_char,
+    value_delta: *const std::os::raw::c_char,
+}
+
+#[repr(C)]
+pub struct CFilterToolCallDelta {
+    index: usize,
+    id: *const std::os::raw::c_char,
+    name: *const std::os::raw::c_char,
+    param_delta: *mut CFilterToolParameter,
+    raw_param_delta: *const std::os::raw::c_char,
+}
+
+#[repr(C)]
+pub struct CSource {
+    tool_call_index: usize,
+    tool_result_indices: *const usize,
+    tool_result_indices_len: usize,
+}
+
+#[repr(C)]
+pub struct CFilterCitation {
+    start_index: usize,
+    end_index: usize,
+    text: *const std::os::raw::c_char,
+    sources: *mut CSource,
+    sources_len: usize,
+    is_thinking: bool,
+}
+
+#[repr(C)]
+pub struct CFilterOutput {
+    text: *const std::os::raw::c_char,
+    token_ids: *const u32,
+    logprobs: *const f32,
+    len: usize,
+    search_query: *mut CFilterSearchQueryDelta,
+    citations: *mut CFilterCitation,
+    citations_len: usize,
+    tool_calls: *mut CFilterToolCallDelta,
+    is_post_answer: bool,
+    is_tools_reason: bool,
+}
+
+#[repr(C)]
+pub struct CFilterOutputVec {
+    outputs: *mut CFilterOutput,
+    len: usize,
+}
+
+use std::ffi::{CString, CStr};
+use std::os::raw::{c_char};
+
+#[unsafe(no_mangle)]
+pub extern "C" fn filterimpl_new() -> *mut FilterImpl {
+    Box::into_raw(Box::new(FilterImpl::new()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn filterimpl_free(ptr: *mut FilterImpl) {
+    if !ptr.is_null() {
+        unsafe { drop(Box::from_raw(ptr)); }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn filterimpl_write_decoded(
+    ptr: *mut FilterImpl,
+    decoded_token: *const c_char,
+    token_ids: *const u32,
+    logprobs: *const f32,
+    len: usize,
+) -> CFilterOutputVec {
+    let filter = unsafe { ptr.as_mut().unwrap() };
+    let decoded_token = unsafe { CStr::from_ptr(decoded_token).to_str().unwrap() };
+    let token_ids = unsafe { std::slice::from_raw_parts(token_ids, len) };
+    let logprobs = unsafe { std::slice::from_raw_parts(logprobs, len) };
+    let probs = crate::types::TokenIDsWithLogProb {
+        token_ids: token_ids.to_vec(),
+        logprobs: logprobs.to_vec(),
+    };
+    let outputs = filter.write_decoded(decoded_token, probs);
+
+    let mut c_outputs: Vec<CFilterOutput> = outputs
+        .into_iter()
+        .map(|out| {
+            // Text
+            let c_text = CString::new(out.text).unwrap();
+            let text_ptr = c_text.into_raw();
+
+            // Token IDs and logprobs
+            let ids_ptr = if !out.logprobs.token_ids.is_empty() {
+                out.logprobs.token_ids.as_ptr()
+            } else {
+                std::ptr::null()
+            };
+            let probs_ptr = if !out.logprobs.logprobs.is_empty() {
+                out.logprobs.logprobs.as_ptr()
+            } else {
+                std::ptr::null()
+            };
+            let len = out.logprobs.token_ids.len();
+            std::mem::forget(out.logprobs.token_ids.clone());
+            std::mem::forget(out.logprobs.logprobs.clone());
+
+            // Search Query
+            let search_query_ptr = if let Some(sq) = out.search_query {
+                let c_sq_text = CString::new(sq.text).unwrap();
+                let sq_struct = Box::new(CFilterSearchQueryDelta {
+                    index: sq.index,
+                    text: c_sq_text.into_raw(),
+                });
+                Box::into_raw(sq_struct)
+            } else {
+                std::ptr::null_mut()
+            };
+
+            // Citations
+            let mut c_citations: Vec<CFilterCitation> = Vec::new();
+            for cit in &out.citations {
+                let c_cit_text = CString::new(cit.text.clone()).unwrap();
+                // Sources
+                let mut c_sources: Vec<CSource> = Vec::new();
+                for src in &cit.sources {
+                    let indices_ptr = if !src.tool_result_indices.is_empty() {
+                        src.tool_result_indices.as_ptr()
+                    } else {
+                        std::ptr::null()
+                    };
+                    c_sources.push(CSource {
+                        tool_call_index: src.tool_call_index,
+                        tool_result_indices: indices_ptr,
+                        tool_result_indices_len: src.tool_result_indices.len(),
+                    });
+                }
+                let sources_ptr = if !c_sources.is_empty() {
+                    let ptr = c_sources.as_mut_ptr();
+                    std::mem::forget(c_sources);
+                    ptr
+                } else {
+                    std::ptr::null_mut()
+                };
+                c_citations.push(CFilterCitation {
+                    start_index: cit.start_index,
+                    end_index: cit.end_index,
+                    text: c_cit_text.into_raw(),
+                    sources: sources_ptr,
+                    sources_len: cit.sources.len(),
+                    is_thinking: cit.is_thinking,
+                });
+            }
+            let citations_ptr = if !c_citations.is_empty() {
+                let ptr = c_citations.as_mut_ptr();
+                std::mem::forget(c_citations);
+                ptr
+            } else {
+                std::ptr::null_mut()
+            };
+
+            // Tool Calls
+            let tool_calls_ptr = if let Some(tc) = &out.tool_calls {
+                // ToolCallDelta fields
+                let c_id = CString::new(tc.id.clone()).unwrap();
+                let c_name = CString::new(tc.name.clone()).unwrap();
+                let c_raw_param_delta = CString::new(tc.raw_param_delta.clone()).unwrap();
+                let param_delta_ptr = if let Some(param) = &tc.param_delta {
+                    let c_param_name = CString::new(param.name.clone()).unwrap();
+                    let c_param_value = CString::new(param.value_delta.clone()).unwrap();
+                    let param_struct = Box::new(CFilterToolParameter {
+                        name: c_param_name.into_raw(),
+                        value_delta: c_param_value.into_raw(),
+                    });
+                    Box::into_raw(param_struct)
+                } else {
+                    std::ptr::null_mut()
+                };
+                let tc_struct = Box::new(CFilterToolCallDelta {
+                    index: tc.index,
+                    id: c_id.into_raw(),
+                    name: c_name.into_raw(),
+                    param_delta: param_delta_ptr,
+                    raw_param_delta: c_raw_param_delta.into_raw(),
+                });
+                Box::into_raw(tc_struct)
+            } else {
+                std::ptr::null_mut()
+            };
+
+            CFilterOutput {
+                text: text_ptr,
+                token_ids: ids_ptr,
+                logprobs: probs_ptr,
+                len,
+                search_query: search_query_ptr,
+                citations: citations_ptr,
+                citations_len: out.citations.len(),
+                tool_calls: tool_calls_ptr,
+                is_post_answer: out.is_post_answer,
+                is_tools_reason: out.is_tools_reason,
+            }
+        })
+        .collect();
+
+    let out_ptr = if !c_outputs.is_empty() {
+        let ptr = c_outputs.as_mut_ptr();
+        std::mem::forget(c_outputs);
+        ptr
+    } else {
+        std::ptr::null_mut()
+    };
+
+    CFilterOutputVec {
+        outputs: out_ptr,
+        len: outputs.len(),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn filterimpl_flush_partials(ptr: *mut FilterImpl) -> CFilterOutputVec {
+    let filter = unsafe { ptr.as_mut().unwrap() };
+    let outputs = filter.flush_partials();
+
+    let mut c_outputs: Vec<CFilterOutput> = outputs
+        .into_iter()
+        .map(|out| {
+            // Text
+            let c_text = CString::new(out.text).unwrap();
+            let text_ptr = c_text.into_raw();
+
+            // Token IDs and logprobs
+            let ids_ptr = if !out.logprobs.token_ids.is_empty() {
+                out.logprobs.token_ids.as_ptr()
+            } else {
+                std::ptr::null()
+            };
+            let probs_ptr = if !out.logprobs.logprobs.is_empty() {
+                out.logprobs.logprobs.as_ptr()
+            } else {
+                std::ptr::null()
+            };
+            let len = out.logprobs.token_ids.len();
+            std::mem::forget(out.logprobs.token_ids.clone());
+            std::mem::forget(out.logprobs.logprobs.clone());
+
+            // Search Query
+            let search_query_ptr = if let Some(sq) = out.search_query {
+                let c_sq_text = CString::new(sq.text).unwrap();
+                let sq_struct = Box::new(CFilterSearchQueryDelta {
+                    index: sq.index,
+                    text: c_sq_text.into_raw(),
+                });
+                Box::into_raw(sq_struct)
+            } else {
+                std::ptr::null_mut()
+            };
+
+            // Citations
+            let mut c_citations: Vec<CFilterCitation> = Vec::new();
+            for cit in &out.citations {
+                let c_cit_text = CString::new(cit.text.clone()).unwrap();
+                // Sources
+                let mut c_sources: Vec<CSource> = Vec::new();
+                for src in &cit.sources {
+                    let indices_ptr = if !src.tool_result_indices.is_empty() {
+                        src.tool_result_indices.as_ptr()
+                    } else {
+                        std::ptr::null()
+                    };
+                    c_sources.push(CSource {
+                        tool_call_index: src.tool_call_index,
+                        tool_result_indices: indices_ptr,
+                        tool_result_indices_len: src.tool_result_indices.len(),
+                    });
+                }
+                let sources_ptr = if !c_sources.is_empty() {
+                    let ptr = c_sources.as_mut_ptr();
+                    std::mem::forget(c_sources);
+                    ptr
+                } else {
+                    std::ptr::null_mut()
+                };
+                c_citations.push(CFilterCitation {
+                    start_index: cit.start_index,
+                    end_index: cit.end_index,
+                    text: c_cit_text.into_raw(),
+                    sources: sources_ptr,
+                    sources_len: cit.sources.len(),
+                    is_thinking: cit.is_thinking,
+                });
+            }
+            let citations_ptr = if !c_citations.is_empty() {
+                let ptr = c_citations.as_mut_ptr();
+                std::mem::forget(c_citations);
+                ptr
+            } else {
+                std::ptr::null_mut()
+            };
+
+            // Tool Calls
+            let tool_calls_ptr = if let Some(tc) = &out.tool_calls {
+                // ToolCallDelta fields
+                let c_id = CString::new(tc.id.clone()).unwrap();
+                let c_name = CString::new(tc.name.clone()).unwrap();
+                let c_raw_param_delta = CString::new(tc.raw_param_delta.clone()).unwrap();
+                let param_delta_ptr = if let Some(param) = &tc.param_delta {
+                    let c_param_name = CString::new(param.name.clone()).unwrap();
+                    let c_param_value = CString::new(param.value_delta.clone()).unwrap();
+                    let param_struct = Box::new(CFilterToolParameter {
+                        name: c_param_name.into_raw(),
+                        value_delta: c_param_value.into_raw(),
+                    });
+                    Box::into_raw(param_struct)
+                } else {
+                    std::ptr::null_mut()
+                };
+                let tc_struct = Box::new(CFilterToolCallDelta {
+                    index: tc.index,
+                    id: c_id.into_raw(),
+                    name: c_name.into_raw(),
+                    param_delta: param_delta_ptr,
+                    raw_param_delta: c_raw_param_delta.into_raw(),
+                });
+                Box::into_raw(tc_struct)
+            } else {
+                std::ptr::null_mut()
+            };
+
+            CFilterOutput {
+                text: text_ptr,
+                token_ids: ids_ptr,
+                logprobs: probs_ptr,
+                len,
+                search_query: search_query_ptr,
+                citations: citations_ptr,
+                citations_len: out.citations.len(),
+                tool_calls: tool_calls_ptr,
+                is_post_answer: out.is_post_answer,
+                is_tools_reason: out.is_tools_reason,
+            }
+        })
+        .collect();
+
+    let out_ptr = if !c_outputs.is_empty() {
+        let ptr = c_outputs.as_mut_ptr();
+        std::mem::forget(c_outputs);
+        ptr
+    } else {
+        std::ptr::null_mut()
+    };
+
+    CFilterOutputVec {
+        outputs: out_ptr,
+        len: outputs.len(),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn filterimpl_free_outputs(vec: CFilterOutputVec) {
+    if vec.outputs.is_null() {
+        return;
+    }
+    unsafe {
+        let slice = std::slice::from_raw_parts_mut(vec.outputs, vec.len);
+        for out in slice {
+            if !out.text.is_null() {
+                drop(CString::from_raw(out.text as *mut c_char));
+            }
+            // token_ids/logprobs are leaked Vecs, so we must reconstruct and drop them
+            if out.len > 0 && !out.token_ids.is_null() {
+                let _ = Vec::from_raw_parts(out.token_ids as *mut u32, out.len, out.len);
+            }
+            if out.len > 0 && !out.logprobs.is_null() {
+                let _ = Vec::from_raw_parts(out.logprobs as *mut f32, out.len, out.len);
+            }
+            // Free search_query
+            if !out.search_query.is_null() {
+                let sq = Box::from_raw(out.search_query);
+                if !sq.text.is_null() {
+                    drop(CString::from_raw(sq.text as *mut c_char));
+                }
+            }
+            // Free citations
+            if out.citations_len > 0 && !out.citations.is_null() {
+                let citations = std::slice::from_raw_parts_mut(out.citations, out.citations_len);
+                for cit in citations {
+                    if !cit.text.is_null() {
+                        drop(CString::from_raw(cit.text as *mut c_char));
+                    }
+                    if cit.sources_len > 0 && !cit.sources.is_null() {
+                        // sources is a flat array of CSource, tool_result_indices are borrowed
+                        Vec::from_raw_parts(cit.sources, cit.sources_len, cit.sources_len);
+                    }
+                }
+                Vec::from_raw_parts(out.citations, out.citations_len, out.citations_len);
+            }
+            // Free tool_calls
+            if !out.tool_calls.is_null() {
+                let tc = Box::from_raw(out.tool_calls);
+                if !tc.id.is_null() {
+                    drop(CString::from_raw(tc.id as *mut c_char));
+                }
+                if !tc.name.is_null() {
+                    drop(CString::from_raw(tc.name as *mut c_char));
+                }
+                if !tc.raw_param_delta.is_null() {
+                    drop(CString::from_raw(tc.raw_param_delta as *mut c_char));
+                }
+                if !tc.param_delta.is_null() {
+                    let param = Box::from_raw(tc.param_delta);
+                    if !param.name.is_null() {
+                        drop(CString::from_raw(param.name as *mut c_char));
+                    }
+                    if !param.value_delta.is_null() {
+                        drop(CString::from_raw(param.value_delta as *mut c_char));
+                    }
+                }
+            }
+        }
+        Vec::from_raw_parts(vec.outputs, vec.len, vec.len);
+    }
+}
