@@ -22,8 +22,6 @@ pub struct FilterImpl {
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,
     pub(crate) trim_prefix: String,
-    pub(crate) max_repetition_limit: usize,
-    pub(crate) max_repetition_sequence_length: usize,
 
     pub(crate) default_mode: FilterMode,
     pub(crate) special_token_map: HashMap<String, FilterMode>,
@@ -44,7 +42,6 @@ pub struct FilterImpl {
 
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
-    pub(crate) llama_tool_parsing: bool,
 
     pub(crate) chunk_size: usize,
     pub(crate) num_tokens_in_chunk: usize,
@@ -63,8 +60,6 @@ impl FilterImpl {
             left_trimmed: false,
             right_trimmed: false,
             trim_prefix: String::new(),
-            max_repetition_limit: 0,
-            max_repetition_sequence_length: 0,
             default_mode: FilterMode::PlainText,
             special_token_map: HashMap::new(),
             stream_non_grounded_answer: false,
@@ -80,7 +75,6 @@ impl FilterImpl {
             sent_curr_index: false,
             has_tool_call_id: false,
             cmd3_citations: false,
-            llama_tool_parsing: false,
             chunk_size: 1,
             num_tokens_in_chunk: 0,
             chunk_log_probs: TokenIDsWithLogProb::new(),
@@ -172,7 +166,7 @@ impl FilterImpl {
         out
     }
 
-    pub(crate) fn handle_token(
+    fn handle_token(
         &mut self,
         mode: FilterMode,
         bstr: &[u8],
