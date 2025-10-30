@@ -133,8 +133,10 @@ impl FilterImpl {
         self.cur_text_byte_index += text.len();
 
         if self.cur_citation_byte_index != -1 {
-            if (self.cur_citation_byte_index as usize) < start_last_id {
-                text = s[self.cur_citation_byte_index as usize..start_last_id].to_string();
+            #[allow(clippy::cast_sign_loss)]
+            let start_idx = self.cur_citation_byte_index as usize;
+            if start_idx < start_last_id {
+                text = s[start_idx..start_last_id].to_string();
             } else {
                 text = String::new();
             }
@@ -180,6 +182,7 @@ impl FilterImpl {
         let start_idx = if self.cur_citation_byte_index == -1 {
             end_first_id + 1
         } else {
+            #[allow(clippy::cast_sign_loss)]
             let idx_as_usize = self.cur_citation_byte_index as usize;
             // If we've already processed all of this string, return early
             if idx_as_usize >= s.len() {
@@ -287,7 +290,12 @@ impl FilterImpl {
             let result_indices_str = cit_splits[1];
 
             let tool_index = match tool_idx_str.trim().parse::<i32>() {
-                Ok(idx) if idx >= 0 => idx as usize,
+                Ok(idx) if idx >= 0 => {
+                    #[allow(clippy::cast_sign_loss)]
+                    {
+                        idx as usize
+                    }
+                }
                 _ => {
                     log::warn!("Invalid citation tool index");
                     continue;
@@ -302,7 +310,10 @@ impl FilterImpl {
 
             for result_split in result_idx_splits {
                 match result_split.trim().parse::<i32>() {
-                    Ok(idx) if idx >= 0 => result_indices.push(idx as usize),
+                    Ok(idx) if idx >= 0 => {
+                        #[allow(clippy::cast_sign_loss)]
+                        result_indices.push(idx as usize);
+                    }
                     _ => {
                         log::warn!("Invalid citation result index");
                     }
@@ -327,6 +338,7 @@ fn convert_string_to_int_list(s: &str) -> Vec<usize> {
         if let Ok(j) = a.parse::<i32>()
             && j >= 0
         {
+            #[allow(clippy::cast_sign_loss)]
             int_arr.push(j as usize);
         }
     }

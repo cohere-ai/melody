@@ -494,7 +494,9 @@ unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
         };
 
         let (search_query_index, search_query_text) = if let Some(sq) = output.search_query {
-            (sq.index as i32, CString::new(sq.text).unwrap().into_raw())
+            #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            let index = sq.index.min(i32::MAX as usize) as i32;
+            (index, CString::new(sq.text).unwrap().into_raw())
         } else {
             (-1, std::ptr::null_mut())
         };
@@ -530,7 +532,12 @@ unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
             };
 
             (
-                tc.index as i32,
+                {
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                    {
+                        tc.index.min(i32::MAX as usize) as i32
+                    }
+                },
                 CString::new(tc.id).unwrap().into_raw(),
                 CString::new(tc.name).unwrap().into_raw(),
                 param_name.0,

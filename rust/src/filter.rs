@@ -262,7 +262,9 @@ impl FilterImpl {
             let text = if self.cur_citation_byte_index == -1 {
                 s[..idx + token.len()].to_string()
             } else {
-                s[self.cur_citation_byte_index as usize..idx + token.len()].to_string()
+                #[allow(clippy::cast_sign_loss)]
+                let start_idx = self.cur_citation_byte_index.max(0) as usize;
+                s[start_idx..idx + token.len()].to_string()
             };
             return vec![FilterOutput {
                 text,
@@ -278,7 +280,9 @@ impl FilterImpl {
                 let (trimmed, _) = self.trim_space(&s[..idx]);
                 trimmed
             } else {
-                let (trimmed, _) = self.trim_space(&s[self.cur_citation_byte_index as usize..idx]);
+                #[allow(clippy::cast_sign_loss)]
+                let start_idx = self.cur_citation_byte_index.max(0) as usize;
+                let (trimmed, _) = self.trim_space(&s[start_idx..idx]);
                 trimmed
             };
             return vec![FilterOutput {
