@@ -137,9 +137,13 @@ func (opts *FilterOptions) WithInclusiveStops(stops []string) *FilterOptions {
 		cStops := make([]*C.char, len(stops))
 		for i, stop := range stops {
 			cStops[i] = C.CString(stop)
-			defer C.free(unsafe.Pointer(cStops[i]))
 		}
 		C.melody_filter_options_with_inclusive_stops(opts.ptr, (**C.char)(unsafe.Pointer(&cStops[0])), C.size_t(len(stops)))
+
+		// Free all C strings after the call
+		for _, cStr := range cStops {
+			C.free(unsafe.Pointer(cStr))
+		}
 	}
 	return opts
 }
@@ -150,9 +154,13 @@ func (opts *FilterOptions) WithExclusiveStops(stops []string) *FilterOptions {
 		cStops := make([]*C.char, len(stops))
 		for i, stop := range stops {
 			cStops[i] = C.CString(stop)
-			defer C.free(unsafe.Pointer(cStops[i]))
 		}
 		C.melody_filter_options_with_exclusive_stops(opts.ptr, (**C.char)(unsafe.Pointer(&cStops[0])), C.size_t(len(stops)))
+
+		// Free all C strings after the call
+		for _, cStr := range cStops {
+			C.free(unsafe.Pointer(cStr))
+		}
 	}
 	return opts
 }
