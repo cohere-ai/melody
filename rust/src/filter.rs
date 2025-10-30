@@ -1,5 +1,5 @@
 use crate::action_filter::FilterAction;
-use crate::types::*;
+use crate::types::{FilterMode, FilterOutput, FilterSearchQueryDelta, TokenIDsWithLogProb};
 use std::collections::HashMap;
 
 /// Filter is the interface used to parse the output of a cohere model.
@@ -12,6 +12,7 @@ pub trait Filter {
     fn flush_partials(&mut self) -> Vec<FilterOutput>;
 }
 
+#[allow(clippy::struct_excessive_bools)]
 pub struct FilterImpl {
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,
@@ -172,7 +173,7 @@ impl FilterImpl {
                 log::error!("in stop mode but we should have already stopped");
                 (Vec::new(), 0)
             }
-            FilterMode::Ignore => (Vec::new(), 0),
+            FilterMode::Ignore | FilterMode::NextSearchQuery => (Vec::new(), 0),
             FilterMode::ToolAction => {
                 let s = String::from_utf8_lossy(bstr);
                 self.parse_actions(&s)
@@ -189,7 +190,6 @@ impl FilterImpl {
                 }
             }
             FilterMode::PlainText => self.process_text(bstr, Some(token_log_probs)),
-            FilterMode::NextSearchQuery => (Vec::new(), 0),
         }
     }
 
@@ -236,11 +236,7 @@ impl FilterImpl {
                 self.right_trimmed = true;
                 (Vec::new(), new_mode, false, true)
             }
-            FilterMode::Answer => {
-                self.left_trimmed = true;
-                (Vec::new(), new_mode, false, true)
-            }
-            FilterMode::SearchQuery => {
+            FilterMode::Answer | FilterMode::SearchQuery => {
                 self.left_trimmed = true;
                 (Vec::new(), new_mode, false, true)
             }
@@ -263,10 +259,10 @@ impl FilterImpl {
         token: &str,
     ) -> Vec<FilterOutput> {
         if idx != usize::MAX && !s[..idx + token.len()].is_empty() {
-            let text = if self.cur_citation_byte_index != -1 {
-                s[self.cur_citation_byte_index as usize..idx + token.len()].to_string()
-            } else {
+            let text = if self.cur_citation_byte_index == -1 {
                 s[..idx + token.len()].to_string()
+            } else {
+                s[self.cur_citation_byte_index as usize..idx + token.len()].to_string()
             };
             return vec![FilterOutput {
                 text,
@@ -278,11 +274,11 @@ impl FilterImpl {
 
     pub(crate) fn handle_exclusive_stop(&mut self, s: &str, idx: usize) -> Vec<FilterOutput> {
         if idx != usize::MAX && !s[..idx].is_empty() {
-            let text = if self.cur_citation_byte_index != -1 {
-                let (trimmed, _) = self.trim_space(&s[self.cur_citation_byte_index as usize..idx]);
+            let text = if self.cur_citation_byte_index == -1 {
+                let (trimmed, _) = self.trim_space(&s[..idx]);
                 trimmed
             } else {
-                let (trimmed, _) = self.trim_space(&s[..idx]);
+                let (trimmed, _) = self.trim_space(&s[self.cur_citation_byte_index as usize..idx]);
                 trimmed
             };
             return vec![FilterOutput {

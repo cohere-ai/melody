@@ -1,8 +1,9 @@
 use crate::filter::FilterImpl;
-use crate::types::*;
+use crate::types::FilterMode;
 use std::collections::HashMap;
 
 #[derive(Clone)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct FilterOptions {
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,
@@ -191,7 +192,7 @@ impl FilterOptions {
 
         // Merge special token maps
         for (token, mode) in self.special_token_map {
-            filter.special_token_map.insert(token.clone(), mode);
+            filter.special_token_map.insert(token, mode);
         }
 
         // Add inclusive stops

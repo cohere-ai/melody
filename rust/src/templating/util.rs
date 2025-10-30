@@ -1,12 +1,19 @@
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::wildcard_imports)]
+
 use super::melody_types::*;
 use liquid::model::{Object as LiquidObject, Value as LiquidValue};
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 
-/// SafeLiquidSubstitutions converts any null values appropriately.
-/// In Rust, we handle Option<T> differently than Go handles pointers.
+/// `SafeLiquidSubstitutions` converts any null values appropriately.
+/// In Rust, we handle `Option<T>` differently than Go handles pointers.
+#[must_use]
 pub fn safe_liquid_substitutions(mut sub: Map<String, Value>) -> Map<String, Value> {
-    for (_k, v) in sub.iter_mut() {
+    for (_k, v) in &mut sub {
         // In Rust, serde_json already handles null values properly
         // so we don't need the same transformation as Go
         if v.is_null() {
@@ -16,7 +23,8 @@ pub fn safe_liquid_substitutions(mut sub: Map<String, Value>) -> Map<String, Val
     sub
 }
 
-/// Convert a serde_json::Value to a liquid::model::Value
+/// Convert a `serde_json::Value` to a `liquid::model::Value`
+#[must_use]
 pub fn json_to_liquid(value: Value) -> LiquidValue {
     match value {
         Value::Null => LiquidValue::Nil,
@@ -45,8 +53,9 @@ pub fn json_to_liquid(value: Value) -> LiquidValue {
     }
 }
 
-/// AddSpacesToJSONEncoding adds spacing to a json string how command 3 models expect:
+/// `AddSpacesToJSONEncoding` adds spacing to a json string how command 3 models expect:
 /// Spaces after colons in maps, and after commas.
+#[must_use]
 pub fn add_spaces_to_json_encoding(input: &str) -> String {
     let mut result = String::with_capacity(input.len() * 2);
     let mut in_string_literal = false;
@@ -65,7 +74,10 @@ pub fn add_spaces_to_json_encoding(input: &str) -> String {
     result
 }
 
-/// MarshalJSONFormatted will marshal the value to json with specific spacing for the prompt template
+/// `MarshalJSONFormatted` will marshal the value to json with specific spacing for the prompt template
+///
+/// # Errors
+/// Returns an error if serialization fails.
 pub fn marshal_json_formatted(v: &Value) -> Result<String, Box<dyn std::error::Error>> {
     let schema_string = serde_json::to_string_pretty(v)?;
 
@@ -80,7 +92,8 @@ pub fn marshal_json_formatted(v: &Value) -> Result<String, Box<dyn std::error::E
     Ok(schema_string_spaced)
 }
 
-/// JSONEscapeString escapes a string for JSON
+/// `JSONEscapeString` escapes a string for JSON
+#[must_use]
 pub fn json_escape_string(s: &str) -> String {
     match serde_json::to_string(s) {
         Ok(escaped) => {
@@ -169,8 +182,9 @@ fn tool_result_to_value(trs: Vec<TemplateToolResult>) -> Value {
     )
 }
 
-/// EscapeSpecialTokens replaces special tokens with their escaped versions
-pub fn escape_special_tokens(text: &str, special_token_map: &HashMap<String, String>) -> String {
+/// `EscapeSpecialTokens` replaces special tokens with their escaped versions
+#[must_use]
+pub fn escape_special_tokens<S: std::hash::BuildHasher>(text: &str, special_token_map: &HashMap<String, String, S>) -> String {
     let mut result = text.to_string();
     for (special_token, replacement) in special_token_map {
         result = result.replace(special_token, replacement);
@@ -178,14 +192,18 @@ pub fn escape_special_tokens(text: &str, special_token_map: &HashMap<String, Str
     result
 }
 
-/// MessagesToTemplate turns messages into a map that can be used with Command templates
-pub fn messages_to_template(
+/// `MessagesToTemplate` turns messages into a map that can be used with Command templates
+///
+/// # Errors
+/// Returns an error if message processing fails.
+#[allow(clippy::too_many_lines)]
+pub fn messages_to_template<S: std::hash::BuildHasher>(
     messages: Vec<Message>,
     docs_present: bool,
-    special_token_map: &HashMap<String, String>,
+    special_token_map: &HashMap<String, String, S>,
 ) -> Result<Vec<Map<String, Value>>, Box<dyn std::error::Error>> {
     let mut template_messages: Vec<TemplateMessage> = Vec::new();
-    let mut running_tool_call_idx = if docs_present { 1 } else { 0 };
+    let mut running_tool_call_idx = i32::from(docs_present);
     let mut tool_call_id_to_tool_result_idx: HashMap<String, usize> = HashMap::new();
     let mut tool_call_id_to_prompt_id: HashMap<String, i32> = HashMap::new();
 
@@ -234,17 +252,16 @@ pub fn messages_to_template(
             let m = template_messages.last_mut().unwrap();
 
             // Insert a tool result if one doesn't exist
-            let tool_result_idx = match tool_call_id_to_tool_result_idx.get(tool_call_id) {
-                Some(&idx) => idx,
-                None => {
-                    m.tool_results.push(TemplateToolResult {
-                        tool_call_id: tool_call_template_id,
-                        documents: Vec::new(),
-                    });
-                    let idx = m.tool_results.len() - 1;
-                    tool_call_id_to_tool_result_idx.insert(tool_call_id.clone(), idx);
-                    idx
-                }
+            let tool_result_idx = if let Some(&idx) = tool_call_id_to_tool_result_idx.get(tool_call_id) {
+                idx
+            } else {
+                m.tool_results.push(TemplateToolResult {
+                    tool_call_id: tool_call_template_id,
+                    documents: Vec::new(),
+                });
+                let idx = m.tool_results.len() - 1;
+                tool_call_id_to_tool_result_idx.insert(tool_call_id.clone(), idx);
+                idx
             };
 
             // Append the document to the tool result
@@ -292,7 +309,7 @@ pub fn messages_to_template(
                         });
                     }
                 }
-                _ => {}
+                ContentType::Unknown => {}
             }
         }
 
@@ -339,7 +356,10 @@ fn tool_call_to_template(
     Ok(add_spaces_to_json_encoding(&rendered))
 }
 
-/// ToolsToTemplate converts tools to template format
+/// `ToolsToTemplate` converts tools to template format
+///
+/// # Errors
+/// Returns an error if JSON formatting fails.
 pub fn tools_to_template(
     tools: &[Tool],
 ) -> Result<Vec<Map<String, Value>>, Box<dyn std::error::Error>> {

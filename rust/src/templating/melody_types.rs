@@ -64,13 +64,17 @@ pub enum Role {
 }
 
 impl Role {
+    /// Parse a role from a string.
+    ///
+    /// # Errors
+    /// Returns an error if the string does not match a known role.
     pub fn from_string(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
             "system" => Ok(Role::System),
             "user" => Ok(Role::User),
             "chatbot" => Ok(Role::Chatbot),
             "tool" => Ok(Role::Tool),
-            _ => Err(format!("unknown role: {}", s)),
+            _ => Err(format!("unknown role: {s}")),
         }
     }
 }
@@ -84,7 +88,7 @@ impl fmt::Display for Role {
             Role::Chatbot => "CHATBOT",
             Role::Tool => "TOOL",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -101,12 +105,16 @@ pub enum ContentType {
 }
 
 impl ContentType {
+    /// Parse a content type from a string.
+    ///
+    /// # Errors
+    /// Returns an error if the string does not match a known content type.
     pub fn from_string(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
             "text" => Ok(ContentType::Text),
             "thinking" => Ok(ContentType::Thinking),
             "image_url" => Ok(ContentType::ImageUrl),
-            _ => Err(format!("unknown content type: {}", s)),
+            _ => Err(format!("unknown content type: {s}")),
         }
     }
 }
@@ -119,7 +127,7 @@ impl fmt::Display for ContentType {
             ContentType::Thinking => "THINKING",
             ContentType::ImageUrl => "IMAGE_URL",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -135,11 +143,15 @@ pub enum CitationQuality {
 }
 
 impl CitationQuality {
+    /// Parse a citation quality from a string.
+    ///
+    /// # Errors
+    /// Returns an error if the string does not match a known citation quality.
     pub fn from_string(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
             "off" => Ok(CitationQuality::Off),
             "on" => Ok(CitationQuality::On),
-            _ => Err(format!("unknown citation quality: {}", s)),
+            _ => Err(format!("unknown citation quality: {s}")),
         }
     }
 }
@@ -151,7 +163,7 @@ impl fmt::Display for CitationQuality {
             CitationQuality::Off => "OFF",
             CitationQuality::On => "ON",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -167,11 +179,15 @@ pub enum Grounding {
 }
 
 impl Grounding {
+    /// Parse a grounding value from a string.
+    ///
+    /// # Errors
+    /// Returns an error if the string does not match a known grounding value.
     pub fn from_string(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
             "enabled" => Ok(Grounding::Enabled),
             "disabled" => Ok(Grounding::Disabled),
-            _ => Err(format!("unknown grounding value: {}", s)),
+            _ => Err(format!("unknown grounding value: {s}")),
         }
     }
 }
@@ -183,7 +199,7 @@ impl fmt::Display for Grounding {
             Grounding::Enabled => "ENABLED",
             Grounding::Disabled => "DISABLED",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -201,12 +217,16 @@ pub enum SafetyMode {
 }
 
 impl SafetyMode {
+    /// Parse a safety mode from a string.
+    ///
+    /// # Errors
+    /// Returns an error if the string does not match a known safety mode.
     pub fn from_string(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
             "none" => Ok(SafetyMode::None),
             "strict" => Ok(SafetyMode::Strict),
             "contextual" => Ok(SafetyMode::Contextual),
-            _ => Err(format!("unknown safety mode: {}", s)),
+            _ => Err(format!("unknown safety mode: {s}")),
         }
     }
 }
@@ -219,7 +239,7 @@ impl fmt::Display for SafetyMode {
             SafetyMode::Strict => "STRICT",
             SafetyMode::Contextual => "CONTEXTUAL",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -235,11 +255,15 @@ pub enum ReasoningType {
 }
 
 impl ReasoningType {
+    /// Parse a reasoning type from a string.
+    ///
+    /// # Errors
+    /// Returns an error if the string does not match a known reasoning type.
     pub fn from_string(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
             "enabled" => Ok(ReasoningType::Enabled),
             "disabled" => Ok(ReasoningType::Disabled),
-            _ => Err(format!("unknown reasoning type: {}", s)),
+            _ => Err(format!("unknown reasoning type: {s}")),
         }
     }
 }
@@ -251,6 +275,6 @@ impl fmt::Display for ReasoningType {
             ReasoningType::Enabled => "ENABLED",
             ReasoningType::Disabled => "DISABLED",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }

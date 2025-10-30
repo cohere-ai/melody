@@ -1,5 +1,5 @@
 use crate::filter::{FilterImpl, find_partial};
-use crate::types::*;
+use crate::types::{FilterCitation, FilterMode, FilterOutput, Source, TokenIDsWithLogProb};
 
 const START_FIRST_CIT: &str = "<co: ";
 const START_LAST_CIT: &str = "</co: ";
@@ -71,7 +71,7 @@ impl FilterImpl {
         };
 
         let (start_first_id, end_first_id, _) =
-            self.find_an_element(s, start_first_citation_str, END_OF_CIT, self.cmd3_citations);
+            Self::find_an_element(s, start_first_citation_str, END_OF_CIT, self.cmd3_citations);
 
         // No citation was found so send the plain text and remove from buffer
         if start_first_id == usize::MAX {
@@ -93,7 +93,7 @@ impl FilterImpl {
 
         // Then try to find the 'last' citation element.
         let (start_last_id, end_last_id, docs_last) =
-            self.find_an_element(s, START_LAST_CIT, END_OF_CIT, self.cmd3_citations);
+            Self::find_an_element(s, START_LAST_CIT, END_OF_CIT, self.cmd3_citations);
 
         // Only partial citation found so we need to wait for the complete citation.
         if start_last_id == usize::MAX || end_last_id == usize::MAX {
@@ -191,7 +191,8 @@ impl FilterImpl {
             idx_as_usize
         };
 
-        self.cur_citation_byte_index = (s.len() - text_before_citation.len()) as isize;
+        let byte_offset = s.len().saturating_sub(text_before_citation.len());
+        self.cur_citation_byte_index = byte_offset.try_into().unwrap_or(isize::MAX);
 
         let end_idx = if start_last_id != usize::MAX && start_last_id > 0 {
             start_last_id
@@ -233,7 +234,6 @@ impl FilterImpl {
     }
 
     fn find_an_element(
-        &self,
         s: &str,
         start: &str,
         end: &str,
@@ -249,32 +249,30 @@ impl FilterImpl {
             return (start_id, usize::MAX, Vec::new());
         }
 
-        let end_id = if let Some(idx) = s[start_id + 1..].find(end) {
-            idx
-        } else {
+        let Some(end_id) = s[start_id + 1..].find(end) else {
             return (start_id, usize::MAX, Vec::new());
         };
 
         let substring = &s[start_id + start.len()..start_id + 1 + end_id];
 
         let doc_indices = if cmd3_citations {
-            self.convert_string_to_doc_indices(substring)
+            Self::convert_string_to_doc_indices(substring)
         } else {
             let int_indices = convert_string_to_int_list(substring);
-            if !int_indices.is_empty() {
+            if int_indices.is_empty() {
+                Vec::new()
+            } else {
                 vec![Source {
                     tool_call_index: 0,
                     tool_result_indices: int_indices,
                 }]
-            } else {
-                Vec::new()
             }
         };
 
         (start_id, start_id + 1 + end_id, doc_indices)
     }
 
-    fn convert_string_to_doc_indices(&self, s: &str) -> Vec<Source> {
+    fn convert_string_to_doc_indices(s: &str) -> Vec<Source> {
         let string_splits: Vec<&str> = s.trim().split(']').collect();
         let mut doc_indices = Vec::new();
 
@@ -310,7 +308,6 @@ impl FilterImpl {
                     Ok(idx) if idx >= 0 => result_indices.push(idx as usize),
                     _ => {
                         log::warn!("Invalid citation result index");
-                        continue;
                     }
                 }
             }
@@ -524,10 +521,9 @@ mod tests {
 
     #[test]
     fn test_find_an_element_standard_case() {
-        let filter = FilterImpl::new();
-
         let input = "hello <co: 2,1> foo </co: 2,1>";
-        let (start_index, end_index, docs) = filter.find_an_element(input, "<co: ", ">", false);
+        let (start_index, end_index, docs) =
+            FilterImpl::find_an_element(input, "<co: ", ">", false);
 
         assert_eq!(start_index, 6);
         assert_eq!(end_index, 14);
@@ -538,10 +534,9 @@ mod tests {
 
     #[test]
     fn test_find_an_element_no_citation() {
-        let filter = FilterImpl::new();
-
         let input = "hello";
-        let (start_index, end_index, docs) = filter.find_an_element(input, "<co: ", ">", false);
+        let (start_index, end_index, docs) =
+            FilterImpl::find_an_element(input, "<co: ", ">", false);
 
         assert_eq!(start_index, usize::MAX);
         assert_eq!(end_index, usize::MAX);
@@ -550,10 +545,9 @@ mod tests {
 
     #[test]
     fn test_find_an_element_cmd3_two_tools() {
-        let filter = FilterImpl::new();
-
         let input = "<co> hello </co: 0:[1,2],1:[0]>";
-        let (start_index, end_index, docs) = filter.find_an_element(input, "</co: ", ">", true);
+        let (start_index, end_index, docs) =
+            FilterImpl::find_an_element(input, "</co: ", ">", true);
 
         assert_eq!(start_index, 11);
         assert_eq!(end_index, 30);

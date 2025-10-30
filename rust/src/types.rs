@@ -1,4 +1,4 @@
-/// TokenIDsWithLogProb pairs tokens with their log probabilities.
+/// `TokenIDsWithLogProb` pairs tokens with their log probabilities.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokenIDsWithLogProb {
     pub token_ids: Vec<u32>,
@@ -6,6 +6,7 @@ pub struct TokenIDsWithLogProb {
 }
 
 impl TokenIDsWithLogProb {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             token_ids: Vec::new(),
@@ -25,7 +26,7 @@ impl Default for TokenIDsWithLogProb {
     }
 }
 
-/// FilterOutput represents a partial parsed output from a model generation.
+/// `FilterOutput` represents a partial parsed output from a model generation.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FilterOutput {
     pub text: String,
@@ -37,14 +38,14 @@ pub struct FilterOutput {
     pub is_tools_reason: bool,
 }
 
-/// FilterSearchQueryDelta represents a change to a search query.
+/// `FilterSearchQueryDelta` represents a change to a search query.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FilterSearchQueryDelta {
     pub index: usize,
     pub text: String,
 }
 
-/// FilterToolCallDelta represents a change to a tool call.
+/// `FilterToolCallDelta` represents a change to a tool call.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FilterToolCallDelta {
     pub index: usize,
@@ -54,21 +55,21 @@ pub struct FilterToolCallDelta {
     pub raw_param_delta: String,
 }
 
-/// FilterToolParameter represents a change to a tool parameter.
+/// `FilterToolParameter` represents a change to a tool parameter.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FilterToolParameter {
     pub name: String,
     pub value_delta: String,
 }
 
-/// FilterCitation represents a citation parsed from a model generation.
+/// `FilterCitation` represents a citation parsed from a model generation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FilterCitation {
     /// The beginning index of the citation in the larger generation.
-    /// E.g. "Hello world" where the citation is "world" would have a start_index of 6.
+    /// E.g. `"Hello world"` where the citation is `"world"` would have a `start_index` of 6.
     pub start_index: usize,
     /// The end index of the citation in the larger generation.
-    /// E.g. "Hello world" where the citation is "world" would have an end_index of 10.
+    /// E.g. `"Hello world"` where the citation is `"world"` would have an `end_index` of 10.
     pub end_index: usize,
     pub text: String,
     pub sources: Vec<Source>,
