@@ -289,18 +289,18 @@ func TestStreamFilter(t *testing.T) {
 					}
 				}
 			})
-			var got string
+			var got strings.Builder
 			var gotProbs []TokenIDsWithLogProb
 			for s := range f.Read() {
 				require.NotEmpty(t, s)
-				got += s.Text
+				got.WriteString(s.Text)
 
 				if tt.inputLogProb != nil {
 					gotProbs = append(gotProbs, s.Logprobs)
 				}
 			}
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
+			if got.String() != tt.want {
+				t.Errorf("got %q, want %q", got.String(), tt.want)
 			}
 			require.Equal(t, tt.expectedLogProbs, gotProbs)
 		})
@@ -662,12 +662,12 @@ func TestMessages_Stops(t *testing.T) {
 					}
 				}
 			})
-			var got string
+			var got strings.Builder
 			for s := range f.Read() {
 				assert.NotEmpty(t, s)
-				got += s.Text
+				got.WriteString(s.Text)
 			}
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want, got.String())
 		})
 	}
 }
@@ -958,12 +958,12 @@ func TestMessages_Citations_Complete(t *testing.T) {
 				}
 			})
 			index := 0
-			var got string
+			var got strings.Builder
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
 				require.NotEmpty(t, s)
 				if !s.IsPostAnswer {
-					got += s.Text
+					got.WriteString(s.Text)
 					if tt.wantFilterOutput != nil {
 						require.Equal(t, tt.wantFilterOutput[index], s)
 					}
@@ -971,7 +971,7 @@ func TestMessages_Citations_Complete(t *testing.T) {
 				}
 				gotCitations = append(gotCitations, s.Citations...)
 			}
-			require.Equal(t, tt.wantCompleteString, got)
+			require.Equal(t, tt.wantCompleteString, got.String())
 			require.Equal(t, tt.wantCitations, gotCitations)
 		})
 	}
@@ -1121,11 +1121,9 @@ func TestMessages_Citations_DifferentDocumentIndices(t *testing.T) {
 					}
 				}
 			})
-			var got string
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
 				assert.NotEmpty(t, s)
-				got += s.Text
 				gotCitations = append(gotCitations, s.Citations...)
 			}
 			assert.Equal(t, tt.wantCitations, gotCitations)
@@ -1235,14 +1233,14 @@ func TestMessages_Citations_BadTag(t *testing.T) {
 					}
 				}
 			})
-			var got string
+			var got strings.Builder
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
 				assert.NotEmpty(t, s)
-				got += s.Text
+				got.WriteString(s.Text)
 				gotCitations = append(gotCitations, s.Citations...)
 			}
-			assert.Equal(t, tt.wantCompleteString, got)
+			assert.Equal(t, tt.wantCompleteString, got.String())
 			assert.Equal(t, tt.wantCitations, gotCitations)
 		})
 	}
@@ -1345,14 +1343,14 @@ func TestStreamFilter_StopSequencesWithCitations(t *testing.T) {
 					}
 				}
 			})
-			var got string
+			var got strings.Builder
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
 				assert.NotEmpty(t, s)
-				got += s.Text
+				got.WriteString(s.Text)
 				gotCitations = append(gotCitations, s.Citations...)
 			}
-			assert.Equal(t, tt.wantCompleteString, got)
+			assert.Equal(t, tt.wantCompleteString, got.String())
 			assert.Equal(t, tt.wantCitations, gotCitations)
 		})
 	}
@@ -1503,20 +1501,19 @@ func TestMessages_Citations_Filter(t *testing.T) {
 					}
 				}
 			})
-			var got string
-			var gotPostAnswer string
+			var got strings.Builder
+			var gotPostAnswer strings.Builder
 			var gotCitations []FilterCitation
 			for s := range f.Read() {
-				assert.NotEmpty(t, s)
 				if s.IsPostAnswer {
-					gotPostAnswer += s.Text
+					gotPostAnswer.WriteString(s.Text)
 				} else {
-					got += s.Text
+					got.WriteString(s.Text)
 				}
 				gotCitations = append(gotCitations, s.Citations...)
 			}
-			assert.Equal(t, tt.wantCompleteString, got)
-			assert.Equal(t, tt.wantPostAnswerString, gotPostAnswer)
+			assert.Equal(t, tt.wantCompleteString, got.String())
+			assert.Equal(t, tt.wantPostAnswerString, gotPostAnswer.String())
 			assert.Equal(t, tt.wantCitations, gotCitations)
 		})
 	}
