@@ -14,13 +14,13 @@ pub struct CFilter {
     _private: [u8; 0],
 }
 
-/// Opaque pointer to FilterOptions
+/// Opaque pointer to `FilterOptions`
 #[repr(C)]
 pub struct CFilterOptions {
     _private: [u8; 0],
 }
 
-/// C-compatible representation of FilterOutput
+/// C-compatible representation of `FilterOutput`
 #[repr(C)]
 pub struct CFilterOutput {
     pub text: *mut c_char,
@@ -48,7 +48,7 @@ pub struct CFilterOutput {
     pub is_tools_reason: bool,
 }
 
-/// C-compatible representation of FilterCitation
+/// C-compatible representation of `FilterCitation`
 #[repr(C)]
 pub struct CFilterCitation {
     pub start_index: usize,
@@ -67,7 +67,7 @@ pub struct CSource {
     pub tool_result_indices_len: usize,
 }
 
-/// C-compatible representation of an array of FilterOutput
+/// C-compatible representation of an array of `FilterOutput`
 #[repr(C)]
 pub struct CFilterOutputArray {
     pub outputs: *mut CFilterOutput,
@@ -342,8 +342,8 @@ pub unsafe extern "C" fn melody_filter_options_remove_token(
     if !options.is_null() && !token.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            let token_str = CStr::from_ptr(token).to_string_lossy().into_owned();
-            *opts = opts.clone().remove_token(token_str);
+            let token_str = CStr::from_ptr(token).to_string_lossy();
+            *opts = opts.clone().remove_token(&token_str);
         }
     }
 }
@@ -448,7 +448,7 @@ pub unsafe extern "C" fn melody_filter_flush_partials(
     }
 }
 
-/// Helper function to convert Rust FilterOutput to C representation
+/// Helper function to convert Rust `FilterOutput` to C representation
 unsafe fn convert_outputs_to_c(outputs: Vec<FilterOutput>) -> *mut CFilterOutputArray {
     unsafe {
         let c_outputs: Vec<CFilterOutput> = outputs
@@ -468,12 +468,13 @@ unsafe fn convert_outputs_to_c(outputs: Vec<FilterOutput>) -> *mut CFilterOutput
     }
 }
 
+#[allow(clippy::too_many_lines)]
 unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
     unsafe {
-        let text = if !output.text.is_empty() {
-            CString::new(output.text).unwrap().into_raw()
-        } else {
+        let text = if output.text.is_empty() {
             std::ptr::null_mut()
+        } else {
+            CString::new(output.text).unwrap().into_raw()
         };
 
         let token_ids_len = output.logprobs.token_ids.len();

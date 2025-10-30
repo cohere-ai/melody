@@ -184,7 +184,10 @@ fn tool_result_to_value(trs: Vec<TemplateToolResult>) -> Value {
 
 /// `EscapeSpecialTokens` replaces special tokens with their escaped versions
 #[must_use]
-pub fn escape_special_tokens<S: std::hash::BuildHasher>(text: &str, special_token_map: &HashMap<String, String, S>) -> String {
+pub fn escape_special_tokens<S: std::hash::BuildHasher>(
+    text: &str,
+    special_token_map: &HashMap<String, String, S>,
+) -> String {
     let mut result = text.to_string();
     for (special_token, replacement) in special_token_map {
         result = result.replace(special_token, replacement);
@@ -212,7 +215,7 @@ pub fn messages_to_template<S: std::hash::BuildHasher>(
             // Template expects all tool messages to be aggregated
             let tool_call_id = &msg.tool_call_id;
             if tool_call_id.is_empty() {
-                return Err(format!("tool message[{}] missing tool_call_id", i).into());
+                return Err(format!("tool message[{i}] missing tool_call_id").into());
             }
 
             let tool_call_template_id = *tool_call_id_to_prompt_id
@@ -252,17 +255,18 @@ pub fn messages_to_template<S: std::hash::BuildHasher>(
             let m = template_messages.last_mut().unwrap();
 
             // Insert a tool result if one doesn't exist
-            let tool_result_idx = if let Some(&idx) = tool_call_id_to_tool_result_idx.get(tool_call_id) {
-                idx
-            } else {
-                m.tool_results.push(TemplateToolResult {
-                    tool_call_id: tool_call_template_id,
-                    documents: Vec::new(),
-                });
-                let idx = m.tool_results.len() - 1;
-                tool_call_id_to_tool_result_idx.insert(tool_call_id.clone(), idx);
-                idx
-            };
+            let tool_result_idx =
+                if let Some(&idx) = tool_call_id_to_tool_result_idx.get(tool_call_id) {
+                    idx
+                } else {
+                    m.tool_results.push(TemplateToolResult {
+                        tool_call_id: tool_call_template_id,
+                        documents: Vec::new(),
+                    });
+                    let idx = m.tool_results.len() - 1;
+                    tool_call_id_to_tool_result_idx.insert(tool_call_id.clone(), idx);
+                    idx
+                };
 
             // Append the document to the tool result
             m.tool_results[tool_result_idx]
@@ -319,10 +323,11 @@ pub fn messages_to_template<S: std::hash::BuildHasher>(
                 return Err("tool calls are only supported for chatbot/assistant messages".into());
             }
             if tc.id.is_empty() {
-                return Err(format!("message[{}] has tool call with empty id", i).into());
+                return Err(format!("message[{i}] has tool call with empty id").into());
             }
             if tool_call_id_to_prompt_id.contains_key(&tc.id) {
-                return Err(format!("message[{}] has duplicate tool call id: {}", i, tc.id).into());
+                let id = &tc.id;
+                return Err(format!("message[{i}] has duplicate tool call id: {id}").into());
             }
             tool_call_id_to_prompt_id.insert(tc.id.clone(), running_tool_call_idx);
             let rendered_tool_call = tool_call_to_template(tc, running_tool_call_idx)?;

@@ -289,17 +289,17 @@ impl FilterImpl {
         Vec::new()
     }
 
-    pub(crate) fn utf8_valid_or_limit(&self, bstr: &[u8]) -> bool {
+    pub(crate) fn utf8_valid_or_limit(bstr: &[u8]) -> bool {
         let limit = 4; // utf-8 is up to 4 bytes
         let valid = std::str::from_utf8(bstr).is_ok();
         if bstr.len() >= limit && !valid {
-            log::warn!("emitting invalid utf8: {:?}", bstr);
+            log::warn!("emitting invalid utf8: {bstr:?}");
         }
         valid || bstr.len() >= limit
     }
 
     pub(crate) fn process_search_query(&mut self, bstr: &[u8]) -> (Vec<FilterOutput>, usize) {
-        if !self.utf8_valid_or_limit(bstr) {
+        if !Self::utf8_valid_or_limit(bstr) {
             return (Vec::new(), 0);
         }
 
@@ -326,7 +326,7 @@ impl FilterImpl {
         bstr: &[u8],
         token_log_probs: Option<&TokenIDsWithLogProb>,
     ) -> (Vec<FilterOutput>, usize) {
-        if !self.utf8_valid_or_limit(bstr) {
+        if !Self::utf8_valid_or_limit(bstr) {
             return (Vec::new(), 0);
         }
 

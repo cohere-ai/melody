@@ -14,7 +14,7 @@ impl FilterImpl {
         mode: FilterMode,
         token_log_probs: Option<&TokenIDsWithLogProb>,
     ) -> (Vec<FilterOutput>, usize) {
-        if !self.utf8_valid_or_limit(bstr) {
+        if !Self::utf8_valid_or_limit(bstr) {
             return (Vec::new(), 0);
         }
 
@@ -119,10 +119,7 @@ impl FilterImpl {
 
         if end_first_id > start_last_id {
             log::warn!(
-                "Invalid citation: text={}, start_first_id={}, start_last_id={}",
-                s,
-                start_first_id,
-                start_last_id
+                "Invalid citation: text={s}, start_first_id={start_first_id}, start_last_id={start_last_id}"
             );
             return (None, 0);
         }

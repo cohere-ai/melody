@@ -1,3 +1,7 @@
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::doc_markdown)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
