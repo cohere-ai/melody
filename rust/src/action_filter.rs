@@ -1,6 +1,6 @@
 use crate::filter::FilterImpl;
 use crate::param_filter::ParamState;
-use crate::types::*;
+use crate::types::{FilterOutput, FilterToolCallDelta, FilterToolParameter};
 use regex::Regex;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -210,7 +210,7 @@ impl FilterImpl {
     }
 
     fn handle_end_of_param_name(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let param_name_regex = Regex::new(r#"\s*:\s*"#).unwrap();
+        let param_name_regex = Regex::new(r"\s*:\s*").unwrap();
 
         if let Some(mat) = param_name_regex.find(s) {
             self.action_metadata.mode = ActionMode::ParamValue;

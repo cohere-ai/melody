@@ -1,8 +1,9 @@
 use crate::filter::FilterImpl;
-use crate::types::*;
+use crate::types::FilterMode;
 use std::collections::HashMap;
 
 #[derive(Clone)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct FilterOptions {
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,
@@ -10,8 +11,6 @@ pub struct FilterOptions {
     pub(crate) inclusive_stops: Vec<String>,
     pub(crate) exclusive_stops: Vec<String>,
     pub(crate) chunk_size: usize,
-    pub(crate) repetition_limit: usize,
-    pub(crate) max_sequence_length: usize,
     pub(crate) special_token_map: HashMap<String, FilterMode>,
     pub(crate) default_mode: FilterMode,
     pub(crate) stream_non_grounded_answer: bool,
@@ -30,8 +29,6 @@ impl Default for FilterOptions {
             inclusive_stops: Vec::new(),
             exclusive_stops: Vec::new(),
             chunk_size: 1,
-            repetition_limit: 0,
-            max_sequence_length: 0,
             special_token_map: HashMap::new(),
             default_mode: FilterMode::PlainText,
             stream_non_grounded_answer: false,
@@ -44,46 +41,48 @@ impl Default for FilterOptions {
 }
 
 impl FilterOptions {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn with_left_trimmed(mut self) -> Self {
         self.left_trimmed = true;
         self
     }
 
+    #[must_use]
     pub fn with_right_trimmed(mut self) -> Self {
         self.right_trimmed = true;
         self
     }
 
+    #[must_use]
     pub fn with_prefix_trim(mut self, prefix: String) -> Self {
         self.trim_prefix = prefix;
         self
     }
 
+    #[must_use]
     pub fn with_inclusive_stops(mut self, stops: Vec<String>) -> Self {
         self.inclusive_stops = stops;
         self
     }
 
+    #[must_use]
     pub fn with_exclusive_stops(mut self, stops: Vec<String>) -> Self {
         self.exclusive_stops = stops;
         self
     }
 
+    #[must_use]
     pub fn with_chunk_size(mut self, size: usize) -> Self {
         self.chunk_size = size;
         self
     }
 
-    pub fn with_repetition_limit(mut self, limit: usize, max_sequence_length: usize) -> Self {
-        self.repetition_limit = limit;
-        self.max_sequence_length = max_sequence_length;
-        self
-    }
-
+    #[must_use]
     pub fn handle_rag(mut self) -> Self {
         self.default_mode = FilterMode::Ignore;
         self.right_trimmed = true;
@@ -94,6 +93,7 @@ impl FilterOptions {
         self
     }
 
+    #[must_use]
     pub fn handle_search_query(mut self) -> Self {
         self.default_mode = FilterMode::Ignore;
         self.right_trimmed = true;
@@ -106,6 +106,7 @@ impl FilterOptions {
         self
     }
 
+    #[must_use]
     pub fn handle_multi_hop(mut self) -> Self {
         self.default_mode = FilterMode::Ignore;
         self.right_trimmed = true;
@@ -126,6 +127,7 @@ impl FilterOptions {
         self
     }
 
+    #[must_use]
     pub fn handle_multi_hop_cmd3(mut self) -> Self {
         self.default_mode = FilterMode::GroundedAnswer;
         self.right_trimmed = true;
@@ -146,6 +148,7 @@ impl FilterOptions {
         self
     }
 
+    #[must_use]
     pub fn handle_multi_hop_cmd4(mut self) -> Self {
         self.default_mode = FilterMode::GroundedAnswer;
         self.right_trimmed = true;
@@ -166,27 +169,31 @@ impl FilterOptions {
         self
     }
 
+    #[must_use]
     pub fn stream_non_grounded_answer(mut self) -> Self {
         self.stream_non_grounded_answer = true;
         self
     }
 
+    #[must_use]
     pub fn stream_tool_actions(mut self) -> Self {
         self.stream_tool_actions = true;
         self
     }
 
+    #[must_use]
     pub fn stream_processed_params(mut self) -> Self {
         self.stream_processed_params = true;
         self
     }
 
-    pub fn remove_token(mut self, token: String) -> Self {
-        self.special_token_map.remove(&token);
+    #[must_use]
+    pub fn remove_token(mut self, token: &str) -> Self {
+        self.special_token_map.remove(token);
         self
     }
 
-    pub fn apply_to_filter(self, filter: &mut FilterImpl) {
+    pub(crate) fn apply_to_filter(self, filter: &mut FilterImpl) {
         filter.left_trimmed = self.left_trimmed;
         filter.right_trimmed = self.right_trimmed;
         filter.trim_prefix = self.trim_prefix;
@@ -201,7 +208,7 @@ impl FilterOptions {
 
         // Merge special token maps
         for (token, mode) in self.special_token_map {
-            filter.special_token_map.insert(token.clone(), mode);
+            filter.special_token_map.insert(token, mode);
         }
 
         // Add inclusive stops
@@ -223,6 +230,7 @@ impl FilterOptions {
     }
 }
 
+#[must_use]
 pub fn new_filter(options: FilterOptions) -> FilterImpl {
     let mut filter = FilterImpl::new();
     options.apply_to_filter(&mut filter);

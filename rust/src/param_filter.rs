@@ -1,6 +1,6 @@
 use crate::action_filter::ActionMode;
 use crate::filter::{FilterImpl, find_partial};
-use crate::types::*;
+use crate::types::FilterOutput;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ParamState {

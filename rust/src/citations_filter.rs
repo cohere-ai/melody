@@ -1,5 +1,5 @@
 use crate::filter::{FilterImpl, find_partial};
-use crate::types::*;
+use crate::types::{FilterCitation, FilterMode, FilterOutput, Source, TokenIDsWithLogProb};
 
 const START_FIRST_CIT: &str = "<co: ";
 const START_LAST_CIT: &str = "</co: ";
@@ -14,7 +14,7 @@ impl FilterImpl {
         mode: FilterMode,
         token_log_probs: Option<&TokenIDsWithLogProb>,
     ) -> (Vec<FilterOutput>, usize) {
-        if !self.utf8_valid_or_limit(bstr) {
+        if !Self::utf8_valid_or_limit(bstr) {
             return (Vec::new(), 0);
         }
 
@@ -42,13 +42,7 @@ impl FilterImpl {
 
         let mut res_out = res_out.unwrap();
         res_out.is_post_answer = self.stream_non_grounded_answer && mode != FilterMode::ToolReason;
-
-        // Citation outputs (empty text with citations) are metadata, not tool reasoning text
-        if res_out.text.is_empty() && !res_out.citations.is_empty() {
-            res_out.is_tools_reason = false;
-        } else {
-            res_out.is_tools_reason = mode == FilterMode::ToolReason;
-        }
+        res_out.is_tools_reason = mode == FilterMode::ToolReason;
 
         // Don't send logprobs for citations if there's no corresponding text.
         if let Some(probs) = token_log_probs
@@ -77,7 +71,7 @@ impl FilterImpl {
         };
 
         let (start_first_id, end_first_id, _) =
-            self.find_an_element(s, start_first_citation_str, END_OF_CIT, self.cmd3_citations);
+            Self::find_an_element(s, start_first_citation_str, END_OF_CIT, self.cmd3_citations);
 
         // No citation was found so send the plain text and remove from buffer
         if start_first_id == usize::MAX {
@@ -99,7 +93,7 @@ impl FilterImpl {
 
         // Then try to find the 'last' citation element.
         let (start_last_id, end_last_id, docs_last) =
-            self.find_an_element(s, START_LAST_CIT, END_OF_CIT, self.cmd3_citations);
+            Self::find_an_element(s, START_LAST_CIT, END_OF_CIT, self.cmd3_citations);
 
         // Only partial citation found so we need to wait for the complete citation.
         if start_last_id == usize::MAX || end_last_id == usize::MAX {
@@ -125,10 +119,7 @@ impl FilterImpl {
 
         if end_first_id > start_last_id {
             log::warn!(
-                "Invalid citation: text={}, start_first_id={}, start_last_id={}",
-                s,
-                start_first_id,
-                start_last_id
+                "Invalid citation: text={s}, start_first_id={start_first_id}, start_last_id={start_last_id}"
             );
             return (None, 0);
         }
@@ -142,8 +133,10 @@ impl FilterImpl {
         self.cur_text_byte_index += text.len();
 
         if self.cur_citation_byte_index != -1 {
-            if (self.cur_citation_byte_index as usize) < start_last_id {
-                text = s[self.cur_citation_byte_index as usize..start_last_id].to_string();
+            #[allow(clippy::cast_sign_loss)]
+            let start_idx = self.cur_citation_byte_index as usize;
+            if start_idx < start_last_id {
+                text = s[start_idx..start_last_id].to_string();
             } else {
                 text = String::new();
             }
@@ -189,6 +182,7 @@ impl FilterImpl {
         let start_idx = if self.cur_citation_byte_index == -1 {
             end_first_id + 1
         } else {
+            #[allow(clippy::cast_sign_loss)]
             let idx_as_usize = self.cur_citation_byte_index as usize;
             // If we've already processed all of this string, return early
             if idx_as_usize >= s.len() {
@@ -197,7 +191,8 @@ impl FilterImpl {
             idx_as_usize
         };
 
-        self.cur_citation_byte_index = (s.len() - text_before_citation.len()) as isize;
+        let byte_offset = s.len().saturating_sub(text_before_citation.len());
+        self.cur_citation_byte_index = byte_offset.try_into().unwrap_or(isize::MAX);
 
         let end_idx = if start_last_id != usize::MAX && start_last_id > 0 {
             start_last_id
@@ -239,7 +234,6 @@ impl FilterImpl {
     }
 
     fn find_an_element(
-        &self,
         s: &str,
         start: &str,
         end: &str,
@@ -255,32 +249,30 @@ impl FilterImpl {
             return (start_id, usize::MAX, Vec::new());
         }
 
-        let end_id = if let Some(idx) = s[start_id + 1..].find(end) {
-            idx
-        } else {
+        let Some(end_id) = s[start_id + 1..].find(end) else {
             return (start_id, usize::MAX, Vec::new());
         };
 
         let substring = &s[start_id + start.len()..start_id + 1 + end_id];
 
         let doc_indices = if cmd3_citations {
-            self.convert_string_to_doc_indices(substring)
+            Self::convert_string_to_doc_indices(substring)
         } else {
             let int_indices = convert_string_to_int_list(substring);
-            if !int_indices.is_empty() {
+            if int_indices.is_empty() {
+                Vec::new()
+            } else {
                 vec![Source {
                     tool_call_index: 0,
                     tool_result_indices: int_indices,
                 }]
-            } else {
-                Vec::new()
             }
         };
 
         (start_id, start_id + 1 + end_id, doc_indices)
     }
 
-    fn convert_string_to_doc_indices(&self, s: &str) -> Vec<Source> {
+    fn convert_string_to_doc_indices(s: &str) -> Vec<Source> {
         let string_splits: Vec<&str> = s.trim().split(']').collect();
         let mut doc_indices = Vec::new();
 
@@ -298,7 +290,12 @@ impl FilterImpl {
             let result_indices_str = cit_splits[1];
 
             let tool_index = match tool_idx_str.trim().parse::<i32>() {
-                Ok(idx) if idx >= 0 => idx as usize,
+                Ok(idx) if idx >= 0 => {
+                    #[allow(clippy::cast_sign_loss)]
+                    {
+                        idx as usize
+                    }
+                }
                 _ => {
                     log::warn!("Invalid citation tool index");
                     continue;
@@ -313,10 +310,12 @@ impl FilterImpl {
 
             for result_split in result_idx_splits {
                 match result_split.trim().parse::<i32>() {
-                    Ok(idx) if idx >= 0 => result_indices.push(idx as usize),
+                    Ok(idx) if idx >= 0 => {
+                        #[allow(clippy::cast_sign_loss)]
+                        result_indices.push(idx as usize);
+                    }
                     _ => {
                         log::warn!("Invalid citation result index");
-                        continue;
                     }
                 }
             }
@@ -339,6 +338,7 @@ fn convert_string_to_int_list(s: &str) -> Vec<usize> {
         if let Ok(j) = a.parse::<i32>()
             && j >= 0
         {
+            #[allow(clippy::cast_sign_loss)]
             int_arr.push(j as usize);
         }
     }
@@ -530,10 +530,9 @@ mod tests {
 
     #[test]
     fn test_find_an_element_standard_case() {
-        let filter = FilterImpl::new();
-
         let input = "hello <co: 2,1> foo </co: 2,1>";
-        let (start_index, end_index, docs) = filter.find_an_element(input, "<co: ", ">", false);
+        let (start_index, end_index, docs) =
+            FilterImpl::find_an_element(input, "<co: ", ">", false);
 
         assert_eq!(start_index, 6);
         assert_eq!(end_index, 14);
@@ -544,10 +543,9 @@ mod tests {
 
     #[test]
     fn test_find_an_element_no_citation() {
-        let filter = FilterImpl::new();
-
         let input = "hello";
-        let (start_index, end_index, docs) = filter.find_an_element(input, "<co: ", ">", false);
+        let (start_index, end_index, docs) =
+            FilterImpl::find_an_element(input, "<co: ", ">", false);
 
         assert_eq!(start_index, usize::MAX);
         assert_eq!(end_index, usize::MAX);
@@ -556,10 +554,9 @@ mod tests {
 
     #[test]
     fn test_find_an_element_cmd3_two_tools() {
-        let filter = FilterImpl::new();
-
         let input = "<co> hello </co: 0:[1,2],1:[0]>";
-        let (start_index, end_index, docs) = filter.find_an_element(input, "</co: ", ">", true);
+        let (start_index, end_index, docs) =
+            FilterImpl::find_an_element(input, "</co: ", ">", true);
 
         assert_eq!(start_index, 11);
         assert_eq!(end_index, 30);

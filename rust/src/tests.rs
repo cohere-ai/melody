@@ -895,7 +895,7 @@ mod tests {
                         }],
                         tool_calls: None,
                         is_post_answer: false,
-                        is_tools_reason: false,
+                        is_tools_reason: true,
                     },
                     FilterOutput {
                         text: "foo".to_string(),

@@ -1,3 +1,6 @@
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::doc_markdown)]
+
 use indexmap::IndexMap;
 use serde::de::{Deserialize, Deserializer, MapAccess, Visitor};
 use serde::ser::{Serialize, SerializeMap, Serializer};

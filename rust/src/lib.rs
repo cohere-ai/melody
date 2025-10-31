@@ -12,6 +12,10 @@ mod action_filter;
 mod citations_filter;
 mod param_filter;
 
+// FFI bindings for calling from other languages (Go, Python, etc.)
+#[cfg(feature = "ffi")]
+pub mod ffi;
+
 #[cfg(test)]
 mod tests;
 

@@ -1,6 +1,17 @@
-use crate::templating::melody_types::*;
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::return_self_not_must_use)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::implicit_hasher)]
+#![allow(clippy::needless_pass_by_value)]
+
+use crate::templating::melody_types::{Document, Grounding, Message, Tool};
 use crate::templating::prompts;
-use crate::templating::util::*;
+use crate::templating::util::{
+    escape_special_tokens, json_to_liquid, messages_to_template, safe_liquid_substitutions,
+    tools_to_template,
+};
 use liquid::ParserBuilder;
 use regex::Regex;
 use serde_json::{Map, Value, json};
