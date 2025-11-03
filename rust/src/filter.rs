@@ -29,7 +29,7 @@ pub struct FilterImpl {
 
     pub(crate) cur_text_index: usize,
     pub(crate) cur_text_byte_index: usize,
-    pub(crate) cur_citation_byte_index: isize,
+    pub(crate) cur_citation_byte_index: Option<usize>,
     pub(crate) action_metadata: FilterAction,
 
     pub(crate) curr_search_query_idx: usize,
@@ -64,7 +64,7 @@ impl FilterImpl {
             saw_non_whitespace_in_current_line: false,
             cur_text_index: 0,
             cur_text_byte_index: 0,
-            cur_citation_byte_index: -1,
+            cur_citation_byte_index: None,
             action_metadata: FilterAction::new(),
             curr_search_query_idx: 0,
             sent_curr_index: false,
@@ -259,13 +259,12 @@ impl FilterImpl {
         token: &str,
     ) -> Vec<FilterOutput> {
         if idx != usize::MAX && !s[..idx + token.len()].is_empty() {
-            let text = if self.cur_citation_byte_index == -1 {
-                s[..idx + token.len()].to_string()
-            } else {
-                #[allow(clippy::cast_sign_loss)]
-                let start_idx = self.cur_citation_byte_index.max(0) as usize;
+            let text = if let Some(start_idx) = self.cur_citation_byte_index {
                 s[start_idx..idx + token.len()].to_string()
+            } else {
+                s[..idx + token.len()].to_string()
             };
+
             return vec![FilterOutput {
                 text,
                 ..Default::default()
@@ -276,15 +275,14 @@ impl FilterImpl {
 
     pub(crate) fn handle_exclusive_stop(&mut self, s: &str, idx: usize) -> Vec<FilterOutput> {
         if idx != usize::MAX && !s[..idx].is_empty() {
-            let text = if self.cur_citation_byte_index == -1 {
-                let (trimmed, _) = self.trim_space(&s[..idx]);
-                trimmed
-            } else {
-                #[allow(clippy::cast_sign_loss)]
-                let start_idx = self.cur_citation_byte_index.max(0) as usize;
+            let text = if let Some(start_idx) = self.cur_citation_byte_index {
                 let (trimmed, _) = self.trim_space(&s[start_idx..idx]);
                 trimmed
+            } else {
+                let (trimmed, _) = self.trim_space(&s[..idx]);
+                trimmed
             };
+
             return vec![FilterOutput {
                 text,
                 ..Default::default()

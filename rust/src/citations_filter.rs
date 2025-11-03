@@ -132,16 +132,14 @@ impl FilterImpl {
         self.cur_text_index += text.chars().count();
         self.cur_text_byte_index += text.len();
 
-        if self.cur_citation_byte_index != -1 {
-            #[allow(clippy::cast_sign_loss)]
-            let start_idx = self.cur_citation_byte_index as usize;
+        if let Some(start_idx) = self.cur_citation_byte_index {
             if start_idx < start_last_id {
                 text = s[start_idx..start_last_id].to_string();
             } else {
                 text = String::new();
             }
         }
-        self.cur_citation_byte_index = -1;
+        self.cur_citation_byte_index = None;
 
         let mut cits = vec![FilterCitation {
             start_index,
@@ -179,20 +177,18 @@ impl FilterImpl {
         self.cur_text_index += text_before_citation.chars().count();
         self.cur_text_byte_index += text_before_citation.len();
 
-        let start_idx = if self.cur_citation_byte_index == -1 {
-            end_first_id + 1
-        } else {
-            #[allow(clippy::cast_sign_loss)]
-            let idx_as_usize = self.cur_citation_byte_index as usize;
+        let start_idx = if let Some(start_idx) = self.cur_citation_byte_index {
             // If we've already processed all of this string, return early
-            if idx_as_usize >= s.len() {
+            if start_idx >= s.len() {
                 return (text_before_citation.to_string(), text_before_citation.len());
             }
-            idx_as_usize
+            start_idx
+        } else {
+            end_first_id + 1
         };
 
         let byte_offset = s.len().saturating_sub(text_before_citation.len());
-        self.cur_citation_byte_index = byte_offset.try_into().unwrap_or(isize::MAX);
+        self.cur_citation_byte_index = Some(byte_offset);
 
         let end_idx = if start_last_id != usize::MAX && start_last_id > 0 {
             start_last_id
@@ -289,17 +285,9 @@ impl FilterImpl {
             let tool_idx_str = cit_splits[0];
             let result_indices_str = cit_splits[1];
 
-            let tool_index = match tool_idx_str.trim().parse::<i32>() {
-                Ok(idx) if idx >= 0 => {
-                    #[allow(clippy::cast_sign_loss)]
-                    {
-                        idx as usize
-                    }
-                }
-                _ => {
-                    log::warn!("Invalid citation tool index");
-                    continue;
-                }
+            let Ok(tool_index) = tool_idx_str.trim().parse::<usize>() else {
+                log::warn!("Invalid citation tool index");
+                continue;
             };
 
             let mut result_indices = Vec::new();
@@ -309,11 +297,8 @@ impl FilterImpl {
                 .collect();
 
             for result_split in result_idx_splits {
-                match result_split.trim().parse::<i32>() {
-                    Ok(idx) if idx >= 0 => {
-                        #[allow(clippy::cast_sign_loss)]
-                        result_indices.push(idx as usize);
-                    }
+                match result_split.trim().parse::<usize>() {
+                    Ok(idx) => result_indices.push(idx),
                     _ => {
                         log::warn!("Invalid citation result index");
                     }
@@ -335,11 +320,8 @@ fn convert_string_to_int_list(s: &str) -> Vec<usize> {
     let mut int_arr = Vec::new();
 
     for a in string_indexes {
-        if let Ok(j) = a.parse::<i32>()
-            && j >= 0
-        {
-            #[allow(clippy::cast_sign_loss)]
-            int_arr.push(j as usize);
+        if let Ok(j) = a.parse::<usize>() {
+            int_arr.push(j);
         }
     }
 
@@ -355,7 +337,7 @@ mod tests {
     fn test_handle_citations_standard_case() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello <co: 2,1>foo</co: 2,1>";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
@@ -380,7 +362,7 @@ mod tests {
     fn test_handle_citations_standard_case_no_stream() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = false;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello <co: 2,1>foo</co: 2,1>";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
@@ -405,7 +387,7 @@ mod tests {
     fn test_handle_citations_no_document() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello <co: >foo</co: >";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
@@ -425,7 +407,7 @@ mod tests {
     fn test_handle_citations_non_int_document() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello <co: 2, foo>foo</co: 2, foo>";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
@@ -447,7 +429,7 @@ mod tests {
     fn test_handle_citations_different_documents() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello <co: 1,2>foo</co: 3,4>";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
@@ -472,7 +454,7 @@ mod tests {
     fn test_handle_citations_no_citation() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello coo";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
@@ -487,7 +469,7 @@ mod tests {
     fn test_handle_citations_incomplete_first_citation() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "<";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
@@ -500,7 +482,7 @@ mod tests {
     fn test_handle_citations_multiple_citations() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello <co: 2,1>foo</co: 2,1> hi <co: 0>barber</co: 0>";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);

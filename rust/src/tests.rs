@@ -10,7 +10,7 @@ mod tests {
     fn test_citations_standard_case() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello <co: 2,1>foo</co: 2,1>";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
@@ -35,7 +35,7 @@ mod tests {
     fn test_citations_no_document() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello <co: >foo</co: >";
         let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
@@ -55,7 +55,7 @@ mod tests {
     fn test_citations_multiple() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = -1;
+        filter.cur_citation_byte_index = None;
 
         let input = "hello <co: 1>foo</co: 1> world <co: 2>bar</co: 2>";
         let (output, _remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
