@@ -5,7 +5,6 @@
 
 pub mod filter;
 pub mod options;
-pub mod templating;
 pub mod types;
 
 mod action_filter;
