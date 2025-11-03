@@ -23,8 +23,8 @@ use melody_parsing::{FilterOptions, TokenIDsWithLogProb, new_filter};
 
 // Create a filter with options
 let options = FilterOptions::new()
-    .with_left_trimmed()
-    .with_right_trimmed();
+    .handle_multi_hop_cmd3()
+    .stream_tool_actions();
 
 let mut filter = new_filter(options);
 
