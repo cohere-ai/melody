@@ -11,7 +11,7 @@
 The `examples/` directory contains several example programs demonstrating how to use the Melody parsing library in Rust. You can run them using:
 
 ```bash
-cargo run --example basic_usage
+cargo run --example basic
 ```
 
 ## Usage
@@ -19,53 +19,36 @@ cargo run --example basic_usage
 ### Basic Filter
 
 ```rust
-use melody_parsing::{FilterImpl, FilterOptions, Filter};
+use melody_parsing::{FilterOptions, TokenIDsWithLogProb, new_filter};
 
 // Create a filter with options
 let options = FilterOptions::new()
-    .with_left_trimmed()
-    .with_right_trimmed();
+    .handle_multi_hop_cmd3()
+    .stream_tool_actions();
 
-let mut filter = FilterImpl::new(Some(tokenizer));
-options.apply_to_filter(&mut filter);
+let mut filter = new_filter(options);
 
-// Write tokens
-let outputs = filter.write(token_id, Some(log_prob))?;
+// Simulate text
+let text = "Hello <co: 1>world</co: 1>!";
+let logprobs = TokenIDsWithLogProb {
+    token_ids: vec![1, 2, 3],
+    logprobs: vec![0.1, 0.2, 0.3],
+};
+
+// Write text
+let outputs = filter.write_decoded(text, logprobs);
 
 // Process outputs
 for output in outputs {
-    println!("Text: {}", output.text);
+    println!("  Text: {}", output.text);
     for citation in output.citations {
-        println!("Citation: {}", citation.text);
+        println!(
+            "    Citation: {} (indices {}-{})",
+            citation.text, citation.start_index, citation.end_index
+        );
     }
 }
 
 // Flush remaining tokens
 let final_outputs = filter.flush_partials();
-```
-
-### Stream Filter
-
-```rust
-use melody_parsing::{StreamFilter, FilterImpl, FilterOptions};
-
-let options = FilterOptions::new()
-    .handle_multi_hop_cmd3()
-    .stream_tool_actions();
-
-let filter = FilterImpl::new(Some(tokenizer));
-options.apply_to_filter(&mut filter);
-
-let stream = StreamFilter::new(filter);
-
-// Write decoded text
-stream.write_decoded("hello world", logprobs);
-
-// Read from output channel
-let rx = stream.read();
-for output in rx {
-    println!("{}", output.text);
-}
-
-stream.close();
 ```
