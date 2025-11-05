@@ -15,6 +15,10 @@ mod param_filter;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
+#[cfg(feature = "python_ffi")]
+mod python_ffi;
+
+
 #[cfg(test)]
 mod tests;
 

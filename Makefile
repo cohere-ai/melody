@@ -38,3 +38,6 @@ rust-format:
 
 rust-build:
 	cd rust && cargo clean && cargo build --release
+
+python-bindings:
+	cd rust && maturin develop --features python_ffi

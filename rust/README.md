@@ -19,7 +19,7 @@ cargo run --example basic
 ### Basic Filter
 
 ```rust
-use melody_parsing::{FilterOptions, TokenIDsWithLogProb, new_filter};
+use cohere_melody::{FilterOptions, TokenIDsWithLogProb, new_filter};
 
 // Create a filter with options
 let options = FilterOptions::new()
