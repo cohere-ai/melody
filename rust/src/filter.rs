@@ -1,7 +1,7 @@
+use crate::FilterOptions;
 use crate::action_filter::FilterAction;
 use crate::types::{FilterMode, FilterOutput, FilterSearchQueryDelta, TokenIDsWithLogProb};
 use std::collections::HashMap;
-use crate::FilterOptions;
 
 /// Filter is the interface used to parse the output of a cohere model.
 pub trait Filter {
@@ -102,15 +102,13 @@ impl FilterImpl {
 
         // Add inclusive stops
         for stop in options.inclusive_stops {
-            self
-                .special_token_map
+            self.special_token_map
                 .insert(stop, FilterMode::InclusiveStop);
         }
 
         // Add exclusive stops
         for stop in options.exclusive_stops {
-            self
-                .special_token_map
+            self.special_token_map
                 .insert(stop, FilterMode::ExclusiveStop);
         }
 

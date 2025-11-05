@@ -1,5 +1,5 @@
+use crate::{Filter, FilterImpl, FilterOptions, FilterOutput, TokenIDsWithLogProb, new_filter};
 use pyo3::prelude::*;
-use crate::{new_filter, Filter, FilterImpl, FilterOptions, FilterOutput, TokenIDsWithLogProb};
 
 #[pyclass]
 struct PyFilter {
@@ -18,7 +18,9 @@ impl PyFilter {
     // TODO: figure out how we want to pass log probs (if we do)
     fn write_decoded(&mut self, decoded_token: &str) -> PyResult<Vec<FilterOutput>> {
         // You may need to convert logprobs to TokenIDsWithLogProb as appropriate
-        Ok(self.inner.write_decoded(decoded_token, TokenIDsWithLogProb::new()))
+        Ok(self
+            .inner
+            .write_decoded(decoded_token, TokenIDsWithLogProb::new()))
     }
 
     fn flush_partials(&mut self) -> PyResult<Vec<FilterOutput>> {
@@ -28,7 +30,7 @@ impl PyFilter {
 
 #[pyclass]
 struct PyFilterOptions {
-    inner: FilterOptions
+    inner: FilterOptions,
 }
 
 #[pymethods]
@@ -36,7 +38,7 @@ impl PyFilterOptions {
     #[new]
     fn new() -> Self {
         PyFilterOptions {
-            inner: FilterOptions::default()
+            inner: FilterOptions::default(),
         }
     }
 
