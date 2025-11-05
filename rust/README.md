@@ -52,3 +52,24 @@ for output in outputs {
 // Flush remaining tokens
 let final_outputs = filter.flush_partials();
 ```
+
+## Building Python Bindings
+
+### Prerequisites
+1. [Recommended] [Install pyenv](https://github.com/pyenv/pyenv#a-getting-pyenv)
+   2. Use the automatic installer under Linux/Unix; it also installs pyenv-virtualenv
+2. [Recommended] Start and activate a virtualenv:
+```bash
+pyenv install 3.12 --keep
+pyenv virtualenv 3.12 venv
+pyenv activate venv
+```
+3. Install maturin:
+```bash
+pip install maturin
+```
+
+You should now be able to build the Python bindings with:
+```bash
+maturin develop --features python_ffi
+```
