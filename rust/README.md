@@ -55,7 +55,7 @@ let final_outputs = filter.flush_partials();
 
 ## Building Python Bindings
 
-### Prerequisites
+### Prerequisites (from [pyo3](https://pyo3.rs/v0.27.1/getting-started.html#installation))
 1. [Recommended] [Install pyenv](https://github.com/pyenv/pyenv#a-getting-pyenv)
    2. Use the automatic installer under Linux/Unix; it also installs pyenv-virtualenv
 2. [Recommended] Start and activate a virtualenv:
