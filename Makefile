@@ -40,4 +40,4 @@ rust-build:
 	cd rust && cargo clean && cargo build --release
 
 python-bindings:
-	cd rust && maturin develop --features python_ffi
+	cd rust && uv venv && uv pip install maturin && uv run maturin develop --features python_ffi

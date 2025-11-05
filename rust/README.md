@@ -56,20 +56,14 @@ let final_outputs = filter.flush_partials();
 ## Building Python Bindings
 
 ### Prerequisites (from [pyo3](https://pyo3.rs/v0.27.1/getting-started.html#installation))
-1. [Recommended] [Install pyenv](https://github.com/pyenv/pyenv#a-getting-pyenv)
-   2. Use the automatic installer under Linux/Unix; it also installs pyenv-virtualenv
-2. [Recommended] Start and activate a virtualenv:
-```bash
-pyenv install 3.12 --keep
-pyenv virtualenv 3.12 venv
-pyenv activate venv
-```
-3. Install maturin:
-```bash
-pip install maturin
-```
 
-You should now be able to build the Python bindings with:
-```bash
-maturin develop --features python_ffi
-```
+1. Recommended [install uv](https://docs.astral.sh/uv)
+2. From root directory, run:
+   ```bash
+   make python-bindings
+   ```
+3. Test the bindings:
+   ```bash
+   cd rust
+   uv run python -c "import cohere_melody;"
+   ```
