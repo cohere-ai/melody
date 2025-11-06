@@ -8,13 +8,13 @@ mod-install-tokenizers:
 	@echo "-- installed libtokenizers.a"
 
 install-tokenizers:
-	@echo "-- installing libtokenizers.a at ./golang/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a..."
+	@echo "-- installing libtokenizers.a at ./go-bindings/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a..."
 	@curl -fsSL https://github.com/cohere-ai/tokenizers/releases/download/${TOKENIZERS_VERSION}/libtokenizers.${UNAME}-${ARCH}.tar.gz | tar xvz
-	@mv libtokenizers.a golang/vendor/github.com/cohere-ai/tokenizers/
+	@mv libtokenizers.a go-bindings/vendor/github.com/cohere-ai/tokenizers/
 	@echo "-- installed libtokenizers.a"
 
 check-install-tokenizers:
-	@if [ ! -e "./golang/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a" ]; then \
+	@if [ ! -e "./go-bindings/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a" ]; then \
   		$(MAKE) install-tokenizers; \
 	fi;
 

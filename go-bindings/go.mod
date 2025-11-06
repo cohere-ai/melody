@@ -1,4 +1,4 @@
-module github.com/cohere-ai/melody
+module github.com/cohere-ai/melody/go-bindings
 
 go 1.25
 
