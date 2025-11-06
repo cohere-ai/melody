@@ -17,3 +17,7 @@ module-name = "cohere_melody"
 
 [tool.uv]
 managed = false
+
+[tool.pytest.ini_options]
+# Only collect tests from the top-level tests directory
+testpaths = ["tests"]
