@@ -57,7 +57,7 @@ jobs:
         run: make install-tokenizers
 
       - name: Run Go tests
-        working-directory: golang/
+        working-directory: go-bindings
         run: |
           go env -w GOPRIVATE=github.com/cohere-ai
           go test ./...
