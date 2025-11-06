@@ -18,26 +18,20 @@ check-install-tokenizers:
   		$(MAKE) install-tokenizers; \
 	fi;
 
-golang-lint:
-	cd golang && golangci-lint run --config=.golangci.yaml ./...
-
-golang-test: check-install-tokenizers
-	cd golang && go test ./...
-
 golang-bindings-test: check-install-tokenizers rust-build
 	cd go-bindings && go test -v ./...
 
 rust-test:
-	cd rust && cargo test --verbose
+	cargo test --verbose
 
 rust-lint:
-	cd rust && cargo clippy -- -D warnings
+	cargo clippy -- -D warnings
 
 rust-format:
-	cd rust && cargo fmt
+	cargo fmt
 
 rust-build:
-	cd rust && cargo clean && cargo build --release
+	cargo clean && cargo build --release
 
 python-bindings:
-	cd rust && uv venv && uv pip install maturin && uv run maturin develop --features python_ffi
+	uv venv && uv pip install maturin && uv run maturin develop --features python_ffi
