@@ -71,7 +71,6 @@ jobs:
         with:
           components: rustfmt
       - name: Check formatting
-        working-directory: ./rust
         run: cargo fmt -- --check
 
   rust-build:
