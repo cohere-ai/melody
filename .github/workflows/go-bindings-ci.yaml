@@ -81,7 +81,6 @@ jobs:
         run: ls -la target/release
 
       - name: Run Go tests
-        working-directory: go-bindings
         run: |
           go env -w GOPRIVATE=github.com/cohere-ai
-          go test ./...
+          LD_LIBRARY_PATH=$(pwd)/target/release cd go-bindings && go test ./...
