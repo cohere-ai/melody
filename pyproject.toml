@@ -3,7 +3,7 @@ requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "melody"
+name = "cohere_melody"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
@@ -12,7 +12,8 @@ classifiers = [
 ]
 dynamic = ["version"]
 [tool.maturin]
-features = ["pyo3/extension-module"]
+features = ["pyo3/extension-module", "python_ffi"]
+module-name = "cohere_melody"
 
 [tool.uv]
 managed = false
