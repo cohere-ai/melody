@@ -44,7 +44,7 @@ jobs:
           path: rust/target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       - name: Build
-        working-directory: ./rust
+        working-directory: ./
         run: cargo build --release --verbose
 
       - name: Set up Go
