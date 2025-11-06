@@ -46,6 +46,12 @@ jobs:
       - name: Build
         working-directory: ./
         run: cargo build --release --verbose
+      - name: List current directory contents
+        run: ls -la
+      - name: List current target contents
+        run: ls -la target
+      - name: List current release contents
+        run: ls -la target/release
 
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
