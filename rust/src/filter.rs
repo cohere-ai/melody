@@ -1,3 +1,4 @@
+use crate::FilterOptions;
 use crate::action_filter::FilterAction;
 use crate::types::{FilterMode, FilterOutput, FilterSearchQueryDelta, TokenIDsWithLogProb};
 use std::collections::HashMap;
@@ -79,6 +80,41 @@ impl FilterImpl {
             special_token_keys: Vec::new(),
             done: false,
         }
+    }
+
+    pub(crate) fn apply_options(mut self, options: FilterOptions) -> Self {
+        self.left_trimmed = options.left_trimmed;
+        self.right_trimmed = options.right_trimmed;
+        self.trim_prefix = options.trim_prefix;
+        self.chunk_size = options.chunk_size;
+        self.stream_non_grounded_answer = options.stream_non_grounded_answer;
+        self.stream_tool_actions = options.stream_tool_actions;
+        self.stream_processed_params = options.stream_processed_params;
+        self.has_tool_call_id = options.has_tool_call_id;
+        self.cmd3_citations = options.cmd3_citations;
+        self.default_mode = options.default_mode;
+        self.mode = options.default_mode;
+
+        // Merge special token maps
+        for (token, mode) in &options.special_token_map {
+            self.special_token_map.insert(token.clone(), *mode);
+        }
+
+        // Add inclusive stops
+        for stop in options.inclusive_stops {
+            self.special_token_map
+                .insert(stop, FilterMode::InclusiveStop);
+        }
+
+        // Add exclusive stops
+        for stop in options.exclusive_stops {
+            self.special_token_map
+                .insert(stop, FilterMode::ExclusiveStop);
+        }
+
+        // Update special token keys
+        self.special_token_keys = options.special_token_map.keys().cloned().collect();
+        self
     }
 
     pub(crate) fn write_text(

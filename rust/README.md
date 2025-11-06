@@ -19,7 +19,7 @@ cargo run --example basic
 ### Basic Filter
 
 ```rust
-use melody_parsing::{FilterOptions, TokenIDsWithLogProb, new_filter};
+use cohere_melody::{FilterOptions, TokenIDsWithLogProb, new_filter};
 
 // Create a filter with options
 let options = FilterOptions::new()
@@ -52,3 +52,18 @@ for output in outputs {
 // Flush remaining tokens
 let final_outputs = filter.flush_partials();
 ```
+
+## Building Python Bindings
+
+### Prerequisites (from [pyo3](https://pyo3.rs/v0.27.1/getting-started.html#installation))
+
+1. Recommended [install uv](https://docs.astral.sh/uv)
+2. From root directory, run:
+   ```bash
+   make python-bindings
+   ```
+3. Test the bindings:
+   ```bash
+   cd rust
+   uv run python -c "import cohere_melody;"
+   ```

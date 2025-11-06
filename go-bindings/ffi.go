@@ -1,6 +1,6 @@
 package melody
 
-// #cgo LDFLAGS: -L${SRCDIR}/../rust/target/release -lmelody_parsing
+// #cgo LDFLAGS: -L${SRCDIR}/../rust/target/release -lcohere_melody
 // #include <stdlib.h>
 // #include "melody.h"
 import "C"

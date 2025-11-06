@@ -1,4 +1,4 @@
-use melody_parsing::{Filter, FilterOptions, TokenIDsWithLogProb, new_filter};
+use cohere_melody::{Filter, FilterOptions, TokenIDsWithLogProb, new_filter};
 
 fn main() {
     // Initialize logging

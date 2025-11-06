@@ -1,4 +1,8 @@
+#[cfg(feature = "python_ffi")]
+use pyo3::prelude::*;
+
 /// `TokenIDsWithLogProb` pairs tokens with their log probabilities.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokenIDsWithLogProb {
     pub token_ids: Vec<u32>,
@@ -27,6 +31,7 @@ impl Default for TokenIDsWithLogProb {
 }
 
 /// `FilterOutput` represents a partial parsed output from a model generation.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FilterOutput {
     pub text: String,
@@ -39,6 +44,7 @@ pub struct FilterOutput {
 }
 
 /// `FilterSearchQueryDelta` represents a change to a search query.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FilterSearchQueryDelta {
     pub index: usize,
@@ -46,6 +52,7 @@ pub struct FilterSearchQueryDelta {
 }
 
 /// `FilterToolCallDelta` represents a change to a tool call.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FilterToolCallDelta {
     pub index: usize,
@@ -56,6 +63,7 @@ pub struct FilterToolCallDelta {
 }
 
 /// `FilterToolParameter` represents a change to a tool parameter.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FilterToolParameter {
     pub name: String,
@@ -64,6 +72,7 @@ pub struct FilterToolParameter {
 
 /// `FilterCitation` represents a citation parsed from a model generation.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 pub struct FilterCitation {
     /// The beginning index of the citation in the larger generation.
     /// E.g. `"Hello world"` where the citation is `"world"` would have a `start_index` of 6.
@@ -78,12 +87,14 @@ pub struct FilterCitation {
 
 /// Source indicates which tool call and which tool results from that tool are being cited.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 pub struct Source {
     pub tool_call_index: usize,
     pub tool_result_indices: Vec<usize>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "python_ffi", pyclass(eq, eq_int))]
 pub(crate) enum FilterMode {
     PlainText,
     Ignore,

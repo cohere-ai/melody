@@ -192,47 +192,10 @@ impl FilterOptions {
         self.special_token_map.remove(token);
         self
     }
-
-    pub(crate) fn apply_to_filter(self, filter: &mut FilterImpl) {
-        filter.left_trimmed = self.left_trimmed;
-        filter.right_trimmed = self.right_trimmed;
-        filter.trim_prefix = self.trim_prefix;
-        filter.chunk_size = self.chunk_size;
-        filter.stream_non_grounded_answer = self.stream_non_grounded_answer;
-        filter.stream_tool_actions = self.stream_tool_actions;
-        filter.stream_processed_params = self.stream_processed_params;
-        filter.has_tool_call_id = self.has_tool_call_id;
-        filter.cmd3_citations = self.cmd3_citations;
-        filter.default_mode = self.default_mode;
-        filter.mode = self.default_mode;
-
-        // Merge special token maps
-        for (token, mode) in self.special_token_map {
-            filter.special_token_map.insert(token, mode);
-        }
-
-        // Add inclusive stops
-        for stop in self.inclusive_stops {
-            filter
-                .special_token_map
-                .insert(stop, FilterMode::InclusiveStop);
-        }
-
-        // Add exclusive stops
-        for stop in self.exclusive_stops {
-            filter
-                .special_token_map
-                .insert(stop, FilterMode::ExclusiveStop);
-        }
-
-        // Update special token keys
-        filter.special_token_keys = filter.special_token_map.keys().cloned().collect();
-    }
 }
 
 #[must_use]
 pub fn new_filter(options: FilterOptions) -> FilterImpl {
-    let mut filter = FilterImpl::new();
-    options.apply_to_filter(&mut filter);
-    filter
+    let filter = FilterImpl::new();
+    filter.apply_options(options)
 }
