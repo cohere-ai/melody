@@ -39,3 +39,10 @@ Cargo.lock
 
 # OS
 .DS_Store
+
+# Python
+__pycache__/
+*.pyo
+*.pyd
+*.whl
+*.egg-info/
