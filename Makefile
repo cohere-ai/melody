@@ -33,8 +33,11 @@ rust-format:
 rust-build:
 	cargo clean && cargo build --release
 
-python-bindings:
-	uv venv --allow-existing && uv pip install maturin && uv run maturin develop --features python_ffi
+venv-setup:
+	uv venv --allow-existing && uv pip install maturin pytest
 
-python-bindings-test:
-	uv venv --allow-existing && uv pip install pytest && uv run pytest tests
+python-bindings: venv-setup
+	uv run maturin develop --features python_ffi
+
+python-bindings-test: venv-setup
+	uv run pytest tests
