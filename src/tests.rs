@@ -141,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_options_handle_multi_hop_cmd3() {
+    fn test_filter_options_cmd3() {
         let options = FilterOptions::new().cmd3();
 
         assert_eq!(options.default_mode, FilterMode::GroundedAnswer);
