@@ -42,7 +42,7 @@ func (opts *FilterOptions) Cmd3() *FilterOptions {
 }
 
 // HandleMultiHopCmd4 configures options for multi-hop CMD4 format
-func (opts *FilterOptions) HandleMultiHopCmd4() *FilterOptions {
+func (opts *FilterOptions) Cmd4() *FilterOptions {
 	if opts.ptr != nil {
 		C.melody_filter_options_cmd4(opts.ptr)
 	}
