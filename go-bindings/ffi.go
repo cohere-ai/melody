@@ -81,6 +81,14 @@ func (opts *FilterOptions) StreamNonGroundedAnswer() *FilterOptions {
 	return opts
 }
 
+// StreamToolActions enables streaming of tool actions
+func (opts *FilterOptions) StreamToolActions() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_stream_tool_actions(opts.ptr)
+	}
+	return opts
+}
+
 // StreamProcessedParams enables streaming of processed parameters
 func (opts *FilterOptions) StreamProcessedParams() *FilterOptions {
 	if opts.ptr != nil {

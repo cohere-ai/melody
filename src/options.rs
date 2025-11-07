@@ -178,6 +178,12 @@ impl FilterOptions {
     }
 
     #[must_use]
+    pub fn stream_tool_actions(mut self) -> Self {
+        self.stream_tool_actions = true;
+        self
+    }
+
+    #[must_use]
     pub fn stream_processed_params(mut self) -> Self {
         self.stream_processed_params = true;
         self

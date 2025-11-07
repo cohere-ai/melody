@@ -26,10 +26,10 @@ type filterConfig struct {
 func (cfg *filterConfig) apply(opts *FilterOptions) {
 	// Handle format types
 	if cfg.multiHopCmd3 {
-		opts.HandleMultiHopCmd3()
+		opts.Cmd3()
 	}
 	if cfg.multiHopCmd4 {
-		opts.HandleMultiHopCmd4()
+		opts.Cmd4()
 	}
 	if cfg.rag {
 		opts.HandleRAG()
