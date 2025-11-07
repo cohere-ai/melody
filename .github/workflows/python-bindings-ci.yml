@@ -47,5 +47,6 @@ jobs:
           set -e
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install ty vllm cohere_melody --force-reinstall
+          pip install ty vllm
+          pip install cohere_melody --find-links dist --force-reinstall
           ty check python/cohere_melody
