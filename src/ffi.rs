@@ -101,20 +101,6 @@ pub unsafe extern "C" fn melody_filter_options_free(options: *mut CFilterOptions
     }
 }
 
-/// Enables streaming of tool actions
-///
-/// # Safety
-/// `options` must be a valid pointer returned from `melody_filter_options_new`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_options_stream_tool_actions(options: *mut CFilterOptions) {
-    if !options.is_null() {
-        unsafe {
-            let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().stream_tool_actions();
-        }
-    }
-}
-
 /// Configures options for multi-hop CMD3 format
 ///
 /// # Safety
@@ -197,6 +183,20 @@ pub unsafe extern "C" fn melody_filter_options_stream_non_grounded_answer(
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
             *opts = opts.clone().stream_non_grounded_answer();
+        }
+    }
+}
+
+/// Enables streaming of tool actions
+///
+/// # Safety
+/// `options` must be a valid pointer returned from `melody_filter_options_new`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_stream_tool_actions(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options.cast::<FilterOptions>());
+            *opts = opts.clone().stream_tool_actions();
         }
     }
 }
