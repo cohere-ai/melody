@@ -39,9 +39,7 @@ fn main() {
     // Example 2: Filter with citations
     println!("Example 2: Citation Parsing");
     {
-        let options = FilterOptions::new()
-            .handle_multi_hop_cmd3()
-            .stream_tool_actions();
+        let options = FilterOptions::new().cmd3();
 
         let mut filter = new_filter(options);
 

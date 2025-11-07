@@ -27,9 +27,7 @@ cargo run --example basic
 use cohere_melody::{FilterOptions, TokenIDsWithLogProb, new_filter};
 
 // Create a filter with options
-let options = FilterOptions::new()
-    .handle_multi_hop_cmd3()
-    .stream_tool_actions();
+let options = FilterOptions::new().cmd3();
 
 let mut filter = new_filter(options);
 

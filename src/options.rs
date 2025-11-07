@@ -128,11 +128,12 @@ impl FilterOptions {
     }
 
     #[must_use]
-    pub fn handle_multi_hop_cmd3(mut self) -> Self {
+    pub fn cmd3(mut self) -> Self {
         self.default_mode = FilterMode::GroundedAnswer;
         self.right_trimmed = true;
         self.has_tool_call_id = true;
         self.cmd3_citations = true;
+        self.stream_tool_actions = true;
         self.special_token_map
             .insert("<|START_RESPONSE|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
@@ -140,7 +141,7 @@ impl FilterOptions {
         self.special_token_map
             .insert("<|START_THINKING|>".to_string(), FilterMode::ToolReason);
         self.special_token_map
-            .insert("<|END_THINKING|>".to_string(), FilterMode::Ignore);
+            .insert("<|END_THINKING|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
             .insert("<|START_ACTION|>".to_string(), FilterMode::ToolAction);
         self.special_token_map
@@ -149,11 +150,12 @@ impl FilterOptions {
     }
 
     #[must_use]
-    pub fn handle_multi_hop_cmd4(mut self) -> Self {
+    pub fn cmd4(mut self) -> Self {
         self.default_mode = FilterMode::GroundedAnswer;
         self.right_trimmed = true;
         self.has_tool_call_id = true;
         self.cmd3_citations = true;
+        self.stream_tool_actions = true;
         self.special_token_map
             .insert("<|START_TEXT|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
@@ -161,7 +163,7 @@ impl FilterOptions {
         self.special_token_map
             .insert("<|START_THINKING|>".to_string(), FilterMode::ToolReason);
         self.special_token_map
-            .insert("<|END_THINKING|>".to_string(), FilterMode::Ignore);
+            .insert("<|END_THINKING|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
             .insert("<|START_ACTION|>".to_string(), FilterMode::ToolAction);
         self.special_token_map

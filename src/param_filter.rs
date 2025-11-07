@@ -170,7 +170,7 @@ mod tests {
         assert_eq!(actual_remove, 6);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
@@ -191,7 +191,7 @@ mod tests {
         assert_eq!(actual_remove, 8);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
@@ -212,7 +212,7 @@ mod tests {
         assert_eq!(actual_remove, 9);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
@@ -233,7 +233,7 @@ mod tests {
         assert_eq!(actual_remove, 9);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(actual_remove, 8);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
@@ -275,7 +275,7 @@ mod tests {
         assert_eq!(actual_remove, 17);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
@@ -296,7 +296,7 @@ mod tests {
         assert_eq!(actual_remove, 17);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
@@ -317,7 +317,7 @@ mod tests {
         assert_eq!(actual_remove, 18);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
@@ -338,7 +338,7 @@ mod tests {
         assert_eq!(actual_remove, 24);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
@@ -359,7 +359,7 @@ mod tests {
         assert_eq!(actual_remove, 21);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_calls {
+            if let Some(tool_calls) = o.tool_call_delta {
                 if let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }

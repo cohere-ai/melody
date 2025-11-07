@@ -42,13 +42,13 @@ impl PyFilterOptions {
         }
     }
 
-    fn handle_multi_hop_cmd3(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        slf.inner = slf.inner.clone().handle_multi_hop_cmd3();
+    fn cmd3(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
+        slf.inner = slf.inner.clone().cmd3();
         Ok(slf)
     }
 
-    fn stream_tool_actions(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        slf.inner = slf.inner.clone().stream_tool_actions();
+    fn cmd4(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
+        slf.inner = slf.inner.clone().cmd4();
         Ok(slf)
     }
 }

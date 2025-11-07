@@ -237,7 +237,7 @@ impl FilterImpl {
         }
 
         vec![FilterOutput {
-            tool_calls: Some(FilterToolCallDelta {
+            tool_call_delta: Some(FilterToolCallDelta {
                 index: self.action_metadata.cur_tool_call_index,
                 id: s.to_string(),
                 ..Default::default()
@@ -252,7 +252,7 @@ impl FilterImpl {
         }
 
         vec![FilterOutput {
-            tool_calls: Some(FilterToolCallDelta {
+            tool_call_delta: Some(FilterToolCallDelta {
                 index: self.action_metadata.cur_tool_call_index,
                 name: s.to_string(),
                 ..Default::default()
@@ -269,7 +269,7 @@ impl FilterImpl {
         self.action_metadata.cur_param_name = s.to_string();
 
         vec![FilterOutput {
-            tool_calls: Some(FilterToolCallDelta {
+            tool_call_delta: Some(FilterToolCallDelta {
                 index: self.action_metadata.cur_tool_call_index,
                 param_delta: Some(FilterToolParameter {
                     name: s.to_string(),
@@ -287,7 +287,7 @@ impl FilterImpl {
         }
 
         vec![FilterOutput {
-            tool_calls: Some(FilterToolCallDelta {
+            tool_call_delta: Some(FilterToolCallDelta {
                 index: self.action_metadata.cur_tool_call_index,
                 raw_param_delta: s.to_string(),
                 ..Default::default()
@@ -312,7 +312,7 @@ impl FilterImpl {
 
         (
             vec![FilterOutput {
-                tool_calls: Some(FilterToolCallDelta {
+                tool_call_delta: Some(FilterToolCallDelta {
                     index: self.action_metadata.cur_tool_call_index,
                     param_delta: Some(FilterToolParameter {
                         name: self.action_metadata.cur_param_name.clone(),
@@ -439,9 +439,9 @@ mod tests {
 
         assert_eq!(actual_remove, 4);
         assert_eq!(out.len(), 1);
-        assert!(out[0].tool_calls.is_some());
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "int");
+        assert!(out[0].tool_call_delta.is_some());
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().name, "int");
     }
 
     #[test]
@@ -457,9 +457,12 @@ mod tests {
 
         assert_eq!(actual_remove, 66);
         assert_eq!(out.len(), 1);
-        assert!(out[0].tool_calls.is_some());
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "internet_search");
+        assert!(out[0].tool_call_delta.is_some());
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
+        assert_eq!(
+            out[0].tool_call_delta.as_ref().unwrap().name,
+            "internet_search"
+        );
     }
 
     #[test]
@@ -475,9 +478,9 @@ mod tests {
 
         assert_eq!(actual_remove, 47);
         assert_eq!(out.len(), 1);
-        assert!(out[0].tool_calls.is_some());
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().id, "0");
+        assert!(out[0].tool_call_delta.is_some());
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().id, "0");
     }
 
     #[test]
@@ -499,12 +502,19 @@ mod tests {
 
         assert_eq!(actual_remove, 7);
         assert_eq!(out.len(), 1);
-        assert!(out[0].tool_calls.is_some());
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
-        assert!(out[0].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert!(out[0].tool_call_delta.is_some());
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
+        assert!(
+            out[0]
+                .tool_call_delta
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .is_some()
+        );
         assert_eq!(
             out[0]
-                .tool_calls
+                .tool_call_delta
                 .as_ref()
                 .unwrap()
                 .param_delta
@@ -534,12 +544,19 @@ mod tests {
 
         assert_eq!(actual_remove, 9);
         assert_eq!(out.len(), 1);
-        assert!(out[0].tool_calls.is_some());
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
-        assert!(out[0].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert!(out[0].tool_call_delta.is_some());
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
+        assert!(
+            out[0]
+                .tool_call_delta
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .is_some()
+        );
         assert_eq!(
             out[0]
-                .tool_calls
+                .tool_call_delta
                 .as_ref()
                 .unwrap()
                 .param_delta
@@ -564,17 +581,27 @@ mod tests {
         assert_eq!(out.len(), 3);
 
         // Tool name
-        assert!(out[0].tool_calls.is_some());
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "internet_search");
+        assert!(out[0].tool_call_delta.is_some());
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
+        assert_eq!(
+            out[0].tool_call_delta.as_ref().unwrap().name,
+            "internet_search"
+        );
 
         // Param name
-        assert!(out[1].tool_calls.is_some());
-        assert_eq!(out[1].tool_calls.as_ref().unwrap().index, 0);
-        assert!(out[1].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert!(out[1].tool_call_delta.is_some());
+        assert_eq!(out[1].tool_call_delta.as_ref().unwrap().index, 0);
+        assert!(
+            out[1]
+                .tool_call_delta
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .is_some()
+        );
         assert_eq!(
             out[1]
-                .tool_calls
+                .tool_call_delta
                 .as_ref()
                 .unwrap()
                 .param_delta
@@ -585,12 +612,19 @@ mod tests {
         );
 
         // Param value
-        assert!(out[2].tool_calls.is_some());
-        assert_eq!(out[2].tool_calls.as_ref().unwrap().index, 0);
-        assert!(out[2].tool_calls.as_ref().unwrap().param_delta.is_some());
+        assert!(out[2].tool_call_delta.is_some());
+        assert_eq!(out[2].tool_call_delta.as_ref().unwrap().index, 0);
+        assert!(
+            out[2]
+                .tool_call_delta
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .is_some()
+        );
         assert_eq!(
             out[2]
-                .tool_calls
+                .tool_call_delta
                 .as_ref()
                 .unwrap()
                 .param_delta
@@ -601,7 +635,7 @@ mod tests {
         );
         assert_eq!(
             out[2]
-                .tool_calls
+                .tool_call_delta
                 .as_ref()
                 .unwrap()
                 .param_delta
@@ -626,15 +660,18 @@ mod tests {
         assert_eq!(out.len(), 2);
 
         // Tool name
-        assert!(out[0].tool_calls.is_some());
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().index, 0);
-        assert_eq!(out[0].tool_calls.as_ref().unwrap().name, "internet_search");
+        assert!(out[0].tool_call_delta.is_some());
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
+        assert_eq!(
+            out[0].tool_call_delta.as_ref().unwrap().name,
+            "internet_search"
+        );
 
         // Raw params
-        assert!(out[1].tool_calls.is_some());
-        assert_eq!(out[1].tool_calls.as_ref().unwrap().index, 0);
+        assert!(out[1].tool_call_delta.is_some());
+        assert_eq!(out[1].tool_call_delta.as_ref().unwrap().index, 0);
         assert_eq!(
-            out[1].tool_calls.as_ref().unwrap().raw_param_delta,
+            out[1].tool_call_delta.as_ref().unwrap().raw_param_delta,
             "{\n\"query\": \"query1\"\n}"
         );
     }

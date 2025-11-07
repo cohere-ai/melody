@@ -37,7 +37,7 @@ typedef struct {
     char* tool_call_param_value_delta;
     char* tool_call_raw_param_delta;
     bool is_post_answer;
-    bool is_tools_reason;
+    bool is_reasoning;
 } CFilterOutput;
 
 typedef struct {
@@ -48,8 +48,8 @@ typedef struct {
 // FilterOptions functions
 extern CFilterOptions* melody_filter_options_new();
 extern void melody_filter_options_free(CFilterOptions* options);
-extern void melody_filter_options_handle_multi_hop_cmd3(CFilterOptions* options);
-extern void melody_filter_options_handle_multi_hop_cmd4(CFilterOptions* options);
+extern void melody_filter_options_cmd3(CFilterOptions* options);
+extern void melody_filter_options_cmd4(CFilterOptions* options);
 extern void melody_filter_options_handle_rag(CFilterOptions* options);
 extern void melody_filter_options_handle_search_query(CFilterOptions* options);
 extern void melody_filter_options_handle_multi_hop(CFilterOptions* options);

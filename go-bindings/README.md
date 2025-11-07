@@ -28,14 +28,14 @@ out = append(out, f.FlushPartials()...)
 /*
 Expected output:
 []melody.FilterOutput{
-    {IsToolsReason: true, Text: "This"},
-    {IsToolsReason: true, Text: " is"},
-    {IsToolsReason: true, Text: " a"},
-    {IsToolsReason: true, Text: " rainbow"},
-    {IsToolsReason: true, Text: " "},
-    {IsToolsReason: true, Text: "emoji"},
-    {IsToolsReason: true, Text: ":"},
-    {IsToolsReason: true, Text: " 🌈"},
+    {IsReasoning: true, Text: "This"},
+    {IsReasoning: true, Text: " is"},
+    {IsReasoning: true, Text: " a"},
+    {IsReasoning: true, Text: " rainbow"},
+    {IsReasoning: true, Text: " "},
+    {IsReasoning: true, Text: "emoji"},
+    {IsReasoning: true, Text: ":"},
+    {IsReasoning: true, Text: " 🌈"},
     {Citations: []melody.FilterCitation{{
         StartIndex: 18,
         EndIndex:   26,

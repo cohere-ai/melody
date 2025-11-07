@@ -33,18 +33,18 @@ func (opts *FilterOptions) Free() {
 	}
 }
 
-// HandleMultiHopCmd3 configures options for multi-hop CMD3 format
-func (opts *FilterOptions) HandleMultiHopCmd3() *FilterOptions {
+// Cmd3 configures options for multi-hop CMD3 format
+func (opts *FilterOptions) Cmd3() *FilterOptions {
 	if opts.ptr != nil {
-		C.melody_filter_options_handle_multi_hop_cmd3(opts.ptr)
+		C.melody_filter_options_cmd3(opts.ptr)
 	}
 	return opts
 }
 
 // HandleMultiHopCmd4 configures options for multi-hop CMD4 format
-func (opts *FilterOptions) HandleMultiHopCmd4() *FilterOptions {
+func (opts *FilterOptions) Cmd4() *FilterOptions {
 	if opts.ptr != nil {
-		C.melody_filter_options_handle_multi_hop_cmd4(opts.ptr)
+		C.melody_filter_options_cmd4(opts.ptr)
 	}
 	return opts
 }
@@ -329,11 +329,11 @@ func convertCOutput(cOutput *C.CFilterOutput) FilterOutput {
 			}
 		}
 
-		output.ToolCalls = tc
+		output.ToolCallDelta = tc
 	}
 
 	output.IsPostAnswer = bool(cOutput.is_post_answer)
-	output.IsToolsReason = bool(cOutput.is_tools_reason)
+	output.IsReasoning = bool(cOutput.is_reasoning)
 
 	return output
 }

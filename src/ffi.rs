@@ -45,7 +45,7 @@ pub struct CFilterOutput {
     pub tool_call_raw_param_delta: *mut c_char,
 
     pub is_post_answer: bool,
-    pub is_tools_reason: bool,
+    pub is_reasoning: bool,
 }
 
 /// C-compatible representation of `FilterCitation`
@@ -106,11 +106,11 @@ pub unsafe extern "C" fn melody_filter_options_free(options: *mut CFilterOptions
 /// # Safety
 /// `options` must be a valid pointer returned from `melody_filter_options_new`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_options_handle_multi_hop_cmd3(options: *mut CFilterOptions) {
+pub unsafe extern "C" fn melody_filter_options_cmd3(options: *mut CFilterOptions) {
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().handle_multi_hop_cmd3();
+            *opts = opts.clone().cmd3();
         }
     }
 }
@@ -120,11 +120,11 @@ pub unsafe extern "C" fn melody_filter_options_handle_multi_hop_cmd3(options: *m
 /// # Safety
 /// `options` must be a valid pointer returned from `melody_filter_options_new`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_options_handle_multi_hop_cmd4(options: *mut CFilterOptions) {
+pub unsafe extern "C" fn melody_filter_options_cmd4(options: *mut CFilterOptions) {
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().handle_multi_hop_cmd4();
+            *opts = opts.clone().cmd4();
         }
     }
 }
@@ -521,7 +521,7 @@ unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
             tool_call_param_name,
             tool_call_param_value_delta,
             tool_call_raw_param_delta,
-        ) = if let Some(tc) = output.tool_calls {
+        ) = if let Some(tc) = output.tool_call_delta {
             let param_name = if let Some(param) = tc.param_delta {
                 (
                     CString::new(param.name).unwrap().into_raw(),
@@ -577,7 +577,7 @@ unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
             tool_call_param_value_delta,
             tool_call_raw_param_delta,
             is_post_answer: output.is_post_answer,
-            is_tools_reason: output.is_tools_reason,
+            is_reasoning: output.is_reasoning,
         }
     }
 }
