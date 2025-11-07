@@ -1,14 +1,14 @@
 """Python wrapper around the Rust implementation of *melody*.
 
-The heavy lifting (tokenisation, rendering, parsing, …) is implemented in
-Rust.  The thin bindings are available through the private ``cohere_melody``
-extension module which is compiled via *maturin* / *PyO3*.
+The heavy lifting is implemented in Rust.
+The thin bindings are available through the private ``cohere_melody``
+extension module which is compiled via `maturin` / `PyO3`.
 """
 
-# Re-export the low-level Rust bindings under a private name so that we can
-# keep the *public* namespace clean and purely Pythonic.
+from typing import Optional, Sequence, Union
 from vllm.entrypoints.openai.protocol import (
     ChatCompletionRequest,
+    ResponsesRequest,
     DeltaMessage,
     DeltaToolCall,
     DeltaFunctionCall,
@@ -28,28 +28,19 @@ try:
     from .cohere_melody import PyFilter as _PyFilter  # type: ignore
     from .cohere_melody import PyFilterOptions as _PyFilterOptions  # type: ignore
 
-except ModuleNotFoundError:  # pragma: no cover – raised during type-checking
-    # When running *mypy* without the compiled extension in place we still want
-    # to succeed.  Therefore we create dummy stubs that satisfy the type
-    # checker.  They will, however, raise at **runtime** if accessed.
-
-    class _Stub:  # pylint: disable=too-few-public-methods
-        def __getattr__(self, name: str) -> None:  # noqa: D401
-            raise RuntimeError(
-                "The compiled melody bindings are not available. Make sure to "
-                "build the project with `maturin develop` before running this "
-                "code."
-            )
-
-    _PyFilter = _Stub()  # type: ignore
-    _PyFilterOptions = _Stub()  # type: ignore
+except ModuleNotFoundError:
+    raise RuntimeError(
+        "The compiled melody bindings are not available. Make sure to "
+        "build the project with `maturin develop` before running this "
+        "code."
+    )
 
 
 @ReasoningParserManager.register_module(["cohere2"])
 class CohereCommand2ReasoningParser(ReasoningParser):
     def __init__(self, tokenizer: AnyTokenizer, *args, **kwargs):
         super().__init__(tokenizer, *args, **kwargs)
-        self.melody = melody.PyFilter(melody.PyFilterOptions().cmd3())
+        self.melody = _PyFilter(_PyFilterOptions().cmd3())
 
     def extract_reasoning_content_streaming(
         self,
@@ -65,7 +56,7 @@ class CohereCommand2ReasoningParser(ReasoningParser):
 
         content = None
         reasoning_content = None
-        delta_tool_calls = []
+        delta_tool_calls: list[DeltaToolCall] = []
         for o in out:
             if o.text is not None:
                 if o.is_reasoning:
@@ -102,7 +93,7 @@ class CohereCommand2ReasoningParser(ReasoningParser):
         return msg
 
     def extract_reasoning_content(
-        self, model_output: str, request: ChatCompletionRequest
+        self, model_output: str, request: ChatCompletionRequest | ResponsesRequest
     ) -> tuple[Optional[str], Optional[str]]:
         reasoning_content = None
         reasoning_token_boundary = 0
@@ -133,7 +124,7 @@ class CohereCommand2ReasoningParser(ReasoningParser):
 class CohereCommand2ToolParser(ToolParser):
     def __init__(self, tokenizer: AnyTokenizer):
         super().__init__(tokenizer)
-        self.melody = melody.PyFilter(melody.PyFilterOptions().cmd3())
+        self.melody = _PyFilter(_PyFilterOptions().cmd3())
 
     def adjust_request(self, request: ChatCompletionRequest) -> ChatCompletionRequest:
         request = super().adjust_request(request)
@@ -175,9 +166,8 @@ class CohereCommand2ToolParser(ToolParser):
         model_output: str,
         request: ChatCompletionRequest,
     ) -> ExtractedToolCallInformation:
-        tool_calls = []
-
-        content = None
+        tool_calls: list[ToolCall] = []
+        content: str | None = None
         # tokenize to provide token size string fragments to melody
         for t in self.model_tokenizer.encode(model_output, add_special_tokens=False):
             token_str = self.model_tokenizer.decode([t], skip_special_tokens=False)
