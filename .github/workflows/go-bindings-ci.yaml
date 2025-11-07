@@ -81,9 +81,10 @@ jobs:
         run: ls -la target/release
 
       - name: pwd
-        run: pwd
+        run: echo $(pwd)/target/release
 
       - name: Run Go tests
         run: |
           go env -w GOPRIVATE=github.com/cohere-ai
-          LD_LIBRARY_PATH=/home/runner/work/melody/melody/target/release cd go-bindings && go test ./...
+          export LD_LIBRARY_PATH=/home/runner/work/melody/melody/target/release
+          cd go-bindings && go test ./...
