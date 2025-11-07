@@ -459,7 +459,10 @@ mod tests {
         assert_eq!(out.len(), 1);
         assert!(out[0].tool_call_delta.is_some());
         assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
-        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().name, "internet_search");
+        assert_eq!(
+            out[0].tool_call_delta.as_ref().unwrap().name,
+            "internet_search"
+        );
     }
 
     #[test]
@@ -501,7 +504,14 @@ mod tests {
         assert_eq!(out.len(), 1);
         assert!(out[0].tool_call_delta.is_some());
         assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
-        assert!(out[0].tool_call_delta.as_ref().unwrap().param_delta.is_some());
+        assert!(
+            out[0]
+                .tool_call_delta
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .is_some()
+        );
         assert_eq!(
             out[0]
                 .tool_call_delta
@@ -536,7 +546,14 @@ mod tests {
         assert_eq!(out.len(), 1);
         assert!(out[0].tool_call_delta.is_some());
         assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
-        assert!(out[0].tool_call_delta.as_ref().unwrap().param_delta.is_some());
+        assert!(
+            out[0]
+                .tool_call_delta
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .is_some()
+        );
         assert_eq!(
             out[0]
                 .tool_call_delta
@@ -566,12 +583,22 @@ mod tests {
         // Tool name
         assert!(out[0].tool_call_delta.is_some());
         assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
-        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().name, "internet_search");
+        assert_eq!(
+            out[0].tool_call_delta.as_ref().unwrap().name,
+            "internet_search"
+        );
 
         // Param name
         assert!(out[1].tool_call_delta.is_some());
         assert_eq!(out[1].tool_call_delta.as_ref().unwrap().index, 0);
-        assert!(out[1].tool_call_delta.as_ref().unwrap().param_delta.is_some());
+        assert!(
+            out[1]
+                .tool_call_delta
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .is_some()
+        );
         assert_eq!(
             out[1]
                 .tool_call_delta
@@ -587,7 +614,14 @@ mod tests {
         // Param value
         assert!(out[2].tool_call_delta.is_some());
         assert_eq!(out[2].tool_call_delta.as_ref().unwrap().index, 0);
-        assert!(out[2].tool_call_delta.as_ref().unwrap().param_delta.is_some());
+        assert!(
+            out[2]
+                .tool_call_delta
+                .as_ref()
+                .unwrap()
+                .param_delta
+                .is_some()
+        );
         assert_eq!(
             out[2]
                 .tool_call_delta
@@ -628,7 +662,10 @@ mod tests {
         // Tool name
         assert!(out[0].tool_call_delta.is_some());
         assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
-        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().name, "internet_search");
+        assert_eq!(
+            out[0].tool_call_delta.as_ref().unwrap().name,
+            "internet_search"
+        );
 
         // Raw params
         assert!(out[1].tool_call_delta.is_some());
