@@ -25,8 +25,8 @@ from vllm.transformers_utils.tokenizer import AnyTokenizer
 
 
 try:
-    from .cohere_melody import PyFilter as _PyFilter  # type: ignore
-    from .cohere_melody import PyFilterOptions as _PyFilterOptions  # type: ignore
+    from .cohere_melody import PyFilter  # type: ignore
+    from .cohere_melody import PyFilterOptions  # type: ignore
 
 except ModuleNotFoundError:
     raise RuntimeError(
@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 class CohereCommand2ReasoningParser(ReasoningParser):
     def __init__(self, tokenizer: AnyTokenizer, *args, **kwargs):
         super().__init__(tokenizer, *args, **kwargs)
-        self.melody = _PyFilter(_PyFilterOptions().cmd3())
+        self.melody = PyFilter(PyFilterOptions().cmd3())
 
     def extract_reasoning_content_streaming(
         self,
@@ -124,7 +124,7 @@ class CohereCommand2ReasoningParser(ReasoningParser):
 class CohereCommand2ToolParser(ToolParser):
     def __init__(self, tokenizer: AnyTokenizer):
         super().__init__(tokenizer)
-        self.melody = _PyFilter(_PyFilterOptions().cmd3())
+        self.melody = PyFilter(PyFilterOptions().cmd3())
 
     def adjust_request(self, request: ChatCompletionRequest) -> ChatCompletionRequest:
         request = super().adjust_request(request)
