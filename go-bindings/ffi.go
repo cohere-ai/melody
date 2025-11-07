@@ -33,10 +33,10 @@ func (opts *FilterOptions) Free() {
 	}
 }
 
-// HandleMultiHopCmd3 configures options for multi-hop CMD3 format
-func (opts *FilterOptions) HandleMultiHopCmd3() *FilterOptions {
+// Cmd3 configures options for multi-hop CMD3 format
+func (opts *FilterOptions) Cmd3() *FilterOptions {
 	if opts.ptr != nil {
-		C.melody_filter_options_handle_multi_hop_cmd3(opts.ptr)
+		C.melody_filter_options_cmd3(opts.ptr)
 	}
 	return opts
 }
@@ -44,7 +44,7 @@ func (opts *FilterOptions) HandleMultiHopCmd3() *FilterOptions {
 // HandleMultiHopCmd4 configures options for multi-hop CMD4 format
 func (opts *FilterOptions) HandleMultiHopCmd4() *FilterOptions {
 	if opts.ptr != nil {
-		C.melody_filter_options_handle_multi_hop_cmd4(opts.ptr)
+		C.melody_filter_options_cmd4(opts.ptr)
 	}
 	return opts
 }
@@ -77,14 +77,6 @@ func (opts *FilterOptions) HandleMultiHop() *FilterOptions {
 func (opts *FilterOptions) StreamNonGroundedAnswer() *FilterOptions {
 	if opts.ptr != nil {
 		C.melody_filter_options_stream_non_grounded_answer(opts.ptr)
-	}
-	return opts
-}
-
-// StreamToolActions enables streaming of tool actions
-func (opts *FilterOptions) StreamToolActions() *FilterOptions {
-	if opts.ptr != nil {
-		C.melody_filter_options_stream_tool_actions(opts.ptr)
 	}
 	return opts
 }

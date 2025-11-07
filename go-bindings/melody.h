@@ -48,13 +48,12 @@ typedef struct {
 // FilterOptions functions
 extern CFilterOptions* melody_filter_options_new();
 extern void melody_filter_options_free(CFilterOptions* options);
-extern void melody_filter_options_handle_multi_hop_cmd3(CFilterOptions* options);
-extern void melody_filter_options_handle_multi_hop_cmd4(CFilterOptions* options);
+extern void melody_filter_options_cmd3(CFilterOptions* options);
+extern void melody_filter_options_cmd4(CFilterOptions* options);
 extern void melody_filter_options_handle_rag(CFilterOptions* options);
 extern void melody_filter_options_handle_search_query(CFilterOptions* options);
 extern void melody_filter_options_handle_multi_hop(CFilterOptions* options);
 extern void melody_filter_options_stream_non_grounded_answer(CFilterOptions* options);
-extern void melody_filter_options_stream_tool_actions(CFilterOptions* options);
 extern void melody_filter_options_stream_processed_params(CFilterOptions* options);
 extern void melody_filter_options_with_left_trimmed(CFilterOptions* options);
 extern void melody_filter_options_with_right_trimmed(CFilterOptions* options);

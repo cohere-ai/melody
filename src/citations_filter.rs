@@ -42,7 +42,7 @@ impl FilterImpl {
 
         let mut res_out = res_out.unwrap();
         res_out.is_post_answer = self.stream_non_grounded_answer && mode != FilterMode::ToolReason;
-        res_out.is_tools_reason = mode == FilterMode::ToolReason;
+        res_out.is_reasoning = mode == FilterMode::ToolReason;
 
         // Don't send logprobs for citations if there's no corresponding text.
         if let Some(probs) = token_log_probs
@@ -52,7 +52,7 @@ impl FilterImpl {
         }
 
         let mut out = Vec::new();
-        if self.stream_tool_actions || !res_out.is_tools_reason {
+        if self.stream_tool_actions || !res_out.is_reasoning {
             out.push(res_out);
         }
 

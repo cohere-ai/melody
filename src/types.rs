@@ -38,9 +38,9 @@ pub struct FilterOutput {
     pub logprobs: TokenIDsWithLogProb,
     pub search_query: Option<FilterSearchQueryDelta>,
     pub citations: Vec<FilterCitation>,
-    pub tool_calls: Option<FilterToolCallDelta>,
+    pub tool_call_delta: Option<FilterToolCallDelta>,
     pub is_post_answer: bool,
-    pub is_tools_reason: bool,
+    pub is_reasoning: bool,
 }
 
 /// `FilterSearchQueryDelta` represents a change to a search query.
