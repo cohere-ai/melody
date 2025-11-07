@@ -33,7 +33,7 @@ jobs:
           pytest
 
   ty:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Build sdist
