@@ -45,7 +45,7 @@ pub struct CFilterOutput {
     pub tool_call_raw_param_delta: *mut c_char,
 
     pub is_post_answer: bool,
-    pub is_tools_reason: bool,
+    pub is_reasoning: bool,
 }
 
 /// C-compatible representation of `FilterCitation`
@@ -577,7 +577,7 @@ unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
             tool_call_param_value_delta,
             tool_call_raw_param_delta,
             is_post_answer: output.is_post_answer,
-            is_tools_reason: output.is_reasoning,
+            is_reasoning: output.is_reasoning,
         }
     }
 }

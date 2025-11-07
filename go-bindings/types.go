@@ -12,9 +12,9 @@ type FilterOutput struct {
 	Logprobs      TokenIDsWithLogProb
 	SearchQuery   *FilterSearchQueryDelta
 	Citations     []FilterCitation
-	ToolCalls     *FilterToolCallDelta
+	ToolCallDelta     *FilterToolCallDelta
 	IsPostAnswer  bool
-	IsToolsReason bool
+	IsReasoning bool
 }
 
 // FilterSearchQueryDelta represents a change to a search query

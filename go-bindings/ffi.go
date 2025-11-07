@@ -329,11 +329,11 @@ func convertCOutput(cOutput *C.CFilterOutput) FilterOutput {
 			}
 		}
 
-		output.ToolCalls = tc
+		output.ToolCallDelta = tc
 	}
 
 	output.IsPostAnswer = bool(cOutput.is_post_answer)
-	output.IsToolsReason = bool(cOutput.is_tools_reason)
+	output.IsReasoning = bool(cOutput.is_reasoning)
 
 	return output
 }

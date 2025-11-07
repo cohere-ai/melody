@@ -37,7 +37,7 @@ typedef struct {
     char* tool_call_param_value_delta;
     char* tool_call_raw_param_delta;
     bool is_post_answer;
-    bool is_tools_reason;
+    bool is_reasoning;
 } CFilterOutput;
 
 typedef struct {
