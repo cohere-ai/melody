@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "cohere_melody"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dynamic = ["version"]
+[tool.maturin]
+features = ["pyo3/extension-module", "python_ffi"]
+module-name = "cohere_melody"
+
+[tool.uv]
+managed = false
+
+[tool.pytest.ini_options]
+# Only collect tests from the top-level tests directory
+testpaths = ["tests"]

@@ -1,10 +1,10 @@
-module github.com/cohere-ai/melody
+module github.com/cohere-ai/melody/go-bindings
 
 go 1.25
 
 require (
-	github.com/stretchr/testify v1.11.1
 	github.com/cohere-ai/tokenizers v0.9.1
+	github.com/stretchr/testify v1.11.1
 )
 
 require (

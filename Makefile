@@ -8,36 +8,36 @@ mod-install-tokenizers:
 	@echo "-- installed libtokenizers.a"
 
 install-tokenizers:
-	@echo "-- installing libtokenizers.a at ./golang/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a..."
+	@echo "-- installing libtokenizers.a at ./go-bindings/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a..."
 	@curl -fsSL https://github.com/cohere-ai/tokenizers/releases/download/${TOKENIZERS_VERSION}/libtokenizers.${UNAME}-${ARCH}.tar.gz | tar xvz
-	@mv libtokenizers.a golang/vendor/github.com/cohere-ai/tokenizers/
+	@mv libtokenizers.a go-bindings/vendor/github.com/cohere-ai/tokenizers/
 	@echo "-- installed libtokenizers.a"
 
 check-install-tokenizers:
-	@if [ ! -e "./golang/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a" ]; then \
+	@if [ ! -e "./go-bindings/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a" ]; then \
   		$(MAKE) install-tokenizers; \
 	fi;
-
-golang-lint:
-	cd golang && golangci-lint run --config=.golangci.yaml ./...
-
-golang-test: check-install-tokenizers
-	cd golang && go test ./...
 
 golang-bindings-test: check-install-tokenizers rust-build
 	cd go-bindings && go test -v ./...
 
 rust-test:
-	cd rust && cargo test --verbose
+	cargo test --verbose
 
 rust-lint:
-	cd rust && cargo clippy -- -D warnings
+	cargo clippy -- -D warnings
 
 rust-format:
-	cd rust && cargo fmt
+	cargo fmt
 
 rust-build:
-	cd rust && cargo clean && cargo build --release
+	cargo clean && cargo build --release
 
-python-bindings:
-	cd rust && uv venv && uv pip install maturin && uv run maturin develop --features python_ffi
+venv-setup:
+	uv venv --allow-existing && uv pip install maturin pytest
+
+python-bindings: venv-setup
+	uv run maturin develop --features python_ffi
+
+python-bindings-test: venv-setup
+	uv run pytest tests

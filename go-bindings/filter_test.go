@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/cohere-ai/melody"
-	"github.com/cohere-ai/melody/_internal/tokenizers"
+	"github.com/cohere-ai/melody/go-bindings"
+	"github.com/cohere-ai/melody/go-bindings/_internal/tokenizers"
 )
 
 func TestFilter_Command3(t *testing.T) {

@@ -26,15 +26,36 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: rust/target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build
+        working-directory: ./
+        run: cargo build --release --verbose
+
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           cache: false
-          go-version-file: golang/go.mod
+          go-version-file: go-bindings/go.mod
 
       - name: Get Go environment
         id: go-env
-        working-directory: golang/
+        working-directory: go-bindings/
         run: |
           GOCACHE="$(go env GOCACHE)"
           GOMODCACHE="$(go env GOMODCACHE)"
@@ -57,7 +78,7 @@ jobs:
         run: make install-tokenizers
 
       - name: Run Go tests
-        working-directory: golang/
         run: |
           go env -w GOPRIVATE=github.com/cohere-ai
-          go test ./...
+          export LD_LIBRARY_PATH=$(pwd)/target/release
+          cd go-bindings && go test ./...
