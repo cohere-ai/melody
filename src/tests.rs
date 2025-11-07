@@ -955,6 +955,37 @@ mod tests {
                     },
                 ],
             },
+            TestCase {
+                name: "VLLM skipping <|START_RESPONSE|>",
+                input: "<|START_THINKING|>Plan<|END_THINKING|>Response",
+                options: FilterOptions::new().cmd3(),
+                want: vec![
+                    FilterOutput {
+                        text: "Plan".to_string(),
+                        logprobs: TokenIDsWithLogProb {
+                            token_ids: vec![22297],
+                            logprobs: vec![0.001],
+                        },
+                        search_query: None,
+                        citations: vec![],
+                        tool_call_delta: None,
+                        is_post_answer: false,
+                        is_reasoning: true,
+                    },
+                    FilterOutput {
+                        text: "Response".to_string(),
+                        logprobs: TokenIDsWithLogProb {
+                            token_ids: vec![6458],
+                            logprobs: vec![0.003],
+                        },
+                        search_query: None,
+                        citations: vec![],
+                        tool_call_delta: None,
+                        is_post_answer: false,
+                        is_reasoning: false,
+                    },
+                ],
+            },
         ];
 
         for tt in test_cases {
