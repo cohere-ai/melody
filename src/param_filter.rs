@@ -50,7 +50,7 @@ impl FilterImpl {
     }
 
     fn handle_param_value_basic_type(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let (idx, _) = find_partial(s, &["}".to_string(), ",".to_string()]);
+        let (idx, _) = find_partial(s, ["}".to_string(), ",".to_string()].iter());
 
         if idx == usize::MAX {
             return self.send_param_value_chunk(s);
