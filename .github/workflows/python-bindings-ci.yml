@@ -31,3 +31,22 @@ jobs:
           pip install cohere_melody --find-links dist --force-reinstall
           pip install pytest
           pytest
+
+  ty:
+    runs-on: depot-ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - name: ty
+        shell: bash
+        run: |
+          set -e
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install ty vllm
+          pip install cohere_melody --find-links dist --force-reinstall
+          ty check python/

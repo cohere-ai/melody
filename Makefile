@@ -34,7 +34,7 @@ rust-build:
 	cargo clean && cargo build --release
 
 venv-setup:
-	uv venv --allow-existing && uv pip install maturin pytest
+	uv venv --allow-existing && uv pip install maturin pytest ty vllm
 
 python-bindings: venv-setup
 	uv run maturin develop --features python_ffi
