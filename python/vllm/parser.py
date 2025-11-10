@@ -1,8 +1,6 @@
-"""Python wrapper around the Rust implementation of *melody*.
+"""vLLM integration for *melody*.
 
-The heavy lifting is implemented in Rust.
-The thin bindings are available through the private ``cohere_melody``
-extension module which is compiled via `maturin` / `PyO3`.
+Wrapps the melody functionality into vLLM parsers for reasoning and tool calls.
 """
 
 from typing import Optional, Sequence, Union
@@ -25,8 +23,7 @@ from vllm.transformers_utils.tokenizer import AnyTokenizer
 
 
 try:
-    from .cohere_melody import PyFilter  # type: ignore
-    from .cohere_melody import PyFilterOptions  # type: ignore
+    from cohere_melody import PyFilter, PyFilterOptions  # type: ignore
 
 except ModuleNotFoundError:
     raise RuntimeError(
