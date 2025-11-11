@@ -1,6 +1,6 @@
 """vLLM integration for *melody*.
 
-Wrapps the melody functionality into vLLM parsers for reasoning and tool calls.
+Wraps the melody functionality into vLLM parsers for reasoning and tool calls.
 """
 
 from typing import Optional, Sequence, Union
@@ -26,11 +26,7 @@ try:
     from cohere_melody import PyFilter, PyFilterOptions  # type: ignore
 
 except ModuleNotFoundError:
-    raise RuntimeError(
-        "The compiled melody bindings are not available. Make sure to "
-        "build the project with `maturin develop` before running this "
-        "code."
-    )
+    raise RuntimeError("The compiled melody bindings are not available.")
 
 
 @ReasoningParserManager.register_module(["cohere2"])
@@ -94,7 +90,8 @@ class CohereCommand2ReasoningParser(ReasoningParser):
     ) -> tuple[Optional[str], Optional[str]]:
         reasoning_content = None
         content = None
-        # ignore special tool action tokens since tool parser will be called on the resulting content
+        # create a new melody parser that ignores special tool action tokens
+        # since the tool parser will be called on the resulting content
         melody = PyFilter(
             PyFilterOptions()
             .cmd3()
@@ -107,14 +104,16 @@ class CohereCommand2ReasoningParser(ReasoningParser):
             token_str = self.model_tokenizer.decode([t], skip_special_tokens=False)
             out = melody.write_decoded(token_str)
             for o in out:
-                if o.is_reasoning:
-                    reasoning_content = (
-                        "" if reasoning_content is None else reasoning_content
-                    )
-                    reasoning_content += o.text
-                elif o.text is not None:
-                    content = "" if content is None else content
-                    content += o.text
+                if o.text is not None:
+                    if o.is_reasoning:
+                        reasoning_content = (
+                            "" if reasoning_content is None else reasoning_content
+                        )
+                        reasoning_content += o.text
+                    else:
+                        content = "" if content is None else content
+                        content += o.text
+
         return reasoning_content, content
 
 
