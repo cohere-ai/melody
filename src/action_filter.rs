@@ -2,6 +2,19 @@ use crate::filter::FilterImpl;
 use crate::param_filter::ParamState;
 use crate::types::{FilterOutput, FilterToolCallDelta, FilterToolParameter};
 use regex::Regex;
+use std::sync::LazyLock;
+
+// Compile regexes once at startup to avoid recompilation in hot path
+static TOOL_CALL_ID_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#""tool_call_id":\s*""#).expect("Invalid tool_call_id regex"));
+static TOOL_NAME_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#""tool_name":\s*""#).expect("Invalid tool_name regex"));
+static PARAM_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#""parameters":\s*\{\s*""#).expect("Invalid parameters regex"));
+static RAW_PARAM_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#""parameters":\s*"#).expect("Invalid raw parameters regex"));
+static PARAM_NAME_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\s*:\s*").expect("Invalid param name regex"));
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ActionMode {
@@ -65,15 +78,9 @@ impl FilterImpl {
 
     fn handle_before_tool(&mut self, s: &str, check_call_id: bool) -> (Vec<FilterOutput>, usize) {
         let (regex, mode) = if check_call_id {
-            (
-                Regex::new(r#""tool_call_id":\s*""#).unwrap(),
-                ActionMode::ToolCallID,
-            )
+            (&*TOOL_CALL_ID_REGEX, ActionMode::ToolCallID)
         } else {
-            (
-                Regex::new(r#""tool_name":\s*""#).unwrap(),
-                ActionMode::ToolName,
-            )
+            (&*TOOL_NAME_REGEX, ActionMode::ToolName)
         };
 
         if let Some(mat) = regex.find(s) {
@@ -117,7 +124,7 @@ impl FilterImpl {
     }
 
     fn handle_tool_name_end(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let param_regex = Regex::new(r#""parameters":\s*\{\s*""#).unwrap();
+        let param_regex = &*PARAM_REGEX;
 
         if let Some(mat) = param_regex.find(s) {
             if self.stream_processed_params {
@@ -126,7 +133,7 @@ impl FilterImpl {
                 return (out, rem + mat.end());
             }
             self.action_metadata.mode = ActionMode::RawParam;
-            let raw_param_regex = Regex::new(r#""parameters":\s*"#).unwrap();
+            let raw_param_regex = &*RAW_PARAM_REGEX;
             if let Some(mat) = raw_param_regex.find(s) {
                 let (out, rem) = self.parse_actions(&s[mat.end()..]);
                 return (out, rem + mat.end());
@@ -210,7 +217,7 @@ impl FilterImpl {
     }
 
     fn handle_end_of_param_name(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let param_name_regex = Regex::new(r"\s*:\s*").unwrap();
+        let param_name_regex = &*PARAM_NAME_REGEX;
 
         if let Some(mat) = param_name_regex.find(s) {
             self.action_metadata.mode = ActionMode::ParamValue;

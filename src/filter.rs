@@ -46,7 +46,6 @@ pub struct FilterImpl {
     pub(crate) buf: Vec<u8>,
     pub(crate) partial_special_token_log_prob: TokenIDsWithLogProb,
     pub(crate) mode: FilterMode,
-    pub(crate) special_token_keys: Vec<String>,
     pub(crate) done: bool,
 }
 
@@ -77,7 +76,6 @@ impl FilterImpl {
             buf: Vec::new(),
             partial_special_token_log_prob: TokenIDsWithLogProb::new(),
             mode: FilterMode::PlainText,
-            special_token_keys: Vec::new(),
             done: false,
         }
     }
@@ -112,8 +110,6 @@ impl FilterImpl {
                 .insert(stop, FilterMode::ExclusiveStop);
         }
 
-        // Update special token keys
-        self.special_token_keys = options.special_token_map.keys().cloned().collect();
         self
     }
 
@@ -130,7 +126,7 @@ impl FilterImpl {
         let str = String::from_utf8_lossy(&self.buf).to_string();
 
         // If is a partial special token, we need to wait for the next token.
-        let (special_token_idx, found_seq) = find_partial(&str, &self.special_token_keys);
+        let (special_token_idx, found_seq) = find_partial(&str, &mut self.special_token_map.keys());
         if special_token_idx != usize::MAX && found_seq.is_empty() {
             self.partial_special_token_log_prob = logprobs;
             return Vec::new();
@@ -154,13 +150,16 @@ impl FilterImpl {
                 // Before the special token, process the buffer with the old mode
                 let pre_special_token = &str[..special_token_idx];
                 if !pre_special_token.is_empty() {
-                    let partial_log_prob = self.partial_special_token_log_prob.clone();
+                    // Take ownership temporarily to avoid clone
+                    let partial_log_prob = std::mem::take(&mut self.partial_special_token_log_prob);
                     let (o, _) = self.handle_token(
                         self.mode,
                         pre_special_token.as_bytes(),
                         false,
                         &partial_log_prob,
                     );
+                    // restore
+                    self.partial_special_token_log_prob = partial_log_prob;
                     out.extend(o);
                 }
 
@@ -386,6 +385,7 @@ impl FilterImpl {
         (out, bstr.len() - rem_right)
     }
 
+    // TODO: this can be refactored to avoid all the string allocations
     pub(crate) fn trim_space(&mut self, s: &str) -> (String, usize) {
         let mut result = s.to_string();
         let mut rem = 0;
@@ -434,10 +434,10 @@ impl Filter for FilterImpl {
             && self.mode != FilterMode::InclusiveStop
             && self.mode != FilterMode::ExclusiveStop
         {
-            let buf_copy = self.buf.clone();
-            let log_prob_copy = self.partial_special_token_log_prob.clone();
-            let (o, remove) = self.handle_token(self.mode, &buf_copy, true, &log_prob_copy);
-            self.buf.drain(..remove);
+            // Use take to avoid cloning
+            let buf_copy = std::mem::take(&mut self.buf);
+            let log_prob_copy = std::mem::take(&mut self.partial_special_token_log_prob);
+            let (o, _remove) = self.handle_token(self.mode, &buf_copy, true, &log_prob_copy);
             return o;
         }
         Vec::new()
@@ -445,7 +445,10 @@ impl Filter for FilterImpl {
 }
 
 /// Find partial returns first index in str that might match one of stop sequences.
-pub(crate) fn find_partial(s: &str, stops: &[String]) -> (usize, String) {
+pub(crate) fn find_partial<'a>(
+    s: &str,
+    stops: impl Iterator<Item = &'a String>,
+) -> (usize, String) {
     let mut min_idx = usize::MAX;
 
     for stop in stops {
@@ -491,17 +494,17 @@ mod tests {
         let stops = vec!["<co: ".to_string(), "</co: ".to_string()];
 
         // Test full match
-        let (idx, found) = find_partial("hello <co: ", &stops);
+        let (idx, found) = find_partial("hello <co: ", stops.iter());
         assert_eq!(idx, 6);
         assert_eq!(found, "<co: ");
 
         // Test partial match
-        let (idx, found) = find_partial("hello <c", &stops);
+        let (idx, found) = find_partial("hello <c", stops.iter());
         assert_eq!(idx, 6);
         assert_eq!(found, "");
 
         // Test no match
-        let (idx, _) = find_partial("hello world", &stops);
+        let (idx, _) = find_partial("hello world", stops.iter());
         assert_eq!(idx, usize::MAX);
     }
 }

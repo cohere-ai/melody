@@ -235,7 +235,7 @@ impl FilterImpl {
         end: &str,
         cmd3_citations: bool,
     ) -> (usize, usize, Vec<Source>) {
-        let (start_id, start_found) = find_partial(s, &[start.to_string()]);
+        let (start_id, start_found) = find_partial(s, [start.to_string()].iter());
 
         if start_id == usize::MAX {
             return (usize::MAX, usize::MAX, Vec::new());

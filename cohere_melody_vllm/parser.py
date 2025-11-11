@@ -1,6 +1,6 @@
 """vLLM integration for *melody*.
 
-Wrapps the melody functionality into vLLM parsers for reasoning and tool calls.
+Wraps the melody functionality into vLLM parsers for reasoning and tool calls.
 """
 
 from typing import Optional, Sequence, Union
@@ -26,15 +26,14 @@ try:
     from cohere_melody import PyFilter, PyFilterOptions  # type: ignore
 
 except ModuleNotFoundError:
-    raise RuntimeError(
-        "The compiled melody bindings are not available. Make sure to "
-        "build the project with `maturin develop` before running this "
-        "code."
-    )
+    raise RuntimeError("The compiled melody bindings are not available.")
+
+REPLACEMENT_CHAR = "\ufffd"
 
 
 @ReasoningParserManager.register_module(["cohere2"])
 class CohereCommand2ReasoningParser(ReasoningParser):
+
     def __init__(self, tokenizer: AnyTokenizer, *args, **kwargs):
         super().__init__(tokenizer, *args, **kwargs)
         self.melody = PyFilter(PyFilterOptions().cmd3())
@@ -93,32 +92,46 @@ class CohereCommand2ReasoningParser(ReasoningParser):
         self, model_output: str, request: ChatCompletionRequest | ResponsesRequest
     ) -> tuple[Optional[str], Optional[str]]:
         reasoning_content = None
-        reasoning_token_boundary = 0
+        content = None
+        # create a new melody parser that ignores special tool action tokens
+        # since the tool parser will be called on the resulting content
+        melody = PyFilter(
+            PyFilterOptions()
+            .cmd3()
+            .remove_token("<|START_ACTION|>")
+            .remove_token("<|END_ACTION|>")
+        )
         # tokenize to provide token size string fragments to melody
         tokens = self.model_tokenizer.encode(model_output, add_special_tokens=False)
-        for i, t in enumerate(tokens):
-            token_str = self.model_tokenizer.decode([t], skip_special_tokens=False)
-            out = self.melody.write_decoded(token_str)
-            for o in out:
-                if o.is_reasoning:
-                    reasoning_content = (
-                        "" if reasoning_content is None else reasoning_content
-                    )
-                    reasoning_content += o.text
-                    reasoning_token_boundary = (
-                        i + 2
-                    )  # add two for <|START_THINKING|> & <|END_THINKING|>
-
-        content = None
-        if reasoning_token_boundary < len(tokens):
-            content = self.model_tokenizer.decode(
-                tokens[reasoning_token_boundary:], skip_special_tokens=False
+        token_buf = []
+        for t in tokens:
+            token_buf.append(t)
+            token_str = self.model_tokenizer.decode(
+                token_buf, skip_special_tokens=False
             )
+            # buffer tokens that generate incomplete strings
+            if token_str.endswith(REPLACEMENT_CHAR):
+                continue
+
+            out = melody.write_decoded(token_str)
+            for o in out:
+                if o.text is not None:
+                    if o.is_reasoning:
+                        reasoning_content = (
+                            "" if reasoning_content is None else reasoning_content
+                        )
+                        reasoning_content += o.text
+                    else:
+                        content = "" if content is None else content
+                        content += o.text
+
+            token_buf = []
         return reasoning_content, content
 
 
 @ToolParserManager.register_module(["cohere2"])
 class CohereCommand2ToolParser(ToolParser):
+
     def __init__(self, tokenizer: AnyTokenizer):
         super().__init__(tokenizer)
         self.melody = PyFilter(PyFilterOptions().cmd3())
@@ -165,9 +178,17 @@ class CohereCommand2ToolParser(ToolParser):
     ) -> ExtractedToolCallInformation:
         tool_calls: list[ToolCall] = []
         content: str | None = None
+        token_buf = []
         # tokenize to provide token size string fragments to melody
         for t in self.model_tokenizer.encode(model_output, add_special_tokens=False):
-            token_str = self.model_tokenizer.decode([t], skip_special_tokens=False)
+            token_buf.append(t)
+            token_str = self.model_tokenizer.decode(
+                token_buf, skip_special_tokens=False
+            )
+            # buffer tokens that generate incomplete strings
+            if token_str.endswith(REPLACEMENT_CHAR):
+                continue
+
             out = self.melody.write_decoded(token_str)
             for o in out:
                 if o.text is not None:
@@ -189,6 +210,8 @@ class CohereCommand2ToolParser(ToolParser):
                     tool_calls[
                         o.tool_call_delta.index
                     ].function.arguments += o.tool_call_delta.raw_param_delta
+
+            token_buf = []
 
         return ExtractedToolCallInformation(
             tools_called=len(tool_calls) > 0,
