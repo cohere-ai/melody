@@ -14,6 +14,7 @@ dynamic = ["version"]
 [tool.maturin]
 features = ["pyo3/extension-module", "python_ffi"]
 module-name = "cohere_melody"
+include=["cohere_melody_vllm/parser.py"]
 
 [tool.uv]
 managed = false

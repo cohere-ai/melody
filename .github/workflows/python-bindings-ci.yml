@@ -55,4 +55,4 @@ jobs:
           source .venv/bin/activate
           pip install ty vllm
           pip install cohere_melody --find-links dist --force-reinstall
-          ty check python/
+          ty check cohere_melody_vllm/
