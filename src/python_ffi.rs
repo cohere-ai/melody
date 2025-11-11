@@ -54,11 +54,6 @@ impl PyFilterOptions {
         slf.inner = std::mem::take(&mut slf.inner).remove_token(token);
         slf
     }
-
-    fn remove_token(mut slf: PyRefMut<Self>, token: String) -> PyResult<PyRefMut<Self>> {
-        slf.inner = slf.inner.clone().remove_token(&token);
-        Ok(slf)
-    }
 }
 
 #[pymodule]
