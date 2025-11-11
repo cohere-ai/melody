@@ -223,6 +223,14 @@ mod tests {
         assert_eq!(logprobs1.logprobs, vec![0.1, 0.2, 0.3, 0.4]);
     }
 
+    static TOKENIZER: std::sync::LazyLock<Tokenizer> = std::sync::LazyLock::new(|| {
+        Tokenizer::from_file(format!(
+            "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap()
+    });
+
     #[test]
     fn test_filter_default() {
         // for simplicity's sake lets just generate likelihoods in intervals of thousandths
@@ -775,13 +783,7 @@ mod tests {
         }];
 
         for tt in test_cases {
-            let tokenizer = Tokenizer::from_file(format!(
-                "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-                env!("CARGO_MANIFEST_DIR")
-            ))
-            .unwrap();
-
-            let encoding = tokenizer.encode(tt.input, false).unwrap();
+            let encoding = TOKENIZER.encode(tt.input, false).unwrap();
             let tokens = encoding.get_ids();
 
             // Duplicate the test by writing the raw strings instead
@@ -794,7 +796,7 @@ mod tests {
                 buffer.push(token);
                 likelihood_buffer.push(test_likelihoods[i]);
 
-                let decoded = tokenizer.decode(&buffer, false).unwrap();
+                let decoded = TOKENIZER.decode(&buffer, false).unwrap();
 
                 if decoded.ends_with(char::REPLACEMENT_CHARACTER) {
                     continue;
@@ -2638,13 +2640,7 @@ mod tests {
         ];
 
         for tt in test_cases {
-            let tokenizer = Tokenizer::from_file(format!(
-                "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
-                env!("CARGO_MANIFEST_DIR")
-            ))
-            .unwrap();
-
-            let encoding = tokenizer.encode(tt.input, false).unwrap();
+            let encoding = TOKENIZER.encode(tt.input, false).unwrap();
             let tokens = encoding.get_ids();
 
             // Duplicate the test by writing the raw strings instead
@@ -2657,7 +2653,7 @@ mod tests {
                 buffer.push(token);
                 likelihood_buffer.push(test_likelihoods[i]);
 
-                let decoded = tokenizer.decode(&buffer, false).unwrap();
+                let decoded = TOKENIZER.decode(&buffer, false).unwrap();
 
                 if decoded.ends_with(char::REPLACEMENT_CHARACTER) {
                     continue;
