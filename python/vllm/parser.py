@@ -106,7 +106,9 @@ class CohereCommand2ReasoningParser(ReasoningParser):
         token_buf = []
         for t in tokens:
             token_buf.append(t)
-            token_str = self.model_tokenizer.decode(token_buf, skip_special_tokens=False)
+            token_str = self.model_tokenizer.decode(
+                token_buf, skip_special_tokens=False
+            )
             # buffer tokens that generate incomplete strings
             if token_str.endswith(REPLACEMENT_CHAR):
                 continue
@@ -180,7 +182,9 @@ class CohereCommand2ToolParser(ToolParser):
         # tokenize to provide token size string fragments to melody
         for t in self.model_tokenizer.encode(model_output, add_special_tokens=False):
             token_buf.append(t)
-            token_str = self.model_tokenizer.decode(token_buf, skip_special_tokens=False)
+            token_str = self.model_tokenizer.decode(
+                token_buf, skip_special_tokens=False
+            )
             # buffer tokens that generate incomplete strings
             if token_str.endswith(REPLACEMENT_CHAR):
                 continue

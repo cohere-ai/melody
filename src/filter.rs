@@ -150,13 +150,16 @@ impl FilterImpl {
                 // Before the special token, process the buffer with the old mode
                 let pre_special_token = &str[..special_token_idx];
                 if !pre_special_token.is_empty() {
-                    let partial_log_prob = self.partial_special_token_log_prob.clone();
+                    // Take ownership temporarily to avoid clone
+                    let partial_log_prob = std::mem::take(&mut self.partial_special_token_log_prob);
                     let (o, _) = self.handle_token(
                         self.mode,
                         pre_special_token.as_bytes(),
                         false,
                         &partial_log_prob,
                     );
+                    // restore
+                    self.partial_special_token_log_prob = partial_log_prob;
                     out.extend(o);
                 }
 
@@ -382,6 +385,7 @@ impl FilterImpl {
         (out, bstr.len() - rem_right)
     }
 
+    // TODO: this can be refactored to avoid all the string allocations
     pub(crate) fn trim_space(&mut self, s: &str) -> (String, usize) {
         let mut result = s.to_string();
         let mut rem = 0;
@@ -430,10 +434,10 @@ impl Filter for FilterImpl {
             && self.mode != FilterMode::InclusiveStop
             && self.mode != FilterMode::ExclusiveStop
         {
-            let buf_copy = self.buf.clone();
-            let log_prob_copy = self.partial_special_token_log_prob.clone();
-            let (o, remove) = self.handle_token(self.mode, &buf_copy, true, &log_prob_copy);
-            self.buf.drain(..remove);
+            // Use take to avoid cloning
+            let buf_copy = std::mem::take(&mut self.buf);
+            let log_prob_copy = std::mem::take(&mut self.partial_special_token_log_prob);
+            let (o, _remove) = self.handle_token(self.mode, &buf_copy, true, &log_prob_copy);
             return o;
         }
         Vec::new()

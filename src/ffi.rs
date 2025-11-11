@@ -110,7 +110,7 @@ pub unsafe extern "C" fn melody_filter_options_cmd3(options: *mut CFilterOptions
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().cmd3();
+            *opts = std::mem::take(opts).cmd3();
         }
     }
 }
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn melody_filter_options_cmd4(options: *mut CFilterOptions
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().cmd4();
+            *opts = std::mem::take(opts).cmd4();
         }
     }
 }
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn melody_filter_options_handle_rag(options: *mut CFilterO
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().handle_rag();
+            *opts = std::mem::take(opts).handle_rag();
         }
     }
 }
@@ -152,7 +152,7 @@ pub unsafe extern "C" fn melody_filter_options_handle_search_query(options: *mut
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().handle_search_query();
+            *opts = std::mem::take(opts).handle_search_query();
         }
     }
 }
@@ -166,7 +166,7 @@ pub unsafe extern "C" fn melody_filter_options_handle_multi_hop(options: *mut CF
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().handle_multi_hop();
+            *opts = std::mem::take(opts).handle_multi_hop();
         }
     }
 }
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn melody_filter_options_stream_non_grounded_answer(
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().stream_non_grounded_answer();
+            *opts = std::mem::take(opts).stream_non_grounded_answer();
         }
     }
 }
@@ -196,7 +196,7 @@ pub unsafe extern "C" fn melody_filter_options_stream_tool_actions(options: *mut
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().stream_tool_actions();
+            *opts = std::mem::take(opts).stream_tool_actions();
         }
     }
 }
@@ -212,7 +212,7 @@ pub unsafe extern "C" fn melody_filter_options_stream_processed_params(
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().stream_processed_params();
+            *opts = std::mem::take(opts).stream_processed_params();
         }
     }
 }
@@ -226,7 +226,7 @@ pub unsafe extern "C" fn melody_filter_options_with_left_trimmed(options: *mut C
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().with_left_trimmed();
+            *opts = std::mem::take(opts).with_left_trimmed();
         }
     }
 }
@@ -240,7 +240,7 @@ pub unsafe extern "C" fn melody_filter_options_with_right_trimmed(options: *mut 
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().with_right_trimmed();
+            *opts = std::mem::take(opts).with_right_trimmed();
         }
     }
 }
@@ -259,7 +259,7 @@ pub unsafe extern "C" fn melody_filter_options_with_prefix_trim(
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
             let prefix_str = CStr::from_ptr(prefix).to_string_lossy().into_owned();
-            *opts = opts.clone().with_prefix_trim(prefix_str);
+            *opts = std::mem::take(opts).with_prefix_trim(prefix_str);
         }
     }
 }
@@ -276,7 +276,7 @@ pub unsafe extern "C" fn melody_filter_options_with_chunk_size(
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = opts.clone().with_chunk_size(size);
+            *opts = std::mem::take(opts).with_chunk_size(size);
         }
     }
 }
@@ -300,7 +300,7 @@ pub unsafe extern "C" fn melody_filter_options_with_inclusive_stops(
                 .iter()
                 .map(|&s| CStr::from_ptr(s).to_string_lossy().into_owned())
                 .collect();
-            *opts = opts.clone().with_inclusive_stops(stop_strings);
+            *opts = std::mem::take(opts).with_inclusive_stops(stop_strings);
         }
     }
 }
@@ -324,7 +324,7 @@ pub unsafe extern "C" fn melody_filter_options_with_exclusive_stops(
                 .iter()
                 .map(|&s| CStr::from_ptr(s).to_string_lossy().into_owned())
                 .collect();
-            *opts = opts.clone().with_exclusive_stops(stop_strings);
+            *opts = std::mem::take(opts).with_exclusive_stops(stop_strings);
         }
     }
 }
@@ -343,7 +343,7 @@ pub unsafe extern "C" fn melody_filter_options_remove_token(
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
             let token_str = CStr::from_ptr(token).to_string_lossy();
-            *opts = opts.clone().remove_token(&token_str);
+            *opts = std::mem::take(opts).remove_token(&token_str);
         }
     }
 }
