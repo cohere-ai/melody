@@ -93,27 +93,28 @@ class CohereCommand2ReasoningParser(ReasoningParser):
         self, model_output: str, request: ChatCompletionRequest | ResponsesRequest
     ) -> tuple[Optional[str], Optional[str]]:
         reasoning_content = None
-        reasoning_token_boundary = 0
+        content = None
+        # ignore special tool action tokens since tool parser will be called on the resulting content
+        melody = PyFilter(
+            PyFilterOptions()
+            .cmd3()
+            .remove_token("<|START_ACTION|>")
+            .remove_token("<|END_ACTION|>")
+        )
         # tokenize to provide token size string fragments to melody
         tokens = self.model_tokenizer.encode(model_output, add_special_tokens=False)
-        for i, t in enumerate(tokens):
+        for t in tokens:
             token_str = self.model_tokenizer.decode([t], skip_special_tokens=False)
-            out = self.melody.write_decoded(token_str)
+            out = melody.write_decoded(token_str)
             for o in out:
                 if o.is_reasoning:
                     reasoning_content = (
                         "" if reasoning_content is None else reasoning_content
                     )
                     reasoning_content += o.text
-                    reasoning_token_boundary = (
-                        i + 2
-                    )  # add two for <|START_THINKING|> & <|END_THINKING|>
-
-        content = None
-        if reasoning_token_boundary < len(tokens):
-            content = self.model_tokenizer.decode(
-                tokens[reasoning_token_boundary:], skip_special_tokens=False
-            )
+                elif o.text is not None:
+                    content = "" if content is None else content
+                    content += o.text
         return reasoning_content, content
 
 
