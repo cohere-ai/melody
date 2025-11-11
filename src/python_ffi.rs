@@ -9,22 +9,20 @@ struct PyFilter {
 #[pymethods]
 impl PyFilter {
     #[new]
-    fn new(opts: PyRefMut<PyFilterOptions>) -> Self {
+    fn new(opts: &PyFilterOptions) -> Self {
         PyFilter {
             inner: new_filter(opts.inner.clone()),
         }
     }
 
     // TODO: figure out how we want to pass log probs (if we do)
-    fn write_decoded(&mut self, decoded_token: &str) -> PyResult<Vec<FilterOutput>> {
-        // You may need to convert logprobs to TokenIDsWithLogProb as appropriate
-        Ok(self
-            .inner
-            .write_decoded(decoded_token, TokenIDsWithLogProb::new()))
+    fn write_decoded(&mut self, decoded_token: &str) -> Vec<FilterOutput> {
+        self.inner
+            .write_decoded(decoded_token, TokenIDsWithLogProb::new())
     }
 
-    fn flush_partials(&mut self) -> PyResult<Vec<FilterOutput>> {
-        Ok(self.inner.flush_partials())
+    fn flush_partials(&mut self) -> Vec<FilterOutput> {
+        self.inner.flush_partials()
     }
 }
 
@@ -42,19 +40,19 @@ impl PyFilterOptions {
         }
     }
 
-    fn cmd3(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        slf.inner = slf.inner.clone().cmd3();
-        Ok(slf)
+    fn cmd3(mut slf: PyRefMut<Self>) -> PyRefMut<Self> {
+        slf.inner = std::mem::take(&mut slf.inner).cmd3();
+        slf
     }
 
-    fn cmd4(mut slf: PyRefMut<Self>) -> PyResult<PyRefMut<Self>> {
-        slf.inner = slf.inner.clone().cmd4();
-        Ok(slf)
+    fn cmd4(mut slf: PyRefMut<Self>) -> PyRefMut<Self> {
+        slf.inner = std::mem::take(&mut slf.inner).cmd4();
+        slf
     }
 
-    fn remove_token(mut slf: PyRefMut<Self>, token: String) -> PyResult<PyRefMut<Self>> {
-        slf.inner = slf.inner.clone().remove_token(&token);
-        Ok(slf)
+    fn remove_token<'a>(mut slf: PyRefMut<'a, Self>, token: &str) -> PyRefMut<'a, Self> {
+        slf.inner = std::mem::take(&mut slf.inner).remove_token(token);
+        slf
     }
 }
 
