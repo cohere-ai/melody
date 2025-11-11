@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 
 /// `TokenIDsWithLogProb` pairs tokens with their log probabilities.
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct TokenIDsWithLogProb {
     pub token_ids: Vec<u32>,
     pub logprobs: Vec<f32>,
@@ -21,12 +21,6 @@ impl TokenIDsWithLogProb {
     pub fn append(&mut self, other: TokenIDsWithLogProb) {
         self.token_ids.extend(other.token_ids);
         self.logprobs.extend(other.logprobs);
-    }
-}
-
-impl Default for TokenIDsWithLogProb {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -95,7 +89,7 @@ pub struct Source {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "python_ffi", pyclass(eq, eq_int))]
-pub(crate) enum FilterMode {
+pub enum FilterMode {
     PlainText,
     Ignore,
     ToolAction,
