@@ -1,6 +1,7 @@
 import pytest
 from cohere_melody import PyFilter, PyFilterOptions
 
+
 def test_simple_filter():
     f = PyFilter(PyFilterOptions().cmd3())
     fo = f.write_decoded("<|START_THINKING|>This is a")

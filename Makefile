@@ -25,7 +25,7 @@ rust-test:
 	cargo test --verbose
 
 rust-lint:
-	cargo clippy -- -D warnings
+	cargo clippy --all-features  -- -Dwarnings
 
 rust-format:
 	cargo fmt
@@ -39,5 +39,8 @@ venv-setup:
 python-bindings: venv-setup
 	uv run maturin develop --features python_ffi
 
-python-bindings-test: venv-setup
+python-bindings-test: venv-setup python-bindings
 	uv run pytest tests
+
+python-bindings-format:
+	uvx black .

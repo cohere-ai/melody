@@ -40,18 +40,24 @@ def bench_tiktoken_llama3():
 
     def encode(text):
         return tokenizer.encode(text)
+
     def decode(tokens):
         return tokenizer.decode(tokens)
+
     return encode, decode
 
 
 def bench_tokenizers_llama3():
-    tokenizer = tokenizers.Tokenizer.from_file("test/data/Meta-Llama-3-8B-Instruct.json")
+    tokenizer = tokenizers.Tokenizer.from_file(
+        "test/data/Meta-Llama-3-8B-Instruct.json"
+    )
 
     def encode(text):
         return tokenizer.encode(text, add_special_tokens=False).ids
+
     def decode(tokens):
         return tokenizer.decode(tokens)
+
     return encode, decode
 
 
@@ -67,7 +73,7 @@ def bench_decode(decodeFn, tokens):
     start = time.perf_counter_ns()
     res = decodeFn(tokens)
     end = time.perf_counter_ns()
-    
+
     print(f" \t{(end - start)/1e3:.2f} microsec")
     return res
 
@@ -76,8 +82,11 @@ if __name__ == "__main__":
     times = 10
     text = Path("test/data/long_text.txt").read_text()
     # split text into times
-    texts = [text[i:i + len(text) // times] for i in range(0, len(text), len(text) // times)]
-    
+    texts = [
+        text[i : i + len(text) // times]
+        for i in range(0, len(text), len(text) // times)
+    ]
+
     print("TikToken:")
     enc, dec = bench_tiktoken_llama3()
     token_groups = []
@@ -88,7 +97,7 @@ if __name__ == "__main__":
         token_groups.append([random.randint(0, 1000) for _ in range(i)])
     for tokens in token_groups:
         bench_decode(dec, tokens)
-    
+
     print("Tokenizers:")
     enc, dec = bench_tokenizers_llama3()
     for i in range(times):
