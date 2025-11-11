@@ -51,6 +51,11 @@ impl PyFilterOptions {
         slf.inner = slf.inner.clone().cmd4();
         Ok(slf)
     }
+
+    fn remove_token(mut slf: PyRefMut<Self>, token: String) -> PyResult<PyRefMut<Self>> {
+        slf.inner = slf.inner.clone().remove_token(&token);
+        Ok(slf)
+    }
 }
 
 #[pymodule]
