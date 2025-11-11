@@ -796,7 +796,7 @@ mod tests {
 
                 let decoded = tokenizer.decode(&buffer, false).unwrap();
 
-                if decoded.ends_with('\u{fffd}') {
+                if decoded.ends_with(char::REPLACEMENT_CHARACTER) {
                     continue;
                 }
 
@@ -2659,7 +2659,7 @@ mod tests {
 
                 let decoded = tokenizer.decode(&buffer, false).unwrap();
 
-                if decoded.ends_with('\u{fffd}') {
+                if decoded.ends_with(char::REPLACEMENT_CHARACTER) {
                     continue;
                 }
 
