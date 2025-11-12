@@ -15,10 +15,7 @@ from vllm.entrypoints.openai.protocol import (
     ToolCall,
 )
 from vllm.reasoning import ReasoningParser, ReasoningParserManager
-from vllm.entrypoints.openai.tool_parsers.abstract_tool_parser import (
-    ToolParser,
-    ToolParserManager,
-)
+from vllm.entrypoints.openai.tool_parsers import ToolParser, ToolParserManager
 from vllm.transformers_utils.tokenizer import AnyTokenizer
 
 
@@ -38,7 +35,7 @@ class CohereCommand2ReasoningParser(ReasoningParser):
         super().__init__(tokenizer, *args, **kwargs)
         self.melody = PyFilter(PyFilterOptions().cmd3())
 
-    def extract_reasoning_content_streaming(
+    def extract_reasoning_streaming(
         self,
         previous_text: str,
         current_text: str,
@@ -88,7 +85,7 @@ class CohereCommand2ReasoningParser(ReasoningParser):
 
         return msg
 
-    def extract_reasoning_content(
+    def extract_reasoning(
         self, model_output: str, request: ChatCompletionRequest | ResponsesRequest
     ) -> tuple[Optional[str], Optional[str]]:
         reasoning_content = None
@@ -127,6 +124,37 @@ class CohereCommand2ReasoningParser(ReasoningParser):
 
             token_buf = []
         return reasoning_content, content
+
+
+# TODO: implement other abstract methods if needed
+#     @abstractmethod
+#     def is_reasoning_end(self, input_ids: list[int]) -> bool:
+#         """
+#         Check if the reasoning content ends in the input_ids.
+
+#         It is used in structured engines like `xgrammar` to check if the
+#         reasoning content ends in the model output.
+
+#         Parameters:
+#         input_ids: list[int]
+#             The input_ids of the model output.
+
+#         Returns:
+#         bool
+#             True if the reasoning content ends in the input_ids.
+#         """
+
+#     @abstractmethod
+#     def extract_content_ids(self, input_ids: list[int]) -> list[int]:
+#         """
+#         Extract content token ids from the input_ids.
+#         Parameters:
+#         input_ids: list[int]
+#             The input_ids of the model output.
+#         Returns:
+#         list[int]
+#             The extracted content from the input_ids.
+#         """
 
 
 @ToolParserManager.register_module(["cohere2"])
