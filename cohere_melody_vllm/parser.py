@@ -125,8 +125,34 @@ class CohereCommand2ReasoningParser(ReasoningParser):
             token_buf = []
         return reasoning_content, content
 
+    def extract_content_ids(self, input_ids: list[int]) -> list[int]:
+        melody = PyFilter(
+            PyFilterOptions()
+            .cmd3()
+            .remove_token("<|START_ACTION|>")
+            .remove_token("<|END_ACTION|>")
+        )
+        token_buf = []
+        content_ids = []
+        for t in input_ids:
+            token_buf.append(t)
+            token_str = self.model_tokenizer.decode(
+                token_buf, skip_special_tokens=False
+            )
+            # buffer tokens that generate incomplete strings
+            if token_str.endswith(REPLACEMENT_CHAR):
+                continue
 
-# TODO: implement other abstract methods if needed
+            out = melody.write_decoded(token_str)
+            for o in out:
+                if o.text is not None:
+                    if not o.is_reasoning:
+                        content_ids.extend(token_buf)
+
+            token_buf = []
+        return content_ids
+
+
 #     @abstractmethod
 #     def is_reasoning_end(self, input_ids: list[int]) -> bool:
 #         """
@@ -142,18 +168,6 @@ class CohereCommand2ReasoningParser(ReasoningParser):
 #         Returns:
 #         bool
 #             True if the reasoning content ends in the input_ids.
-#         """
-
-#     @abstractmethod
-#     def extract_content_ids(self, input_ids: list[int]) -> list[int]:
-#         """
-#         Extract content token ids from the input_ids.
-#         Parameters:
-#         input_ids: list[int]
-#             The input_ids of the model output.
-#         Returns:
-#         list[int]
-#             The extracted content from the input_ids.
 #         """
 
 
