@@ -32,13 +32,13 @@ jobs:
           pip install pytest
           pytest
 
-  formatting:
+  py-format:
     runs-on: depot-ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: psf/black@stable
 
-  type-check:
+  py-check:
     runs-on: depot-ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
