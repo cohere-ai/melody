@@ -15,10 +15,7 @@ from vllm.entrypoints.openai.protocol import (
     ToolCall,
 )
 from vllm.reasoning import ReasoningParser, ReasoningParserManager
-from vllm.entrypoints.openai.tool_parsers.abstract_tool_parser import (
-    ToolParser,
-    ToolParserManager,
-)
+from vllm.entrypoints.openai.tool_parsers import ToolParser, ToolParserManager
 from vllm.transformers_utils.tokenizer import AnyTokenizer
 
 
@@ -38,7 +35,7 @@ class CohereCommand2ReasoningParser(ReasoningParser):
         super().__init__(tokenizer, *args, **kwargs)
         self.melody = PyFilter(PyFilterOptions().cmd3())
 
-    def extract_reasoning_content_streaming(
+    def extract_reasoning_streaming(
         self,
         previous_text: str,
         current_text: str,
@@ -88,7 +85,7 @@ class CohereCommand2ReasoningParser(ReasoningParser):
 
         return msg
 
-    def extract_reasoning_content(
+    def extract_reasoning(
         self, model_output: str, request: ChatCompletionRequest | ResponsesRequest
     ) -> tuple[Optional[str], Optional[str]]:
         reasoning_content = None
@@ -127,6 +124,37 @@ class CohereCommand2ReasoningParser(ReasoningParser):
 
             token_buf = []
         return reasoning_content, content
+
+    def extract_content_ids(self, input_ids: list[int]) -> list[int]:
+        melody = PyFilter(
+            PyFilterOptions()
+            .cmd3()
+            .remove_token("<|START_ACTION|>")
+            .remove_token("<|END_ACTION|>")
+        )
+        token_buf = []
+        content_ids = []
+        for t in input_ids:
+            token_buf.append(t)
+            token_str = self.model_tokenizer.decode(
+                token_buf, skip_special_tokens=False
+            )
+            # buffer tokens that generate incomplete strings
+            if token_str.endswith(REPLACEMENT_CHAR):
+                continue
+
+            out = melody.write_decoded(token_str)
+            for o in out:
+                if o.text is not None:
+                    if not o.is_reasoning:
+                        content_ids.extend(token_buf)
+
+            token_buf = []
+        return content_ids
+
+    def is_reasoning_end(self, input_ids: list[int]) -> bool:
+        end_token_id = self.model_tokenizer.convert_tokens_to_ids("<|END_THINKING|>")
+        return any(input_id == end_token_id for input_id in reversed(input_ids))
 
 
 @ToolParserManager.register_module(["cohere2"])
