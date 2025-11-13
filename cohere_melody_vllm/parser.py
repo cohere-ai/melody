@@ -152,23 +152,9 @@ class CohereCommand2ReasoningParser(ReasoningParser):
             token_buf = []
         return content_ids
 
-
-#     @abstractmethod
-#     def is_reasoning_end(self, input_ids: list[int]) -> bool:
-#         """
-#         Check if the reasoning content ends in the input_ids.
-
-#         It is used in structured engines like `xgrammar` to check if the
-#         reasoning content ends in the model output.
-
-#         Parameters:
-#         input_ids: list[int]
-#             The input_ids of the model output.
-
-#         Returns:
-#         bool
-#             True if the reasoning content ends in the input_ids.
-#         """
+    def is_reasoning_end(self, input_ids: list[int]) -> bool:
+        end_token_id = self.model_tokenizer.convert_tokens_to_ids("<|END_THINKING|>")
+        return any(input_id == end_token_id for input_id in reversed(input_ids))
 
 
 @ToolParserManager.register_module(["cohere2"])
