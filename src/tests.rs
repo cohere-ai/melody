@@ -243,543 +243,21 @@ mod tests {
             name: &'static str,
             input: &'static str,
             options: FilterOptions,
-            want: Vec<FilterOutput>,
+            // Aggregated result so test cases can be simpler
+            want_text: &'static str,
+            want_thinking: &'static str,
+            want_tool_calls: Vec<FilterToolCallDelta>,
+            want_likelihoods: Vec<f32>,
         }
 
         let test_cases = vec![TestCase {
             name: "basic test",
             input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
             options: FilterOptions::new(),
-            want: vec![
-                FilterOutput {
-                    text: "<|START_THINKING|>".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![255019],
-                        logprobs: vec![0.0],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "This".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![4184],
-                        logprobs: vec![0.001],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: " is".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![1801],
-                        logprobs: vec![0.002],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: " a".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![1671],
-                        logprobs: vec![0.003],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: " rainbow".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![84470],
-                        logprobs: vec![0.004],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: " <".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![2154],
-                        logprobs: vec![0.005],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "co".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![2567],
-                        logprobs: vec![0.006],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ">".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![37],
-                        logprobs: vec![0.007],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "emoji".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![104150],
-                        logprobs: vec![0.008],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ":".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![33],
-                        logprobs: vec![0.009],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: " 🌈".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![11254, 242, 238],
-                        logprobs: vec![0.01, 0.011, 0.012],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "</".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![1965],
-                        logprobs: vec![0.013],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "co".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![2567],
-                        logprobs: vec![0.014],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ":".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![33],
-                        logprobs: vec![0.015],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: " ".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![228],
-                        logprobs: vec![0.016],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "0".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![23],
-                        logprobs: vec![0.017],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ":[".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![50706],
-                        logprobs: vec![0.018],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "1".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![24],
-                        logprobs: vec![0.019],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "]>".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![70118],
-                        logprobs: vec![0.020],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "<|END_THINKING|>".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![255020],
-                        logprobs: vec![0.021],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "\n".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![206],
-                        logprobs: vec![0.022],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "<|START_RESPONSE|>".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![255021],
-                        logprobs: vec![0.023],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "foo".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![15579],
-                        logprobs: vec![0.024],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: " <".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![2154],
-                        logprobs: vec![0.025],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "co".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![2567],
-                        logprobs: vec![0.026],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ">".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![37],
-                        logprobs: vec![0.027],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "bar".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![4962],
-                        logprobs: vec![0.028],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "</".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![1965],
-                        logprobs: vec![0.029],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "co".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![2567],
-                        logprobs: vec![0.030],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ":".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![33],
-                        logprobs: vec![0.031],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: " ".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![228],
-                        logprobs: vec![0.032],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "0".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![23],
-                        logprobs: vec![0.033],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ":[".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![50706],
-                        logprobs: vec![0.034],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "1".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![24],
-                        logprobs: vec![0.035],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ",".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![19],
-                        logprobs: vec![0.036],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "2".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![25],
-                        logprobs: vec![0.037],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "],".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![4085],
-                        logprobs: vec![0.038],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "1".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![24],
-                        logprobs: vec![0.039],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ":[".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![50706],
-                        logprobs: vec![0.040],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "3".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![26],
-                        logprobs: vec![0.041],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: ",".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![19],
-                        logprobs: vec![0.042],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "4".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![27],
-                        logprobs: vec![0.043],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "]>".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![70118],
-                        logprobs: vec![0.044],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-                FilterOutput {
-                    text: "<|END_RESPONSE|>".to_string(),
-                    logprobs: TokenIDsWithLogProb {
-                        token_ids: vec![255022],
-                        logprobs: vec![0.045],
-                    },
-                    search_query: None,
-                    citations: vec![],
-                    tool_call_delta: None,
-                    is_post_answer: false,
-                    is_reasoning: false,
-                },
-            ],
+            want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
+            want_thinking: "",
+            want_tool_calls: vec![],
+            want_likelihoods: vec![0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023, 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035, 0.036, 0.037, 0.038, 0.039, 0.04, 0.041, 0.042, 0.043, 0.044, 0.045],
         }];
 
         for tt in test_cases {
@@ -791,6 +269,11 @@ mod tests {
             let mut buffer: Vec<u32> = Vec::new();
             let mut likelihoods_chunks: Vec<TokenIDsWithLogProb> = Vec::new();
             let mut likelihood_buffer: Vec<f32> = Vec::new();
+
+            let mut out_text = String::new();
+            let mut out_thinking = String::new();
+            let mut out_likelihoods = Vec::new();
+            let mut out_tool_calls: Vec<FilterToolCallDelta> = Vec::new();
 
             for (i, &token) in tokens.iter().enumerate() {
                 buffer.push(token);
@@ -812,16 +295,52 @@ mod tests {
             }
 
             let mut filter = crate::options::new_filter(tt.options);
-            let mut out: Vec<FilterOutput> = Vec::new();
             for (i, chunk) in text_chunks.iter().enumerate() {
-                out.extend(filter.write_decoded(chunk, likelihoods_chunks[i].clone()));
+                let out = filter.write_decoded(chunk, likelihoods_chunks[i].clone());
+                for (_, o) in out.iter().enumerate() {
+                    if o.is_reasoning {
+                        out_thinking.push_str(&o.text);
+                    } else {
+                        out_text.push_str(&o.text);
+                    }
+                    for (_, f) in o.logprobs.logprobs.iter().enumerate() {
+                        out_likelihoods.push(*f)
+                    }
+                    if let Some(c) = &o.tool_call_delta {
+                        if c.index > out_tool_calls.len() {
+                            let mut ftcd = FilterToolCallDelta::default();
+                            ftcd.index = c.index;
+                            out_tool_calls.push(ftcd);
+
+                        }
+                        out_tool_calls[c.index].id.push_str(&c.id);
+                        out_tool_calls[c.index].name.push_str(&c.name);
+                        out_tool_calls[c.index].raw_param_delta.push_str(&c.raw_param_delta);
+                    }
+                }
             }
 
             assert_eq!(
-                out, tt.want,
-                "Test case '{}' (WriteDecoded) failed",
+                out_text, tt.want_text,
+                "Test case '{}' (WriteDecoded) failed - text not equal",
                 tt.name
             );
+            assert_eq!(
+                out_thinking, tt.want_thinking,
+                "Test case '{}' (WriteDecoded) failed - thinking not equal",
+                tt.name
+            );
+            assert_eq!(
+                out_likelihoods, tt.want_likelihoods,
+                "Test case '{}' (WriteDecoded) failed - likelihoods not equal",
+                tt.name
+            );
+            assert_eq!(
+                out_tool_calls, tt.want_tool_calls,
+                "Test case '{}' (WriteDecoded) failed - tool_calls not equal",
+                tt.name
+            );
+
         }
     }
 
