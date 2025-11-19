@@ -342,6 +342,34 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_inclusive_stop(){
+        run_filter_test(FilterTestCase {
+            name: "inclusive stop test",
+            input: "The tallest penguin is the emperor penguin.",
+            options: FilterOptions::new().with_inclusive_stops(vec!["emperor penguin".to_string()]),
+            want_text: "The tallest penguin is the emperor penguin",
+            want_thinking: "",
+            want_tool_calls: vec![],
+            want_citations: vec![],
+            want_likelihoods: vec![0.001, 0.002, 0.003]
+        })
+    }
+
+    #[test]
+    fn test_filter_exclusive_stop(){
+        run_filter_test(FilterTestCase {
+            name: "exclusive stop test",
+            input: "The tallest penguin is the emperor penguin.",
+            options: FilterOptions::new().with_exclusive_stops(vec!["emperor penguin".to_string()]),
+            want_text: "The tallest penguin is the ",
+            want_thinking: "",
+            want_tool_calls: vec![],
+            want_citations: vec![],
+            want_likelihoods: vec![0.001, 0.002, 0.003]
+        })
+    }
+
+    #[test]
     fn test_filter_likelihoods() {
         run_filter_test(FilterTestCase {
             name: "basic test",
