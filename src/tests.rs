@@ -240,6 +240,7 @@ mod tests {
         want_thinking: &'static str,
         want_tool_calls: Vec<FilterToolCallDelta>,
         want_likelihoods: Vec<f32>,
+        want_citations: Vec<FilterCitation>
     }
 
     fn run_filter_test(tt: FilterTestCase) {
@@ -262,6 +263,7 @@ mod tests {
         let mut out_thinking = String::new();
         let mut out_likelihoods = Vec::new();
         let mut out_tool_calls: Vec<FilterToolCallDelta> = Vec::new();
+        let mut out_citations: Vec<FilterCitation> = Vec::new();
 
         for (i, &token) in tokens.iter().enumerate() {
             buffer.push(token);
@@ -306,6 +308,9 @@ mod tests {
                         .raw_param_delta
                         .push_str(&c.raw_param_delta);
                 }
+                for c in o.citations.iter() {
+                    out_citations.push(c.clone());
+                }
             }
         }
 
@@ -329,6 +334,11 @@ mod tests {
             "Test case '{}' (WriteDecoded) failed - tool_calls not equal",
             tt.name
         );
+        assert_eq!(
+            out_citations, tt.want_citations,
+            "Test case '{}' (WriteDecoded) failed - citations not equal",
+            tt.name
+        )
     }
 
     #[test]
@@ -340,6 +350,7 @@ mod tests {
             want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
             want_thinking: "",
             want_tool_calls: vec![],
+            want_citations: vec![],
             want_likelihoods: vec![
                 0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011,
                 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023,
@@ -358,6 +369,7 @@ mod tests {
             want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
             want_thinking: "",
             want_tool_calls: vec![],
+            want_citations: vec![],
             want_likelihoods: vec![
                 0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011,
                 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023,
@@ -376,6 +388,22 @@ mod tests {
             want_text: "foo bar",
             want_thinking: "This is a rainbow emoji: 🌈",
             want_tool_calls: vec![],
+            want_citations: vec![FilterCitation {
+                start_index: 18,
+                end_index: 26,
+                text: "emoji: 🌈".to_string(),
+                sources: vec![Source{tool_call_index:0, tool_result_indices: vec![1]}],
+                is_thinking: true,
+            }, FilterCitation {
+                start_index: 4,
+                end_index: 7,
+                text: "bar".to_string(),
+                sources: vec![
+                    Source{tool_call_index:0, tool_result_indices: vec![1,2]},
+                    Source{tool_call_index:1, tool_result_indices: vec![3,4]},
+                ],
+                is_thinking: false,
+            }],
             want_likelihoods: vec![
                 0.001, 0.002, 0.003, 0.004, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.024, 0.027,
                 0.028,
@@ -384,13 +412,34 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_command3_overlapping_citations() {
+        run_filter_test(FilterTestCase {
+            name: "overlapping citations", // This scenario is ambiguous - for now, we define the behavior but we should figure out a nice way to handle this
+            input: "<|START_RESPONSE|>foo <co>bar <co>baz</co: 1:[1]> boo</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
+            options: FilterOptions::new().cmd3(),
+            want_text: "foo bar <co>baz boo</co: 0:[1,2],1:[3,4]>",
+            want_thinking: "",
+            want_tool_calls: vec![],
+            want_citations: vec![FilterCitation {
+                start_index: 4,
+                end_index: 15,
+                text: "bar <co>baz".to_string(),
+                sources: vec![Source{tool_call_index:1, tool_result_indices: vec![1]}],
+                is_thinking: false,
+            }],
+            want_likelihoods: vec![0.001, 0.004, 0.005, 0.007, 0.008, 0.009, 0.018, 0.019, 0.02, 0.021, 0.022, 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035],
+        })
+    }
+
+    #[test]
     fn test_filter_command3_tool_simple() {
         run_filter_test(FilterTestCase {
-            name: "tool use",
+            name: "tool use simple",
             input: r#"<|START_THINKING|>I will use the add tool to calculate the sum of 6 and 7.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#,
             options: FilterOptions::new().cmd3(),
             want_text: "",
             want_thinking: "I will use the add tool to calculate the sum of 6 and 7.",
+            want_citations: vec![],
             want_tool_calls: vec![FilterToolCallDelta {
                 index: 0,
                 id: "0".to_string(),
@@ -406,6 +455,32 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_command3_tool_multiple_calls() {
+        run_filter_test(FilterTestCase {
+            name: "tool use multiple calls",
+            input: r#"<|START_THINKING|>I will search for United States and Canada in separate tool calls.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "web_search", "parameters": {"query": "United States"}},{"tool_call_id": "1", "tool_name": "web_search", "parameters": {"query": "Canada"}}]<|END_ACTION|>"#,
+            options: FilterOptions::new().cmd3(),
+            want_text: "",
+            want_thinking: "I will search for United States and Canada in separate tool calls.",
+            want_citations: vec![],
+            want_tool_calls: vec![FilterToolCallDelta {
+                index: 0,
+                id: "0".to_string(),
+                name: "web_search".to_string(),
+                param_delta: None,
+                raw_param_delta: "{\"query\": \"United States\"}".to_string(),
+            },FilterToolCallDelta {
+                index: 1,
+                id: "1".to_string(),
+                name: "web_search".to_string(),
+                param_delta: None,
+                raw_param_delta: "{\"query\": \"Canada\"}".to_string(),
+            }],
+            want_likelihoods: vec![0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.013],
+        })
+    }
+
+    #[test]
     fn test_filter_command3_skip_tool_parsing() {
         run_filter_test(FilterTestCase {
             name: "skip tool parsing",
@@ -416,6 +491,7 @@ mod tests {
                 .remove_token("<|END_ACTION|>"),
             want_text: "<|START_ACTION|>[{\"tool_call_id\": \"0\", \"tool_name\": \"add\", \"parameters\": {\"a\": 6, \"b\": 7}}]<|END_ACTION|>",
             want_thinking: "I will use the add tool to calculate the sum of 6 and 7.",
+            want_citations: vec![],
             want_tool_calls: vec![],
             want_likelihoods: vec![
                 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.013,
@@ -435,6 +511,7 @@ mod tests {
             options: FilterOptions::new().cmd3(),
             want_text: "Response",
             want_thinking: "Plan",
+            want_citations: vec![],
             want_tool_calls: vec![],
             want_likelihoods: vec![0.001, 0.003],
         });
