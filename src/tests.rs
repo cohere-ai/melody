@@ -513,6 +513,33 @@ mod tests {
         })
     }
 
+
+    #[test]
+    fn test_filter_command3_tool_multiple_calls_chunk_size() {
+        run_filter_test(FilterTestCase {
+            name: "tool use multiple calls with chunk size",
+            input: r#"<|START_THINKING|>I will search for United States and Canada in separate tool calls.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "web_search", "parameters": {"query": "United States"}},{"tool_call_id": "1", "tool_name": "web_search", "parameters": {"query": "Canada"}}]<|END_ACTION|>"#,
+            options: FilterOptions::new().cmd3().with_chunk_size(10),
+            want_text: "",
+            want_thinking: "I will search for United States and Canada in separate tool calls.",
+            want_citations: vec![],
+            want_tool_calls: vec![FilterToolCallDelta {
+                index: 0,
+                id: "0".to_string(),
+                name: "web_search".to_string(),
+                param_delta: None,
+                raw_param_delta: "{\"query\": \"United States\"}".to_string(),
+            },FilterToolCallDelta {
+                index: 1,
+                id: "1".to_string(),
+                name: "web_search".to_string(),
+                param_delta: None,
+                raw_param_delta: "{\"query\": \"Canada\"}".to_string(),
+            }],
+            want_likelihoods: vec![0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01],
+        })
+    }
+
     #[test]
     fn test_filter_command3_skip_tool_parsing() {
         run_filter_test(FilterTestCase {
@@ -536,7 +563,7 @@ mod tests {
         })
     }
 
-    #[test]
+    #[test] // For VLLM, <|START_RESPONSE|> gets omitted because it's a special token (and thinking <|*_THINKING|> is not)
     fn test_filter_command3_handles_missing_start_response() {
         run_filter_test(FilterTestCase {
             name: "skipping <|START_RESPONSE|>",
