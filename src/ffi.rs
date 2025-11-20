@@ -245,25 +245,6 @@ pub unsafe extern "C" fn melody_filter_options_with_right_trimmed(options: *mut 
     }
 }
 
-/// Sets prefix trim
-///
-/// # Safety
-/// `options` must be a valid pointer returned from `melody_filter_options_new`
-/// `prefix` must be a valid null-terminated C string
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_options_with_prefix_trim(
-    options: *mut CFilterOptions,
-    prefix: *const c_char,
-) {
-    if !options.is_null() && !prefix.is_null() {
-        unsafe {
-            let opts = &mut *(options.cast::<FilterOptions>());
-            let prefix_str = CStr::from_ptr(prefix).to_string_lossy().into_owned();
-            *opts = std::mem::take(opts).with_prefix_trim(prefix_str);
-        }
-    }
-}
-
 /// Sets chunk size
 ///
 /// # Safety

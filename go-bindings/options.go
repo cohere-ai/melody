@@ -59,9 +59,6 @@ func (cfg *filterConfig) apply(opts *FilterOptions) {
 	if cfg.rightTrimmed {
 		opts.WithRightTrimmed()
 	}
-	if cfg.prefixTrim != "" {
-		opts.WithPrefixTrim(cfg.prefixTrim)
-	}
 
 	// Handle size and limit options
 	if cfg.chunkSize > 0 {
@@ -149,13 +146,6 @@ func WithLeftTrimmed() FilterOption {
 func WithRightTrimmed() FilterOption {
 	return func(cfg *filterConfig) {
 		cfg.rightTrimmed = true
-	}
-}
-
-// WithPrefixTrim sets a prefix to trim
-func WithPrefixTrim(prefix string) FilterOption {
-	return func(cfg *filterConfig) {
-		cfg.prefixTrim = prefix
 	}
 }
 

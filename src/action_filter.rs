@@ -97,7 +97,7 @@ impl FilterImpl {
         if let Some(idx) = find_non_escaped_char(s, '"') {
             let out = self.send_tool_call_id_chunk(&s[..idx]);
             self.action_metadata.mode = ActionMode::ToolCallIDEnd;
-            let (o, r) = self.parse_actions(&s[idx..]);
+            let (o, r) = self.parse_actions(&s[(idx + 1)..]);
             let mut result = out;
             result.extend(o);
             (result, r + idx + 1)
@@ -114,7 +114,7 @@ impl FilterImpl {
         if let Some(idx) = find_non_escaped_char(s, '"') {
             let out = self.send_tool_name_chunk(&s[..idx]);
             self.action_metadata.mode = ActionMode::ToolNameEnd;
-            let (o, r) = self.parse_actions(&s[idx..]);
+            let (o, r) = self.parse_actions(&s[(idx + 1)..]);
             let mut result = out;
             result.extend(o);
             (result, r + idx + 1)
@@ -207,7 +207,7 @@ impl FilterImpl {
         if let Some(idx) = find_non_escaped_char(s, '"') {
             let out = self.send_param_name_chunk(&s[..idx]);
             self.action_metadata.mode = ActionMode::ParamNameEnd;
-            let (o, r) = self.parse_actions(&s[idx..]);
+            let (o, r) = self.parse_actions(&s[(idx + 1)..]);
             let mut result = out;
             result.extend(o);
             (result, r + idx + 1)
@@ -584,7 +584,7 @@ mod tests {
         let completion = "Action: ```json\n\t\t\t[\n\t\t\t   {\n\t\t\t\t   \"tool_name\": \"internet_search\",\n\t\t\t\t   \"parameters\": {\n\t\t\t\t\t   \"query\": \"query1\"\n\t\t\t\t   }\n\t\t\t   }\n\t\t\t]```";
         let (out, actual_remove) = filter.parse_actions(completion);
 
-        assert_eq!(actual_remove, 119);
+        assert_eq!(actual_remove, 125);
         assert_eq!(out.len(), 3);
 
         // Tool name
@@ -663,7 +663,7 @@ mod tests {
         let completion = "Action: ```json\n\t\t\t[\n\t\t\t   {\n\t\t\t\t   \"tool_name\": \"internet_search\",\n\t\t\t\t   \"parameters\": {\n\t\t\t\t\t   \"query\": \"query1\"\n\t\t\t\t   }\n\t\t\t   }\n\t\t\t]```";
         let (out, actual_remove) = filter.parse_actions(completion);
 
-        assert_eq!(actual_remove, 126);
+        assert_eq!(actual_remove, 125);
         assert_eq!(out.len(), 2);
 
         // Tool name

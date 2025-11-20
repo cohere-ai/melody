@@ -92,7 +92,7 @@ impl FilterImpl {
         let first_char = trim.chars().next().unwrap();
         let idx = s.find(first_char).unwrap();
         let trim_send = s[..idx].trim_end();
-        let (out, rem) = self.send_param_value_chunk(trim_send);
+        let (out, _) = self.send_param_value_chunk(trim_send);
 
         // Reset all the metadata
         self.action_metadata.trim_left = true;
@@ -107,10 +107,10 @@ impl FilterImpl {
             self.action_metadata.mode = ActionMode::ParamValueEnd;
         }
 
-        let (o, r) = self.parse_actions(&s[rem + 1..]);
+        let (o, r) = self.parse_actions(&s[idx + 1..]);
         let mut result = out;
         result.extend(o);
-        (result, r + rem + 1)
+        (result, r + idx + 1)
     }
 }
 
@@ -272,7 +272,7 @@ mod tests {
         let input = "\"testing string\"   \n}";
         let (out, actual_remove) = filter.handle_param_value(input);
 
-        assert_eq!(actual_remove, 17);
+        assert_eq!(actual_remove, 21);
         let mut result = String::new();
         for o in out {
             if let Some(tool_calls) = o.tool_call_delta {
@@ -293,7 +293,7 @@ mod tests {
         let input = "{\"tes t\": [\"}\"]}   \n,";
         let (out, actual_remove) = filter.handle_param_value(input);
 
-        assert_eq!(actual_remove, 17);
+        assert_eq!(actual_remove, 21);
         let mut result = String::new();
         for o in out {
             if let Some(tool_calls) = o.tool_call_delta {
