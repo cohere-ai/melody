@@ -423,7 +423,7 @@ mod tests {
             want_thinking: "",
             want_tool_calls: vec![],
             want_citations: vec![],
-            want_likelihoods: vec![0.001, 0.004, 0.005],
+            want_likelihoods: vec![0.005, 0.006, 0.007, 0.009, 0.01, 0.011, 0.012, 0.013, 0.014],
         })
     }
     #[test]
