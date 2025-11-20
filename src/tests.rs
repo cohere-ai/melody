@@ -107,28 +107,6 @@ mod tests {
     }
 
     #[test]
-    fn test_trim_prefix() {
-        let mut filter = FilterImpl::new();
-        filter.trim_prefix = "prefix:".to_string();
-
-        let (result, rem) = filter.trim_space("prefix:hello");
-        assert_eq!(result, "hello");
-        assert_eq!(rem, 0);
-        assert!(filter.trim_prefix.is_empty());
-    }
-
-    #[test]
-    fn test_trim_prefix_partial() {
-        let mut filter = FilterImpl::new();
-        filter.trim_prefix = "prefix:".to_string();
-
-        let (result, rem) = filter.trim_space("pre");
-        assert_eq!(result, "");
-        assert_eq!(rem, 3);
-        assert_eq!(filter.trim_prefix, "prefix:"); // Should not be cleared
-    }
-
-    #[test]
     fn test_filter_options_builder() {
         let options = FilterOptions::new()
             .with_left_trimmed()
@@ -404,6 +382,33 @@ mod tests {
                 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035,
                 0.036, 0.037, 0.038, 0.039, 0.04, 0.041, 0.042, 0.043, 0.044, 0.045,
             ],
+        })
+    }
+
+    #[test]
+    fn test_filter_command3_left_trim() {
+        run_filter_test(FilterTestCase {
+            name: "filter left trim",
+            input: "\n \tfoo bar baz\t\n ",
+            options: FilterOptions::new().with_left_trimmed(),
+            want_text: "foo bar baz\t\n ",
+            want_thinking: "",
+            want_tool_calls: vec![],
+            want_citations: vec![],
+            want_likelihoods: vec![0.002, 0.003, 0.004, 0.005],
+        })
+    }
+    #[test]
+    fn test_filter_command3_right_trim() {
+        run_filter_test(FilterTestCase {
+            name: "filter right trim",
+            input: "\n \tfoo bar baz\t\n ",
+            options: FilterOptions::new().with_right_trimmed(),
+            want_text: "\n \tfoo bar baz",
+            want_thinking: "",
+            want_tool_calls: vec![],
+            want_citations: vec![],
+            want_likelihoods: vec![0.002, 0.003, 0.004],
         })
     }
 

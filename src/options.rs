@@ -7,7 +7,6 @@ use std::collections::HashMap;
 pub struct FilterOptions {
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,
-    pub(crate) trim_prefix: String,
     pub(crate) inclusive_stops: Vec<String>,
     pub(crate) exclusive_stops: Vec<String>,
     pub(crate) chunk_size: usize,
@@ -25,7 +24,6 @@ impl Default for FilterOptions {
         Self {
             left_trimmed: false,
             right_trimmed: false,
-            trim_prefix: String::new(),
             inclusive_stops: Vec::new(),
             exclusive_stops: Vec::new(),
             chunk_size: 1,
@@ -46,21 +44,49 @@ impl FilterOptions {
         Self::default()
     }
 
-    #[must_use]
-    pub fn with_left_trimmed(mut self) -> Self {
-        self.left_trimmed = true;
-        self
-    }
+    // PUBLIC OPTIONS
 
     #[must_use]
-    pub fn with_right_trimmed(mut self) -> Self {
+    pub fn cmd3(mut self) -> Self {
+        self.default_mode = FilterMode::GroundedAnswer;
         self.right_trimmed = true;
+        self.has_tool_call_id = true;
+        self.cmd3_citations = true;
+        self.stream_tool_actions = true;
+        self.special_token_map
+            .insert("<|START_RESPONSE|>".to_string(), FilterMode::GroundedAnswer);
+        self.special_token_map
+            .insert("<|END_RESPONSE|>".to_string(), FilterMode::Ignore);
+        self.special_token_map
+            .insert("<|START_THINKING|>".to_string(), FilterMode::ToolReason);
+        self.special_token_map
+            .insert("<|END_THINKING|>".to_string(), FilterMode::GroundedAnswer);
+        self.special_token_map
+            .insert("<|START_ACTION|>".to_string(), FilterMode::ToolAction);
+        self.special_token_map
+            .insert("<|END_ACTION|>".to_string(), FilterMode::Ignore);
         self
     }
 
     #[must_use]
-    pub fn with_prefix_trim(mut self, prefix: String) -> Self {
-        self.trim_prefix = prefix;
+    pub fn cmd4(mut self) -> Self {
+        self.default_mode = FilterMode::GroundedAnswer;
+        self.right_trimmed = true;
+        self.has_tool_call_id = true;
+        self.cmd3_citations = true;
+        self.stream_tool_actions = true;
+        self.special_token_map
+            .insert("<|START_TEXT|>".to_string(), FilterMode::GroundedAnswer);
+        self.special_token_map
+            .insert("<|END_TEXT|>".to_string(), FilterMode::Ignore);
+        self.special_token_map
+            .insert("<|START_THINKING|>".to_string(), FilterMode::ToolReason);
+        self.special_token_map
+            .insert("<|END_THINKING|>".to_string(), FilterMode::GroundedAnswer);
+        self.special_token_map
+            .insert("<|START_ACTION|>".to_string(), FilterMode::ToolAction);
+        self.special_token_map
+            .insert("<|END_ACTION|>".to_string(), FilterMode::Ignore);
         self
     }
 
@@ -73,6 +99,20 @@ impl FilterOptions {
     #[must_use]
     pub fn with_exclusive_stops(mut self, stops: Vec<String>) -> Self {
         self.exclusive_stops = stops;
+        self
+    }
+
+
+    // INTERNAL USE OPTIONS
+    #[must_use]
+    pub fn with_left_trimmed(mut self) -> Self {
+        self.left_trimmed = true;
+        self
+    }
+
+    #[must_use]
+    pub fn with_right_trimmed(mut self) -> Self {
+        self.right_trimmed = true;
         self
     }
 
@@ -124,50 +164,6 @@ impl FilterOptions {
             .insert("Relevant Documents:".to_string(), FilterMode::Ignore);
         self.special_token_map
             .insert("Cited Documents:".to_string(), FilterMode::Ignore);
-        self
-    }
-
-    #[must_use]
-    pub fn cmd3(mut self) -> Self {
-        self.default_mode = FilterMode::GroundedAnswer;
-        self.right_trimmed = true;
-        self.has_tool_call_id = true;
-        self.cmd3_citations = true;
-        self.stream_tool_actions = true;
-        self.special_token_map
-            .insert("<|START_RESPONSE|>".to_string(), FilterMode::GroundedAnswer);
-        self.special_token_map
-            .insert("<|END_RESPONSE|>".to_string(), FilterMode::Ignore);
-        self.special_token_map
-            .insert("<|START_THINKING|>".to_string(), FilterMode::ToolReason);
-        self.special_token_map
-            .insert("<|END_THINKING|>".to_string(), FilterMode::GroundedAnswer);
-        self.special_token_map
-            .insert("<|START_ACTION|>".to_string(), FilterMode::ToolAction);
-        self.special_token_map
-            .insert("<|END_ACTION|>".to_string(), FilterMode::Ignore);
-        self
-    }
-
-    #[must_use]
-    pub fn cmd4(mut self) -> Self {
-        self.default_mode = FilterMode::GroundedAnswer;
-        self.right_trimmed = true;
-        self.has_tool_call_id = true;
-        self.cmd3_citations = true;
-        self.stream_tool_actions = true;
-        self.special_token_map
-            .insert("<|START_TEXT|>".to_string(), FilterMode::GroundedAnswer);
-        self.special_token_map
-            .insert("<|END_TEXT|>".to_string(), FilterMode::Ignore);
-        self.special_token_map
-            .insert("<|START_THINKING|>".to_string(), FilterMode::ToolReason);
-        self.special_token_map
-            .insert("<|END_THINKING|>".to_string(), FilterMode::GroundedAnswer);
-        self.special_token_map
-            .insert("<|START_ACTION|>".to_string(), FilterMode::ToolAction);
-        self.special_token_map
-            .insert("<|END_ACTION|>".to_string(), FilterMode::Ignore);
         self
     }
 

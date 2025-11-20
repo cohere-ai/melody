@@ -113,16 +113,6 @@ func (opts *FilterOptions) WithRightTrimmed() *FilterOptions {
 	return opts
 }
 
-// WithPrefixTrim sets a prefix to trim
-func (opts *FilterOptions) WithPrefixTrim(prefix string) *FilterOptions {
-	if opts.ptr != nil {
-		cPrefix := C.CString(prefix)
-		defer C.free(unsafe.Pointer(cPrefix))
-		C.melody_filter_options_with_prefix_trim(opts.ptr, cPrefix)
-	}
-	return opts
-}
-
 // WithChunkSize sets the chunk size
 func (opts *FilterOptions) WithChunkSize(size int) *FilterOptions {
 	if opts.ptr != nil {

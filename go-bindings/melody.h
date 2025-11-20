@@ -58,7 +58,6 @@ extern void melody_filter_options_stream_tool_actions(CFilterOptions* options);
 extern void melody_filter_options_stream_processed_params(CFilterOptions* options);
 extern void melody_filter_options_with_left_trimmed(CFilterOptions* options);
 extern void melody_filter_options_with_right_trimmed(CFilterOptions* options);
-extern void melody_filter_options_with_prefix_trim(CFilterOptions* options, const char* prefix);
 extern void melody_filter_options_with_chunk_size(CFilterOptions* options, size_t size);
 extern void melody_filter_options_with_inclusive_stops(CFilterOptions* options, const char** stops, size_t stops_len);
 extern void melody_filter_options_with_exclusive_stops(CFilterOptions* options, const char** stops, size_t stops_len);

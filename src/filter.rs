@@ -17,7 +17,6 @@ pub trait Filter {
 pub struct FilterImpl {
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,
-    pub(crate) trim_prefix: String,
 
     pub(crate) default_mode: FilterMode,
     pub(crate) special_token_map: HashMap<String, FilterMode>,
@@ -54,7 +53,6 @@ impl FilterImpl {
         Self {
             left_trimmed: false,
             right_trimmed: false,
-            trim_prefix: String::new(),
             default_mode: FilterMode::PlainText,
             special_token_map: HashMap::new(),
             stream_non_grounded_answer: false,
@@ -83,7 +81,6 @@ impl FilterImpl {
     pub(crate) fn apply_options(mut self, options: FilterOptions) -> Self {
         self.left_trimmed = options.left_trimmed;
         self.right_trimmed = options.right_trimmed;
-        self.trim_prefix = options.trim_prefix;
         self.chunk_size = options.chunk_size;
         self.stream_non_grounded_answer = options.stream_non_grounded_answer;
         self.stream_tool_actions = options.stream_tool_actions;
@@ -401,22 +398,6 @@ impl FilterImpl {
             if !result.is_empty() {
                 self.left_trimmed = false;
             }
-        }
-
-        if !self.trim_prefix.is_empty() {
-            let prefix_len = self.trim_prefix.len().min(result.len());
-            let full_prefix_len = self.trim_prefix.len();
-
-            let prefix = &self.trim_prefix[..prefix_len];
-
-            if result.starts_with(prefix) {
-                if prefix_len == full_prefix_len {
-                    self.trim_prefix.clear();
-                    return (result[prefix_len..].to_string(), rem);
-                }
-                return (String::new(), result.len() + rem);
-            }
-            self.trim_prefix.clear();
         }
 
         (result, rem)
