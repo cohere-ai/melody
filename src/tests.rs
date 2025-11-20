@@ -398,6 +398,7 @@ mod tests {
             want_likelihoods: vec![0.002, 0.003, 0.004, 0.005],
         })
     }
+
     #[test]
     fn test_filter_command3_right_trim() {
         run_filter_test(FilterTestCase {
@@ -409,6 +410,36 @@ mod tests {
             want_tool_calls: vec![],
             want_citations: vec![],
             want_likelihoods: vec![0.002, 0.003, 0.004],
+        })
+    }
+
+    #[test]
+    fn test_filter_command3_citations_spacing() {
+        run_filter_test(FilterTestCase {
+            name: "citations with spacing",
+            input: "<|START_RESPONSE|>foo <co>bar</co: 0:[1, 2], 1:[3, 4]><|END_RESPONSE|>",
+            options: FilterOptions::new().cmd3(),
+            want_text: "foo bar",
+            want_thinking: "",
+            want_tool_calls: vec![],
+            want_citations: vec![
+                FilterCitation {
+                    start_index: 4,
+                    end_index: 7,
+                    text: "bar".to_string(),
+                    sources: vec![
+                        Source {
+                            tool_call_index: 0,
+                            tool_result_indices: vec![1, 2],
+                        },
+                        Source {
+                            tool_call_index: 1,
+                            tool_result_indices: vec![3, 4],
+                        },
+                    ],
+                    is_thinking: false,
+                }],
+            want_likelihoods: vec![0.001, 0.004, 0.005],
         })
     }
 
