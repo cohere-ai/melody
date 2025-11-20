@@ -414,6 +414,19 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_command3_html_tags() {
+        run_filter_test(FilterTestCase {
+            name: "html tags are not treated like citations",
+            input: "<|START_RESPONSE|><completion_A> is nice <rating>5</rating><|END_RESPONSE|>",
+            options: FilterOptions::new().cmd3(),
+            want_text: "<completion_A> is nice <rating>5</rating>",
+            want_thinking: "",
+            want_tool_calls: vec![],
+            want_citations: vec![],
+            want_likelihoods: vec![0.001, 0.004, 0.005],
+        })
+    }
+    #[test]
     fn test_filter_command3_citations_spacing() {
         run_filter_test(FilterTestCase {
             name: "citations with spacing",
@@ -422,23 +435,22 @@ mod tests {
             want_text: "foo bar",
             want_thinking: "",
             want_tool_calls: vec![],
-            want_citations: vec![
-                FilterCitation {
-                    start_index: 4,
-                    end_index: 7,
-                    text: "bar".to_string(),
-                    sources: vec![
-                        Source {
-                            tool_call_index: 0,
-                            tool_result_indices: vec![1, 2],
-                        },
-                        Source {
-                            tool_call_index: 1,
-                            tool_result_indices: vec![3, 4],
-                        },
-                    ],
-                    is_thinking: false,
-                }],
+            want_citations: vec![FilterCitation {
+                start_index: 4,
+                end_index: 7,
+                text: "bar".to_string(),
+                sources: vec![
+                    Source {
+                        tool_call_index: 0,
+                        tool_result_indices: vec![1, 2],
+                    },
+                    Source {
+                        tool_call_index: 1,
+                        tool_result_indices: vec![3, 4],
+                    },
+                ],
+                is_thinking: false,
+            }],
             want_likelihoods: vec![0.001, 0.004, 0.005],
         })
     }
