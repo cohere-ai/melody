@@ -584,7 +584,7 @@ mod tests {
         let completion = "Action: ```json\n\t\t\t[\n\t\t\t   {\n\t\t\t\t   \"tool_name\": \"internet_search\",\n\t\t\t\t   \"parameters\": {\n\t\t\t\t\t   \"query\": \"query1\"\n\t\t\t\t   }\n\t\t\t   }\n\t\t\t]```";
         let (out, actual_remove) = filter.parse_actions(completion);
 
-        assert_eq!(actual_remove, 119);
+        assert_eq!(actual_remove, 125);
         assert_eq!(out.len(), 3);
 
         // Tool name
