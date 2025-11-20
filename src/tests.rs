@@ -209,6 +209,7 @@ mod tests {
         .unwrap()
     });
 
+    #[derive(Default)]
     struct FilterTestCase {
         name: &'static str,
         input: &'static str,
@@ -219,6 +220,7 @@ mod tests {
         want_tool_calls: Vec<FilterToolCallDelta>,
         want_likelihoods: Vec<f32>,
         want_citations: Vec<FilterCitation>,
+        want_num_outputs: usize,
     }
 
     fn run_filter_test(tt: FilterTestCase) {
@@ -242,6 +244,7 @@ mod tests {
         let mut out_likelihoods = Vec::new();
         let mut out_tool_calls: Vec<FilterToolCallDelta> = Vec::new();
         let mut out_citations: Vec<FilterCitation> = Vec::new();
+        let mut num_outputs = 0;
 
         for (i, &token) in tokens.iter().enumerate() {
             buffer.push(token);
@@ -265,6 +268,7 @@ mod tests {
         let mut filter = crate::options::new_filter(tt.options);
         for (i, chunk) in text_chunks.iter().enumerate() {
             let out = filter.write_decoded(chunk, likelihoods_chunks[i].clone());
+            num_outputs += out.len();
             for o in out.iter() {
                 if o.is_reasoning {
                     out_thinking.push_str(&o.text);
@@ -316,7 +320,12 @@ mod tests {
             out_citations, tt.want_citations,
             "Test case '{}' (WriteDecoded) failed - citations not equal",
             tt.name
-        )
+        );
+        assert_eq!(
+            num_outputs, tt.want_num_outputs,
+            "Test case '{}' (WriteDecoded) failed - num_outputs not equal",
+            tt.name
+        );
     }
 
     #[test]
@@ -326,10 +335,9 @@ mod tests {
             input: "The tallest penguin is the emperor penguin.",
             options: FilterOptions::new().with_inclusive_stops(vec!["emperor penguin".to_string()]),
             want_text: "The tallest penguin is the emperor penguin",
-            want_thinking: "",
-            want_tool_calls: vec![],
-            want_citations: vec![],
             want_likelihoods: vec![0.001, 0.002, 0.003],
+            want_num_outputs: 4,
+            ..Default::default()
         })
     }
 
@@ -340,10 +348,9 @@ mod tests {
             input: "The tallest penguin is the emperor penguin.",
             options: FilterOptions::new().with_exclusive_stops(vec!["emperor penguin".to_string()]),
             want_text: "The tallest penguin is the ",
-            want_thinking: "",
-            want_tool_calls: vec![],
-            want_citations: vec![],
             want_likelihoods: vec![0.001, 0.002, 0.003],
+            want_num_outputs: 4,
+            ..Default::default()
         })
     }
 
@@ -354,15 +361,14 @@ mod tests {
             input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
             options: FilterOptions::new(),
             want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
-            want_thinking: "",
-            want_tool_calls: vec![],
-            want_citations: vec![],
             want_likelihoods: vec![
                 0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011,
                 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023,
                 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035,
                 0.036, 0.037, 0.038, 0.039, 0.04, 0.041, 0.042, 0.043, 0.044, 0.045,
             ],
+            want_num_outputs: 44,
+            ..Default::default()
         });
     }
 
@@ -373,15 +379,14 @@ mod tests {
             input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
             options: FilterOptions::new(),
             want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
-            want_thinking: "",
-            want_tool_calls: vec![],
-            want_citations: vec![],
             want_likelihoods: vec![
                 0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011,
                 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023,
                 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035,
                 0.036, 0.037, 0.038, 0.039, 0.04, 0.041, 0.042, 0.043, 0.044, 0.045,
             ],
+            want_num_outputs: 44,
+            ..Default::default()
         })
     }
 
@@ -392,10 +397,9 @@ mod tests {
             input: "\n \tfoo bar baz\t\n ",
             options: FilterOptions::new().with_left_trimmed(),
             want_text: "foo bar baz\t\n ",
-            want_thinking: "",
-            want_tool_calls: vec![],
-            want_citations: vec![],
             want_likelihoods: vec![0.002, 0.003, 0.004, 0.005],
+            want_num_outputs: 4,
+            ..Default::default()
         })
     }
 
@@ -406,10 +410,9 @@ mod tests {
             input: "\n \tfoo bar baz\t\n ",
             options: FilterOptions::new().with_right_trimmed(),
             want_text: "\n \tfoo bar baz",
-            want_thinking: "",
-            want_tool_calls: vec![],
-            want_citations: vec![],
             want_likelihoods: vec![0.002, 0.003, 0.004],
+            want_num_outputs: 3,
+            ..Default::default()
         })
     }
 
@@ -420,10 +423,9 @@ mod tests {
             input: "<|START_RESPONSE|><completion_A> is nice <rating>5</rating><|END_RESPONSE|>",
             options: FilterOptions::new().cmd3(),
             want_text: "<completion_A> is nice <rating>5</rating>",
-            want_thinking: "",
-            want_tool_calls: vec![],
-            want_citations: vec![],
             want_likelihoods: vec![0.005, 0.006, 0.007, 0.009, 0.01, 0.011, 0.012, 0.013, 0.014],
+            want_num_outputs: 9,
+            ..Default::default()
         })
     }
     #[test]
@@ -433,8 +435,6 @@ mod tests {
             input: "<|START_RESPONSE|>foo <co>bar</co: 0:[1, 2], 1:[3, 4]><|END_RESPONSE|>",
             options: FilterOptions::new().cmd3(),
             want_text: "foo bar",
-            want_thinking: "",
-            want_tool_calls: vec![],
             want_citations: vec![FilterCitation {
                 start_index: 4,
                 end_index: 7,
@@ -452,6 +452,8 @@ mod tests {
                 is_thinking: false,
             }],
             want_likelihoods: vec![0.001, 0.004, 0.005],
+            want_num_outputs: 4,
+            ..Default::default()
         })
     }
 
@@ -463,7 +465,6 @@ mod tests {
             options: FilterOptions::new().cmd3(),
             want_text: "foo bar",
             want_thinking: "This is a rainbow emoji: 🌈",
-            want_tool_calls: vec![],
             want_citations: vec![
                 FilterCitation {
                     start_index: 18,
@@ -496,6 +497,8 @@ mod tests {
                 0.001, 0.002, 0.003, 0.004, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.024, 0.027,
                 0.028,
             ],
+            want_num_outputs: 13,
+            ..Default::default()
         })
     }
 
@@ -506,8 +509,6 @@ mod tests {
             input: "<|START_RESPONSE|>foo <co>bar <co>baz</co: 1:[1]> boo</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
             options: FilterOptions::new().cmd3(),
             want_text: "foo bar <co>baz boo</co: 0:[1,2],1:[3,4]>",
-            want_thinking: "",
-            want_tool_calls: vec![],
             want_citations: vec![FilterCitation {
                 start_index: 4,
                 end_index: 15,
@@ -522,6 +523,8 @@ mod tests {
                 0.001, 0.004, 0.005, 0.007, 0.008, 0.009, 0.018, 0.019, 0.02, 0.021, 0.022, 0.024,
                 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035,
             ],
+            want_num_outputs: 24,
+            ..Default::default()
         })
     }
 
@@ -531,9 +534,7 @@ mod tests {
             name: "tool use simple",
             input: r#"<|START_THINKING|>I will use the add tool to calculate the sum of 6 and 7.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#,
             options: FilterOptions::new().cmd3(),
-            want_text: "",
             want_thinking: "I will use the add tool to calculate the sum of 6 and 7.",
-            want_citations: vec![],
             want_tool_calls: vec![FilterToolCallDelta {
                 index: 0,
                 id: "0".to_string(),
@@ -545,6 +546,8 @@ mod tests {
                 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.013,
                 0.014, 0.016, 0.017,
             ],
+            want_num_outputs: 29,
+            ..Default::default()
         })
     }
 
@@ -554,9 +557,6 @@ mod tests {
             name: "tool use no thinking",
             input: r#"<|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#,
             options: FilterOptions::new().cmd3(),
-            want_text: "",
-            want_thinking: "",
-            want_citations: vec![],
             want_tool_calls: vec![FilterToolCallDelta {
                 index: 0,
                 id: "0".to_string(),
@@ -564,7 +564,8 @@ mod tests {
                 param_delta: None,
                 raw_param_delta: "{\"a\": 6, \"b\": 7}".to_string(),
             }],
-            want_likelihoods: vec![],
+            want_num_outputs: 14,
+            ..Default::default()
         })
     }
 
@@ -574,9 +575,7 @@ mod tests {
             name: "tool use multiple calls",
             input: r#"<|START_THINKING|>I will search for United States and Canada in separate tool calls.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "web_search", "parameters": {"query": "United States"}},{"tool_call_id": "1", "tool_name": "web_search", "parameters": {"query": "Canada"}}]<|END_ACTION|>"#,
             options: FilterOptions::new().cmd3(),
-            want_text: "",
             want_thinking: "I will search for United States and Canada in separate tool calls.",
-            want_citations: vec![],
             want_tool_calls: vec![
                 FilterToolCallDelta {
                     index: 0,
@@ -597,6 +596,8 @@ mod tests {
                 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012,
                 0.013,
             ],
+            want_num_outputs: 30,
+            ..Default::default()
         })
     }
 
@@ -606,9 +607,7 @@ mod tests {
             name: "tool use multiple calls with chunk size",
             input: r#"<|START_THINKING|>I will search for United States and Canada in separate tool calls.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "web_search", "parameters": {"query": "United States"}},{"tool_call_id": "1", "tool_name": "web_search", "parameters": {"query": "Canada"}}]<|END_ACTION|>"#,
             options: FilterOptions::new().cmd3().with_chunk_size(10),
-            want_text: "",
             want_thinking: "I will search for United States and Canada in separate tool calls.",
-            want_citations: vec![],
             want_tool_calls: vec![
                 FilterToolCallDelta {
                     index: 0,
@@ -628,6 +627,8 @@ mod tests {
             want_likelihoods: vec![
                 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01,
             ],
+            want_num_outputs: 10,
+            ..Default::default()
         })
     }
 
@@ -642,8 +643,6 @@ mod tests {
                 .remove_token("<|END_ACTION|>"),
             want_text: "<|START_ACTION|>[{\"tool_call_id\": \"0\", \"tool_name\": \"add\", \"parameters\": {\"a\": 6, \"b\": 7}}]<|END_ACTION|>",
             want_thinking: "I will use the add tool to calculate the sum of 6 and 7.",
-            want_citations: vec![],
-            want_tool_calls: vec![],
             want_likelihoods: vec![
                 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.013,
                 0.014, 0.016, 0.017, 0.019, 0.02, 0.021, 0.022, 0.023, 0.024, 0.025, 0.026, 0.027,
@@ -651,6 +650,8 @@ mod tests {
                 0.04, 0.041, 0.042, 0.043, 0.044, 0.046, 0.047, 0.048, 0.049, 0.05, 0.052, 0.053,
                 0.054, 0.055,
             ],
+            want_num_outputs: 50,
+            ..Default::default()
         })
     }
 
@@ -662,9 +663,9 @@ mod tests {
             options: FilterOptions::new().cmd3(),
             want_text: "Response",
             want_thinking: "Plan",
-            want_citations: vec![],
-            want_tool_calls: vec![],
             want_likelihoods: vec![0.001, 0.003],
+            want_num_outputs: 2,
+            ..Default::default()
         });
     }
 }
