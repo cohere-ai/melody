@@ -506,6 +506,26 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_command3_tool_no_thinking() {
+        run_filter_test(FilterTestCase {
+            name: "tool use no thinking",
+            input: r#"<|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#,
+            options: FilterOptions::new().cmd3(),
+            want_text: "",
+            want_thinking: "",
+            want_citations: vec![],
+            want_tool_calls: vec![FilterToolCallDelta {
+                index: 0,
+                id: "0".to_string(),
+                name: "add".to_string(),
+                param_delta: None,
+                raw_param_delta: "{\"a\": 6, \"b\": 7}".to_string(),
+            }],
+            want_likelihoods: vec![],
+        })
+    }
+
+    #[test]
     fn test_filter_command3_tool_multiple_calls() {
         run_filter_test(FilterTestCase {
             name: "tool use multiple calls",
