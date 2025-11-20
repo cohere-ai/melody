@@ -212,7 +212,7 @@ mod tests {
     #[derive(Default)]
     struct FilterTestCase {
         name: &'static str,
-        input: &'static str,
+        input: String,
         options: FilterOptions,
         // Aggregated result so test cases can be simpler
         want_text: &'static str,
@@ -332,7 +332,7 @@ mod tests {
     fn test_filter_inclusive_stop() {
         run_filter_test(FilterTestCase {
             name: "inclusive stop test",
-            input: "The tallest penguin is the emperor penguin.",
+            input: "The tallest penguin is the emperor penguin.".to_string(),
             options: FilterOptions::new().with_inclusive_stops(vec!["emperor penguin".to_string()]),
             want_text: "The tallest penguin is the emperor penguin",
             want_likelihoods: vec![0.001, 0.002, 0.003],
@@ -345,7 +345,7 @@ mod tests {
     fn test_filter_exclusive_stop() {
         run_filter_test(FilterTestCase {
             name: "exclusive stop test",
-            input: "The tallest penguin is the emperor penguin.",
+            input: "The tallest penguin is the emperor penguin.".to_string(),
             options: FilterOptions::new().with_exclusive_stops(vec!["emperor penguin".to_string()]),
             want_text: "The tallest penguin is the ",
             want_likelihoods: vec![0.001, 0.002, 0.003],
@@ -358,7 +358,7 @@ mod tests {
     fn test_filter_likelihoods() {
         run_filter_test(FilterTestCase {
             name: "basic test",
-            input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
+            input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>".to_string(),
             options: FilterOptions::new(),
             want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
             want_likelihoods: vec![
@@ -376,7 +376,7 @@ mod tests {
     fn test_filter_command3_simple() {
         run_filter_test(FilterTestCase {
             name: "basic test",
-            input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
+            input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>".to_string(),
             options: FilterOptions::new(),
             want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
             want_likelihoods: vec![
@@ -394,7 +394,7 @@ mod tests {
     fn test_filter_command3_left_trim() {
         run_filter_test(FilterTestCase {
             name: "filter left trim",
-            input: "\n \tfoo bar baz\t\n ",
+            input: "\n \tfoo bar baz\t\n ".to_string(),
             options: FilterOptions::new().with_left_trimmed(),
             want_text: "foo bar baz\t\n ",
             want_likelihoods: vec![0.002, 0.003, 0.004, 0.005],
@@ -407,7 +407,7 @@ mod tests {
     fn test_filter_command3_right_trim() {
         run_filter_test(FilterTestCase {
             name: "filter right trim",
-            input: "\n \tfoo bar baz\t\n ",
+            input: "\n \tfoo bar baz\t\n ".to_string(),
             options: FilterOptions::new().with_right_trimmed(),
             want_text: "\n \tfoo bar baz",
             want_likelihoods: vec![0.002, 0.003, 0.004],
@@ -420,7 +420,8 @@ mod tests {
     fn test_filter_command3_html_tags() {
         run_filter_test(FilterTestCase {
             name: "html tags are not treated like citations",
-            input: "<|START_RESPONSE|><completion_A> is nice <rating>5</rating><|END_RESPONSE|>",
+            input: "<|START_RESPONSE|><completion_A> is nice <rating>5</rating><|END_RESPONSE|>"
+                .to_string(),
             options: FilterOptions::new().cmd3(),
             want_text: "<completion_A> is nice <rating>5</rating>",
             want_likelihoods: vec![0.005, 0.006, 0.007, 0.009, 0.01, 0.011, 0.012, 0.013, 0.014],
@@ -428,11 +429,13 @@ mod tests {
             ..Default::default()
         })
     }
+
     #[test]
     fn test_filter_command3_citations_spacing() {
         run_filter_test(FilterTestCase {
             name: "citations with spacing",
-            input: "<|START_RESPONSE|>foo <co>bar</co: 0:[1, 2], 1:[3, 4]><|END_RESPONSE|>",
+            input: "<|START_RESPONSE|>foo <co>bar</co: 0:[1, 2], 1:[3, 4]><|END_RESPONSE|>"
+                .to_string(),
             options: FilterOptions::new().cmd3(),
             want_text: "foo bar",
             want_citations: vec![FilterCitation {
@@ -461,7 +464,7 @@ mod tests {
     fn test_filter_command3_reasoning_and_citations() {
         run_filter_test(FilterTestCase {
             name: "reasoning and citation parsing",
-            input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
+            input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>".to_string(),
             options: FilterOptions::new().cmd3(),
             want_text: "foo bar",
             want_thinking: "This is a rainbow emoji: 🌈",
@@ -506,7 +509,7 @@ mod tests {
     fn test_filter_command3_overlapping_citations() {
         run_filter_test(FilterTestCase {
             name: "overlapping citations", // This scenario is ambiguous - for now, we define the behavior but we should figure out a nice way to handle this
-            input: "<|START_RESPONSE|>foo <co>bar <co>baz</co: 1:[1]> boo</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
+            input: "<|START_RESPONSE|>foo <co>bar <co>baz</co: 1:[1]> boo</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>".to_string(),
             options: FilterOptions::new().cmd3(),
             want_text: "foo bar <co>baz boo</co: 0:[1,2],1:[3,4]>",
             want_citations: vec![FilterCitation {
@@ -532,7 +535,7 @@ mod tests {
     fn test_filter_command3_tool_simple() {
         run_filter_test(FilterTestCase {
             name: "tool use simple",
-            input: r#"<|START_THINKING|>I will use the add tool to calculate the sum of 6 and 7.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#,
+            input: r#"<|START_THINKING|>I will use the add tool to calculate the sum of 6 and 7.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#.to_string(),
             options: FilterOptions::new().cmd3(),
             want_thinking: "I will use the add tool to calculate the sum of 6 and 7.",
             want_tool_calls: vec![FilterToolCallDelta {
@@ -552,10 +555,54 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_command3_python_tool() {
+        let python_code = r#"import matplotlib.pyplot as plt
+
+# Data for the mountains and number of climbers
+data = {'Mount Everest': None}
+# Sort the data by number of climbers
+sorted_data = dict(sorted(data.items(), key=lambda x: x[1], reverse=True))
+# Get the top 10 mountains
+top_10_mountains = list(sorted_data.keys())[:10]
+# Plot the graph
+plt.figure(figsize=(10, 6))
+plt.bar(top_10_mountains, [data[mountain] for mountain in top_10_mountains])
+plt.xlabel('Mountain')
+plt.ylabel('Number of Climbers')
+            plt.xticks(rotation=45, ha='right')
+            plt.tight_layout()
+            plt.savefig('top_ten_mountains_by_climbers.png')"#;
+        let input = format!(
+            r#"<|START_THINKING|>I will use the python tool to generate a bar graph of the top ten mountains by number of climbers.<|END_THINKING|><|START_ACTION|>[{{"tool_call_id": "0", "tool_name": "python", "parameters": {{"code": {}}}}}]<|END_ACTION|>"#,
+            serde_json::to_string(&python_code).unwrap()
+        );
+
+        run_filter_test(FilterTestCase {
+            name: "python tool",
+            input,
+            options: FilterOptions::new().cmd3(),
+            want_thinking: "I will use the python tool to generate a bar graph of the top ten mountains by number of climbers.",
+            want_tool_calls: vec![FilterToolCallDelta {
+                index: 0,
+                id: "0".to_string(),
+                name: "python".to_string(),
+                param_delta: None,
+                raw_param_delta: r#"{"code": "import matplotlib.pyplot as plt\n\n# Data for the mountains and number of climbers\ndata = {'Mount Everest': None}\n# Sort the data by number of climbers\nsorted_data = dict(sorted(data.items(), key=lambda x: x[1], reverse=True))\n# Get the top 10 mountains\ntop_10_mountains = list(sorted_data.keys())[:10]\n# Plot the graph\nplt.figure(figsize=(10, 6))\nplt.bar(top_10_mountains, [data[mountain] for mountain in top_10_mountains])\nplt.xlabel('Mountain')\nplt.ylabel('Number of Climbers')\n            plt.xticks(rotation=45, ha='right')\n            plt.tight_layout()\n            plt.savefig('top_ten_mountains_by_climbers.png')"}"#.to_string(),
+            }],
+            want_likelihoods: vec![
+                0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012,
+                0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021,
+            ],
+            want_num_outputs: 226,
+            ..Default::default()
+        })
+    }
+
+    #[test]
     fn test_filter_command3_tool_no_thinking() {
         run_filter_test(FilterTestCase {
             name: "tool use no thinking",
-            input: r#"<|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#,
+            input: r#"<|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#.to_string(),
             options: FilterOptions::new().cmd3(),
             want_tool_calls: vec![FilterToolCallDelta {
                 index: 0,
@@ -573,7 +620,7 @@ mod tests {
     fn test_filter_command3_tool_multiple_calls() {
         run_filter_test(FilterTestCase {
             name: "tool use multiple calls",
-            input: r#"<|START_THINKING|>I will search for United States and Canada in separate tool calls.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "web_search", "parameters": {"query": "United States"}},{"tool_call_id": "1", "tool_name": "web_search", "parameters": {"query": "Canada"}}]<|END_ACTION|>"#,
+            input: r#"<|START_THINKING|>I will search for United States and Canada in separate tool calls.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "web_search", "parameters": {"query": "United States"}},{"tool_call_id": "1", "tool_name": "web_search", "parameters": {"query": "Canada"}}]<|END_ACTION|>"#.to_string(),
             options: FilterOptions::new().cmd3(),
             want_thinking: "I will search for United States and Canada in separate tool calls.",
             want_tool_calls: vec![
@@ -605,7 +652,7 @@ mod tests {
     fn test_filter_command3_tool_multiple_calls_chunk_size() {
         run_filter_test(FilterTestCase {
             name: "tool use multiple calls with chunk size",
-            input: r#"<|START_THINKING|>I will search for United States and Canada in separate tool calls.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "web_search", "parameters": {"query": "United States"}},{"tool_call_id": "1", "tool_name": "web_search", "parameters": {"query": "Canada"}}]<|END_ACTION|>"#,
+            input: r#"<|START_THINKING|>I will search for United States and Canada in separate tool calls.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "web_search", "parameters": {"query": "United States"}},{"tool_call_id": "1", "tool_name": "web_search", "parameters": {"query": "Canada"}}]<|END_ACTION|>"#.to_string(),
             options: FilterOptions::new().cmd3().with_chunk_size(10),
             want_thinking: "I will search for United States and Canada in separate tool calls.",
             want_tool_calls: vec![
@@ -636,7 +683,7 @@ mod tests {
     fn test_filter_command3_skip_tool_parsing() {
         run_filter_test(FilterTestCase {
             name: "skip tool parsing",
-            input: r#"<|START_THINKING|>I will use the add tool to calculate the sum of 6 and 7.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#,
+            input: r#"<|START_THINKING|>I will use the add tool to calculate the sum of 6 and 7.<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "add", "parameters": {"a": 6, "b": 7}}]<|END_ACTION|>"#.to_string(),
             options: FilterOptions::new()
                 .cmd3()
                 .remove_token("<|START_ACTION|>")
@@ -659,7 +706,7 @@ mod tests {
     fn test_filter_command3_handles_missing_start_response() {
         run_filter_test(FilterTestCase {
             name: "skipping <|START_RESPONSE|>",
-            input: "<|START_THINKING|>Plan<|END_THINKING|>Response",
+            input: "<|START_THINKING|>Plan<|END_THINKING|>Response".to_string(),
             options: FilterOptions::new().cmd3(),
             want_text: "Response",
             want_thinking: "Plan",
