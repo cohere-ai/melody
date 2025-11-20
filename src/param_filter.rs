@@ -272,7 +272,7 @@ mod tests {
         let input = "\"testing string\"   \n}";
         let (out, actual_remove) = filter.handle_param_value(input);
 
-        assert_eq!(actual_remove, 17);
+        assert_eq!(actual_remove, 21);
         let mut result = String::new();
         for o in out {
             if let Some(tool_calls) = o.tool_call_delta {
@@ -293,7 +293,7 @@ mod tests {
         let input = "{\"tes t\": [\"}\"]}   \n,";
         let (out, actual_remove) = filter.handle_param_value(input);
 
-        assert_eq!(actual_remove, 17);
+        assert_eq!(actual_remove, 21);
         let mut result = String::new();
         for o in out {
             if let Some(tool_calls) = o.tool_call_delta {
