@@ -218,7 +218,7 @@ mod tests {
         want_thinking: &'static str,
         want_tool_calls: Vec<FilterToolCallDelta>,
         want_likelihoods: Vec<f32>,
-        want_citations: Vec<FilterCitation>
+        want_citations: Vec<FilterCitation>,
     }
 
     fn run_filter_test(tt: FilterTestCase) {
@@ -320,7 +320,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_inclusive_stop(){
+    fn test_filter_inclusive_stop() {
         run_filter_test(FilterTestCase {
             name: "inclusive stop test",
             input: "The tallest penguin is the emperor penguin.",
@@ -329,12 +329,12 @@ mod tests {
             want_thinking: "",
             want_tool_calls: vec![],
             want_citations: vec![],
-            want_likelihoods: vec![0.001, 0.002, 0.003]
+            want_likelihoods: vec![0.001, 0.002, 0.003],
         })
     }
 
     #[test]
-    fn test_filter_exclusive_stop(){
+    fn test_filter_exclusive_stop() {
         run_filter_test(FilterTestCase {
             name: "exclusive stop test",
             input: "The tallest penguin is the emperor penguin.",
@@ -343,7 +343,7 @@ mod tests {
             want_thinking: "",
             want_tool_calls: vec![],
             want_citations: vec![],
-            want_likelihoods: vec![0.001, 0.002, 0.003]
+            want_likelihoods: vec![0.001, 0.002, 0.003],
         })
     }
 
@@ -421,22 +421,34 @@ mod tests {
             want_text: "foo bar",
             want_thinking: "This is a rainbow emoji: 🌈",
             want_tool_calls: vec![],
-            want_citations: vec![FilterCitation {
-                start_index: 18,
-                end_index: 26,
-                text: "emoji: 🌈".to_string(),
-                sources: vec![Source{tool_call_index:0, tool_result_indices: vec![1]}],
-                is_thinking: true,
-            }, FilterCitation {
-                start_index: 4,
-                end_index: 7,
-                text: "bar".to_string(),
-                sources: vec![
-                    Source{tool_call_index:0, tool_result_indices: vec![1,2]},
-                    Source{tool_call_index:1, tool_result_indices: vec![3,4]},
-                ],
-                is_thinking: false,
-            }],
+            want_citations: vec![
+                FilterCitation {
+                    start_index: 18,
+                    end_index: 26,
+                    text: "emoji: 🌈".to_string(),
+                    sources: vec![Source {
+                        tool_call_index: 0,
+                        tool_result_indices: vec![1],
+                    }],
+                    is_thinking: true,
+                },
+                FilterCitation {
+                    start_index: 4,
+                    end_index: 7,
+                    text: "bar".to_string(),
+                    sources: vec![
+                        Source {
+                            tool_call_index: 0,
+                            tool_result_indices: vec![1, 2],
+                        },
+                        Source {
+                            tool_call_index: 1,
+                            tool_result_indices: vec![3, 4],
+                        },
+                    ],
+                    is_thinking: false,
+                },
+            ],
             want_likelihoods: vec![
                 0.001, 0.002, 0.003, 0.004, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.024, 0.027,
                 0.028,
@@ -457,10 +469,16 @@ mod tests {
                 start_index: 4,
                 end_index: 15,
                 text: "bar <co>baz".to_string(),
-                sources: vec![Source{tool_call_index:1, tool_result_indices: vec![1]}],
+                sources: vec![Source {
+                    tool_call_index: 1,
+                    tool_result_indices: vec![1],
+                }],
                 is_thinking: false,
             }],
-            want_likelihoods: vec![0.001, 0.004, 0.005, 0.007, 0.008, 0.009, 0.018, 0.019, 0.02, 0.021, 0.022, 0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035],
+            want_likelihoods: vec![
+                0.001, 0.004, 0.005, 0.007, 0.008, 0.009, 0.018, 0.019, 0.02, 0.021, 0.022, 0.024,
+                0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035,
+            ],
         })
     }
 
@@ -496,23 +514,28 @@ mod tests {
             want_text: "",
             want_thinking: "I will search for United States and Canada in separate tool calls.",
             want_citations: vec![],
-            want_tool_calls: vec![FilterToolCallDelta {
-                index: 0,
-                id: "0".to_string(),
-                name: "web_search".to_string(),
-                param_delta: None,
-                raw_param_delta: "{\"query\": \"United States\"}".to_string(),
-            },FilterToolCallDelta {
-                index: 1,
-                id: "1".to_string(),
-                name: "web_search".to_string(),
-                param_delta: None,
-                raw_param_delta: "{\"query\": \"Canada\"}".to_string(),
-            }],
-            want_likelihoods: vec![0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.013],
+            want_tool_calls: vec![
+                FilterToolCallDelta {
+                    index: 0,
+                    id: "0".to_string(),
+                    name: "web_search".to_string(),
+                    param_delta: None,
+                    raw_param_delta: "{\"query\": \"United States\"}".to_string(),
+                },
+                FilterToolCallDelta {
+                    index: 1,
+                    id: "1".to_string(),
+                    name: "web_search".to_string(),
+                    param_delta: None,
+                    raw_param_delta: "{\"query\": \"Canada\"}".to_string(),
+                },
+            ],
+            want_likelihoods: vec![
+                0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012,
+                0.013,
+            ],
         })
     }
-
 
     #[test]
     fn test_filter_command3_tool_multiple_calls_chunk_size() {
@@ -523,20 +546,25 @@ mod tests {
             want_text: "",
             want_thinking: "I will search for United States and Canada in separate tool calls.",
             want_citations: vec![],
-            want_tool_calls: vec![FilterToolCallDelta {
-                index: 0,
-                id: "0".to_string(),
-                name: "web_search".to_string(),
-                param_delta: None,
-                raw_param_delta: "{\"query\": \"United States\"}".to_string(),
-            },FilterToolCallDelta {
-                index: 1,
-                id: "1".to_string(),
-                name: "web_search".to_string(),
-                param_delta: None,
-                raw_param_delta: "{\"query\": \"Canada\"}".to_string(),
-            }],
-            want_likelihoods: vec![0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01],
+            want_tool_calls: vec![
+                FilterToolCallDelta {
+                    index: 0,
+                    id: "0".to_string(),
+                    name: "web_search".to_string(),
+                    param_delta: None,
+                    raw_param_delta: "{\"query\": \"United States\"}".to_string(),
+                },
+                FilterToolCallDelta {
+                    index: 1,
+                    id: "1".to_string(),
+                    name: "web_search".to_string(),
+                    param_delta: None,
+                    raw_param_delta: "{\"query\": \"Canada\"}".to_string(),
+                },
+            ],
+            want_likelihoods: vec![
+                0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01,
+            ],
         })
     }
 

@@ -97,7 +97,7 @@ impl FilterImpl {
         if let Some(idx) = find_non_escaped_char(s, '"') {
             let out = self.send_tool_call_id_chunk(&s[..idx]);
             self.action_metadata.mode = ActionMode::ToolCallIDEnd;
-            let (o, r) = self.parse_actions(&s[(idx+1)..]);
+            let (o, r) = self.parse_actions(&s[(idx + 1)..]);
             let mut result = out;
             result.extend(o);
             (result, r + idx + 1)
@@ -114,7 +114,7 @@ impl FilterImpl {
         if let Some(idx) = find_non_escaped_char(s, '"') {
             let out = self.send_tool_name_chunk(&s[..idx]);
             self.action_metadata.mode = ActionMode::ToolNameEnd;
-            let (o, r) = self.parse_actions(&s[(idx+1)..]);
+            let (o, r) = self.parse_actions(&s[(idx + 1)..]);
             let mut result = out;
             result.extend(o);
             (result, r + idx + 1)
@@ -207,7 +207,7 @@ impl FilterImpl {
         if let Some(idx) = find_non_escaped_char(s, '"') {
             let out = self.send_param_name_chunk(&s[..idx]);
             self.action_metadata.mode = ActionMode::ParamNameEnd;
-            let (o, r) = self.parse_actions(&s[(idx+1)..]);
+            let (o, r) = self.parse_actions(&s[(idx + 1)..]);
             let mut result = out;
             result.extend(o);
             (result, r + idx + 1)

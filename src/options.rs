@@ -102,7 +102,6 @@ impl FilterOptions {
         self
     }
 
-
     // INTERNAL USE OPTIONS
     #[must_use]
     pub fn with_left_trimmed(mut self) -> Self {
