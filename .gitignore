@@ -36,6 +36,7 @@ rust/target/
 target/
 **/*.rs.bk
 Cargo.lock
+artifacts
 
 # OS
 .DS_Store
