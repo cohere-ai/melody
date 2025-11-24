@@ -1,6 +1,11 @@
 TOKENIZERS_VERSION = v0.9.1
 UNAME := $(shell uname)
 ARCH := $(shell uname -m)
+ifeq ($(UNAME),Linux)
+LIB_EXT := so
+else ifeq ($(UNAME),Darwin)
+LIB_EXT := dylib
+endif
 mod-install-tokenizers:
 	@echo "-- installing libtokenizers.a at ~/go/pkg/mod/github.com/cohere-ai/tokenizers@${TOKENIZERS_VERSION}/libtokenizers.a..."
 	@curl -fsSL https://github.com/cohere-ai/tokenizers/releases/download/${TOKENIZERS_VERSION}/libtokenizers.${UNAME}-${ARCH}.tar.gz | tar xvz
@@ -19,7 +24,7 @@ check-install-tokenizers:
 	fi;
 
 golang-bindings-test: check-install-tokenizers rust-build
-	cd go-bindings && go test -v ./...
+	cp target/release/libcohere_melody.$(LIB_EXT) go-bindings && cd go-bindings && go test -v ./...
 
 rust-test:
 	cargo test --verbose
