@@ -20,6 +20,7 @@ check-install-tokenizers:
 golang-bindings-test: check-install-tokenizers rust-build
 	cd go-bindings && go test -v ./...
 
+# we kind of assume that you're running this on a macOS machine - it just builds locally
 release-darwin-%:
 	cargo build --release --target $*-apple-darwin
 	mkdir -p artifacts/darwin-$*

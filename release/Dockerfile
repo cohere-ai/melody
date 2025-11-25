@@ -18,5 +18,7 @@ COPY ./go-bindings/melody.h ./go-bindings/
 COPY --from=builder-rust \
     /workspace/target/release/libcohere_melody.* \
     ./target/release/
+# Run a simple test (see release/main.go)
 RUN LD_LIBRARY_PATH=/workspace/target/release:$LD_LIBRARY_PATH go run .
+# gzip the release to be extracted later with `docker run ... cp ...`
 RUN tar -czf libcohere_melody.linux.tar.gz target/release/libcohere_melody.*
