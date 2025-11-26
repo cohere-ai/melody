@@ -26,6 +26,7 @@ release-darwin-%:
 	mkdir -p artifacts/darwin-$*
 	cp target/$*-apple-darwin/release/libcohere_melody.* artifacts/darwin-$*
 	cd artifacts/darwin-$* && \
+		rm libcohere_melody.darwin-$*.tar.gz && \
 		tar -czf libcohere_melody.darwin-$*.tar.gz libcohere_melody.*
 	mkdir -p artifacts/all
 	cp artifacts/darwin-$*/libcohere_melody.darwin-$*.tar.gz artifacts/all/libcohere_melody.darwin-$*.tar.gz
@@ -37,9 +38,13 @@ release-linux-%:
 	mkdir -p artifacts/all
 	cp artifacts/linux-$*/libcohere_melody.linux.tar.gz artifacts/all/libcohere_melody.linux-$*.tar.gz
 
-release: release-darwin-aarch64 release-darwin-x86_64 release-linux-arm64 release-linux-x86_64
+clean-artifacts:
+	@if [ -d "artifacts/all" ]; then \
+		rm -r artifacts/all; \
+    fi;
+
+release: clean-artifacts release-darwin-aarch64 release-darwin-x86_64 release-linux-arm64 release-linux-x86_64
 	cp artifacts/all/libcohere_melody.darwin-aarch64.tar.gz artifacts/all/libcohere_melody.darwin-arm64.tar.gz
-	cp artifacts/all/libcohere_melody.darwin-x86_64.tar.gz artifacts/all/libcohere_melody.darwin-x86_64.tar.gz
 	cp artifacts/all/libcohere_melody.linux-arm64.tar.gz artifacts/all/libcohere_melody.linux-aarch64.tar.gz
 	cp artifacts/all/libcohere_melody.linux-x86_64.tar.gz artifacts/all/libcohere_melody.linux-amd64.tar.gz
 
