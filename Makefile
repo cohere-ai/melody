@@ -5,19 +5,12 @@ ARCH := $(shell uname -m)
 #--------------------
 # GOLANG THINGS
 #--------------------
-
-install-tokenizers:
-	@echo "-- installing libtokenizers.a at ./go-bindings/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a..."
-	@curl -fsSL https://github.com/cohere-ai/tokenizers/releases/download/${TOKENIZERS_VERSION}/libtokenizers.${UNAME}-${ARCH}.tar.gz | tar xvz
-	@mv libtokenizers.a go-bindings/vendor/github.com/cohere-ai/tokenizers/
-	@echo "-- installed libtokenizers.a"
-
-check-install-tokenizers:
-	@if [ ! -e "./go-bindings/vendor/github.com/cohere-ai/tokenizers/libtokenizers.a" ]; then \
-  		$(MAKE) install-tokenizers; \
+check-build-with-tokenizers:
+	@if [ ! -e "./target/release/libcohere_melody.a" ]; then \
+  		$(MAKE) rust-build-with-tokenizers; \
 	fi;
 
-golang-bindings-test: check-install-tokenizers rust-build
+golang-bindings-test: check-build-with-tokenizers
 	cd go-bindings && go test -v ./...
 
 # we kind of assume that you're running this on a macOS machine - it just builds locally
@@ -64,6 +57,8 @@ rust-format:
 rust-build:
 	cargo clean && cargo build --release
 
+rust-build-with-tokenizers:
+	cargo clean && cargo build --release --features tkzrs
 
 #--------------------
 # PYTHON THINGS

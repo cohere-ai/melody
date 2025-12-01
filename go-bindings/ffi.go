@@ -1,6 +1,6 @@
 package melody
 
-// #cgo LDFLAGS: -L${SRCDIR}/../target/release -lcohere_melody
+// #cgo LDFLAGS: ${SRCDIR}/../target/release/libcohere_melody.a -ldl -lm -lstdc++
 // #include <stdlib.h>
 // #include "melody.h"
 import "C"

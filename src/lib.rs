@@ -18,6 +18,9 @@ pub mod ffi;
 #[cfg(feature = "python_ffi")]
 mod python_ffi;
 
+#[cfg(feature = "tkzrs")]
+pub mod tokenizers;
+
 #[cfg(test)]
 mod tests;
 
