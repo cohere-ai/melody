@@ -74,9 +74,6 @@ jobs:
             ${{ steps.go-env.outputs.GOMODCACHE }}
           key: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.GOVERSION }}-${{ hashFiles('go.mod') }}
 
-      - name: Install tokenizers
-        run: make install-tokenizers
-
       - name: Run Go tests
         run: |
           go env -w GOPRIVATE=github.com/cohere-ai
