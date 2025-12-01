@@ -19,8 +19,9 @@ pub struct Buffer {
     len: usize,
 }
 
+#[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
-pub extern "C" fn from_bytes(
+pub unsafe extern "C" fn from_bytes(
     bytes: *const u8,
     len: u32,
     opts: &TokenizerOptions,
@@ -31,9 +32,10 @@ pub extern "C" fn from_bytes(
     Box::into_raw(Box::new(tokenizer))
 }
 
-// TODO merge with from_bytes and pass truncation params as an argument to TokenizerOptions
+/// TODO merge with `from_bytes` and pass truncation params as an argument to `TokenizerOptions`
+#[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
-pub extern "C" fn from_bytes_with_truncation(
+pub unsafe extern "C" fn from_bytes_with_truncation(
     bytes: *const u8,
     len: u32,
     max_len: usize,
@@ -57,8 +59,9 @@ pub extern "C" fn from_bytes_with_truncation(
     Box::into_raw(Box::new(tokenizer))
 }
 
+#[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
-pub extern "C" fn from_file(config: *const libc::c_char) -> *mut libc::c_void {
+pub unsafe extern "C" fn from_file(config: *const libc::c_char) -> *mut libc::c_void {
     let config_cstr = unsafe { CStr::from_ptr(config) };
     let config = config_cstr.to_str().unwrap();
     let config = PathBuf::from(config);
@@ -82,8 +85,9 @@ pub struct EncodeOptions {
     return_offsets: bool,
 }
 
+#[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
-pub extern "C" fn encode(
+pub unsafe extern "C" fn encode(
     ptr: *mut libc::c_void,
     message: *const libc::c_char,
     options: &EncodeOptions,
@@ -179,8 +183,9 @@ pub extern "C" fn encode(
     }
 }
 
+#[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
-pub extern "C" fn decode(
+pub unsafe extern "C" fn decode(
     ptr: *mut libc::c_void,
     ids: *const u32,
     len: u32,
@@ -204,8 +209,9 @@ pub extern "C" fn decode(
     }
 }
 
+#[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
-pub extern "C" fn vocab_size(ptr: *mut libc::c_void) -> u32 {
+pub unsafe extern "C" fn vocab_size(ptr: *mut libc::c_void) -> u32 {
     let tokenizer: &Tokenizer;
     unsafe {
         tokenizer = ptr
@@ -213,7 +219,7 @@ pub extern "C" fn vocab_size(ptr: *mut libc::c_void) -> u32 {
             .as_ref()
             .expect("failed to cast tokenizer");
     }
-    tokenizer.get_vocab_size(true) as u32
+    u32::try_from(tokenizer.get_vocab_size(true)).unwrap()
 }
 
 #[unsafe(no_mangle)]
@@ -263,8 +269,9 @@ pub extern "C" fn free_buffer(buf: Buffer) {
     }
 }
 
+#[allow(clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
-pub extern "C" fn free_string(ptr: *mut libc::c_char) {
+pub unsafe extern "C" fn free_string(ptr: *mut libc::c_char) {
     if ptr.is_null() {
         return;
     }
