@@ -20,7 +20,11 @@ pub struct Buffer {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn from_bytes(bytes: *const u8, len: u32, opts: &TokenizerOptions) -> *mut Tokenizer {
+pub extern "C" fn from_bytes(
+    bytes: *const u8,
+    len: u32,
+    opts: &TokenizerOptions,
+) -> *mut Tokenizer {
     let bytes_slice = unsafe { std::slice::from_raw_parts(bytes, len as usize) };
     let mut tokenizer = Tokenizer::from_bytes(bytes_slice).expect("failed to create tokenizer");
     tokenizer.set_encode_special_tokens(opts.encode_special_tokens);
@@ -29,11 +33,16 @@ pub extern "C" fn from_bytes(bytes: *const u8, len: u32, opts: &TokenizerOptions
 
 // TODO merge with from_bytes and pass truncation params as an argument to TokenizerOptions
 #[unsafe(no_mangle)]
-pub extern "C" fn from_bytes_with_truncation(bytes: *const u8, len: u32, max_len: usize, dir: u8) -> *mut Tokenizer {
+pub extern "C" fn from_bytes_with_truncation(
+    bytes: *const u8,
+    len: u32,
+    max_len: usize,
+    dir: u8,
+) -> *mut Tokenizer {
     let bytes_slice = unsafe { std::slice::from_raw_parts(bytes, len as usize) };
     let tokenizer: Tokenizer = Tokenizer::from_bytes(bytes_slice)
         .expect("failed to create tokenizer")
-        .with_truncation(Some(tokenizers::tokenizer::TruncationParams{
+        .with_truncation(Some(tokenizers::tokenizer::TruncationParams {
             max_length: max_len,
             direction: match dir {
                 0 => tokenizers::tokenizer::TruncationDirection::Left,
@@ -41,7 +50,10 @@ pub extern "C" fn from_bytes_with_truncation(bytes: *const u8, len: u32, max_len
                 _ => panic!("invalid truncation direction"),
             },
             ..Default::default()
-        })).unwrap().to_owned().into();
+        }))
+        .unwrap()
+        .to_owned()
+        .into();
     Box::into_raw(Box::new(tokenizer))
 }
 
@@ -55,9 +67,7 @@ pub extern "C" fn from_file(config: *const libc::c_char) -> *mut libc::c_void {
             let ptr = Box::into_raw(Box::new(tokenizer));
             ptr.cast()
         }
-        Err(_) => {
-            ptr::null_mut()
-        }
+        Err(_) => ptr::null_mut(),
     }
 }
 
@@ -73,18 +83,35 @@ pub struct EncodeOptions {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn encode(ptr: *mut libc::c_void, message: *const libc::c_char, options: &EncodeOptions) -> Buffer {
+pub extern "C" fn encode(
+    ptr: *mut libc::c_void,
+    message: *const libc::c_char,
+    options: &EncodeOptions,
+) -> Buffer {
     let tokenizer: &Tokenizer;
     unsafe {
-        tokenizer = ptr.cast::<Tokenizer>().as_ref().expect("failed to cast tokenizer");
+        tokenizer = ptr
+            .cast::<Tokenizer>()
+            .as_ref()
+            .expect("failed to cast tokenizer");
     }
     let message_cstr = unsafe { CStr::from_ptr(message) };
     let message = message_cstr.to_str();
     if message.is_err() {
-        return Buffer { ids: ptr::null_mut(), tokens: ptr::null_mut(), len: 0, type_ids: ptr::null_mut(), special_tokens_mask: ptr::null_mut(), attention_mask: ptr::null_mut() , offsets: ptr::null_mut()};
+        return Buffer {
+            ids: ptr::null_mut(),
+            tokens: ptr::null_mut(),
+            len: 0,
+            type_ids: ptr::null_mut(),
+            special_tokens_mask: ptr::null_mut(),
+            attention_mask: ptr::null_mut(),
+            offsets: ptr::null_mut(),
+        };
     }
 
-    let encoding = tokenizer.encode(message.unwrap(), options.add_special_tokens).expect("failed to encode input");
+    let encoding = tokenizer
+        .encode(message.unwrap(), options.add_special_tokens)
+        .expect("failed to encode input");
     let mut vec_ids = encoding.get_ids().to_vec();
     vec_ids.shrink_to_fit();
     let ids = vec_ids.as_mut_ptr();
@@ -101,8 +128,10 @@ pub extern "C" fn encode(ptr: *mut libc::c_void, message: *const libc::c_char, o
 
     let mut tokens: *mut *mut libc::c_char = ptr::null_mut();
     if options.return_tokens {
-        let mut vec_tokens = encoding.get_tokens()
-            .to_vec().into_iter()
+        let mut vec_tokens = encoding
+            .get_tokens()
+            .to_vec()
+            .into_iter()
             .map(|s| std::ffi::CString::new(s).unwrap().into_raw())
             .collect::<Vec<_>>();
         vec_tokens.shrink_to_fit();
@@ -139,18 +168,36 @@ pub extern "C" fn encode(ptr: *mut libc::c_void, message: *const libc::c_char, o
         std::mem::forget(vec_offsets);
     }
 
-    Buffer { ids, type_ids, special_tokens_mask, attention_mask, tokens, offsets, len }
+    Buffer {
+        ids,
+        type_ids,
+        special_tokens_mask,
+        attention_mask,
+        tokens,
+        offsets,
+        len,
+    }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn decode(ptr: *mut libc::c_void, ids: *const u32, len: u32, skip_special_tokens: bool) -> *mut libc::c_char {
+pub extern "C" fn decode(
+    ptr: *mut libc::c_void,
+    ids: *const u32,
+    len: u32,
+    skip_special_tokens: bool,
+) -> *mut libc::c_char {
     let tokenizer: &Tokenizer;
     unsafe {
-        tokenizer = ptr.cast::<Tokenizer>().as_ref().expect("failed to cast tokenizer");
+        tokenizer = ptr
+            .cast::<Tokenizer>()
+            .as_ref()
+            .expect("failed to cast tokenizer");
     }
     let ids_slice = unsafe { std::slice::from_raw_parts(ids, len as usize) };
 
-    let string = tokenizer.decode(ids_slice, skip_special_tokens).expect("failed to decode input");
+    let string = tokenizer
+        .decode(ids_slice, skip_special_tokens)
+        .expect("failed to decode input");
     match std::ffi::CString::new(string) {
         Ok(c_string) => c_string.into_raw(),
         Err(_) => ptr::null_mut(),
@@ -161,7 +208,10 @@ pub extern "C" fn decode(ptr: *mut libc::c_void, ids: *const u32, len: u32, skip
 pub extern "C" fn vocab_size(ptr: *mut libc::c_void) -> u32 {
     let tokenizer: &Tokenizer;
     unsafe {
-        tokenizer = ptr.cast::<Tokenizer>().as_ref().expect("failed to cast tokenizer");
+        tokenizer = ptr
+            .cast::<Tokenizer>()
+            .as_ref()
+            .expect("failed to cast tokenizer");
     }
     tokenizer.get_vocab_size(true) as u32
 }
@@ -200,7 +250,7 @@ pub extern "C" fn free_buffer(buf: Buffer) {
     }
     if !buf.offsets.is_null() {
         unsafe {
-            Vec::from_raw_parts(buf.offsets, buf.len*2, buf.len*2);
+            Vec::from_raw_parts(buf.offsets, buf.len * 2, buf.len * 2);
         }
     }
     if !buf.tokens.is_null() {
@@ -208,7 +258,7 @@ pub extern "C" fn free_buffer(buf: Buffer) {
             let strings = Vec::from_raw_parts(buf.tokens, buf.len, buf.len);
             for s in strings {
                 drop(std::ffi::CString::from_raw(s.cast::<libc::c_char>()));
-            }   
+            }
         }
     }
 }
