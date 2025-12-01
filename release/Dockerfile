@@ -6,7 +6,7 @@ WORKDIR /workspace
 COPY ./src ./src
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
-RUN cargo build --release
+RUN cargo build --release --features tkzrs
 
 FROM golang:1.25 as builder-go
 ARG TARGETPLATFORM
@@ -15,10 +15,11 @@ COPY ./release/go.mod   .
 COPY ./release/main.go  .
 COPY ./go-bindings/*.go ./go-bindings/
 COPY ./go-bindings/melody.h ./go-bindings/
+COPY ./go-bindings/tokenizers/* ./go-bindings/tokenizers/
 COPY --from=builder-rust \
-    /workspace/target/release/libcohere_melody.* \
+    /workspace/target/release/libcohere_melody.a \
     ./target/release/
 # Run a simple test (see release/main.go)
-RUN LD_LIBRARY_PATH=/workspace/target/release:$LD_LIBRARY_PATH go run .
+RUN go run .
 # gzip the release to be extracted later with `docker run ... cp ...`
 RUN cd target/release && tar -czf ../../libcohere_melody.linux.tar.gz libcohere_melody.*

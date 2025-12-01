@@ -15,7 +15,7 @@ golang-bindings-test: check-build-with-tokenizers
 
 # we kind of assume that you're running this on a macOS machine - it just builds locally
 release-darwin-%:
-	cargo build --release --target $*-apple-darwin
+	cargo build --release --target $*-apple-darwin --features tkzrs
 	mkdir -p artifacts/darwin-$*
 	cp target/$*-apple-darwin/release/libcohere_melody.* artifacts/darwin-$*
 	cd artifacts/darwin-$* && \
