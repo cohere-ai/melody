@@ -16,6 +16,7 @@ COPY ./release/main.go  .
 COPY ./go-bindings/*.go ./go-bindings/
 COPY ./go-bindings/melody.h ./go-bindings/
 COPY ./go-bindings/tokenizers/* ./go-bindings/tokenizers/
+COPY ./go-bindings/data/bert-base-uncased.json ./go-bindings/data/
 COPY --from=builder-rust \
     /workspace/target/release/libcohere_melody.a \
     ./target/release/
