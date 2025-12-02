@@ -1,4 +1,4 @@
-package melody_test
+package gobindings_test
 
 import (
 	"strings"
@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/cohere-ai/melody/go-bindings"
-	"github.com/cohere-ai/melody/go-bindings/tokenizers"
+	"github.com/cohere-ai/melody/gobindings"
+	"github.com/cohere-ai/melody/gobindings/tokenizers"
 )
 
 //go:embed data/multilingual+255k+bos+eos+sptok+fim+agents3.json

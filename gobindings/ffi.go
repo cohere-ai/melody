@@ -1,4 +1,4 @@
-package melody
+package gobindings
 
 // #cgo LDFLAGS: ${SRCDIR}/../target/release/libcohere_melody.a -ldl -lm -lstdc++
 // #include <stdlib.h>

@@ -51,11 +51,11 @@ jobs:
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           cache: false
-          go-version-file: go-bindings/go.mod
+          go-version-file: go.mod
 
       - name: Get Go environment
         id: go-env
-        working-directory: go-bindings/
+        working-directory: ./
         run: |
           GOCACHE="$(go env GOCACHE)"
           GOMODCACHE="$(go env GOMODCACHE)"
@@ -77,5 +77,4 @@ jobs:
       - name: Run Go tests
         run: |
           go env -w GOPRIVATE=github.com/cohere-ai
-          export LD_LIBRARY_PATH=$(pwd)/target/release
-          cd go-bindings && go test ./...
+          go test ./gobindings/...

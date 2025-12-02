@@ -1,4 +1,4 @@
-package melody
+package gobindings
 
 // TokenIDsWithLogProb pairs tokens with their log probabilities
 type TokenIDsWithLogProb struct {

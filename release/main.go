@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	melody "github.com/cohere-ai/melody/release/go-bindings"
-	"github.com/cohere-ai/melody/release/go-bindings/tokenizers"
+	melody "github.com/cohere-ai/melody/release/gobindings"
+	"github.com/cohere-ai/melody/release/gobindings/tokenizers"
 )
 // main is a test function to ensure the release build is minimally
 // functional (mostly that it's importable and callable). This gets run from
@@ -16,7 +16,7 @@ func main() {
         fmt.Println(output.Text)
     }
 
-    tk, err := tokenizers.FromFile("./go-bindings/data/bert-base-uncased.json")
+    tk, err := tokenizers.FromFile("./gobindings/data/bert-base-uncased.json")
     if err != nil {
         panic(err)
     }
