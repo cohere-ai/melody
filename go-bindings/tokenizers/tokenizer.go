@@ -3,7 +3,7 @@ package tokenizers
 // TODO packaging: how do we build the rust lib for distribution?
 
 /*
-#cgo LDFLAGS: ${SRCDIR}/libtokenizers.a -ldl -lm -lstdc++
+#cgo LDFLAGS: ${SRCDIR}/../../target/release/libcohere_melody.a -ldl -lm -lstdc++
 #include <stdlib.h>
 #include "tokenizers.h"
 */

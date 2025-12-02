@@ -3,15 +3,23 @@ package melody_test
 import (
 	"strings"
 	"testing"
+	_ "embed"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/cohere-ai/melody/go-bindings"
-	"github.com/cohere-ai/melody/go-bindings/_internal/tokenizers"
+	"github.com/cohere-ai/melody/go-bindings/tokenizers"
 )
+
+//go:embed data/multilingual+255k+bos+eos+sptok+fim+agents3.json
+var tokenizerCommand3 []byte
 
 func TestFilter_Command3(t *testing.T) {
 	t.Parallel()
+
+
+    tkzr, err := tokenizers.FromBytes(tokenizerCommand3)
+    require.NoError(t, err)
 
 	// for simplicity's sake lets just generate likelihoods in intervals of thousandths
 	testLikelihoods := make([]float32, 999)
@@ -117,10 +125,7 @@ func TestFilter_Command3(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tkzr, err := tokenizers.GetTokenizer("multilingual+255k+bos+eos+sptok+fim+agents3")
-			require.NoError(t, err)
-			tokens, err := tkzr.EncodeUint32(tt.input, tokenizers.NoSpecialTokens())
-			require.NoError(t, err)
+			tokens, _ := tkzr.Encode(tt.input, false)
 
 			var textChunks []string
 			var buffer []uint32
@@ -128,8 +133,7 @@ func TestFilter_Command3(t *testing.T) {
 			var likelihoodBuffer []float32
 			for i, token := range tokens {
 				buffer = append(buffer, token)
-				decoded, err := tkzr.DecodeUint32(buffer, false)
-				require.NoError(t, err)
+				decoded := tkzr.Decode(buffer, false)
 				likelihoodBuffer = append(likelihoodBuffer, tt.likelihoods[i])
 				if strings.HasSuffix(decoded, "\ufffd") {
 					continue

@@ -1,13 +1,15 @@
 [package]
 name = "melody-parsing"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 
 [dependencies]
 serde_json = "1.0"
 regex = "1.10"
 log = "0.4"
-pyo3 = { version = "0.27.1", features = ["extension-module"], optional = true}
+pyo3 = { version = "0.27.1", features = ["extension-module"], optional = true }
+tokenizers = { version = "0.20.0", optional = true }
+libc = {  version = "0.2.140", optional = true}
 
 [dev-dependencies]
 env_logger = "0.11"
@@ -16,12 +18,13 @@ tokenizers = { version = "0.22.1", features = ["http"] }
 [lib]
 name = "cohere_melody"
 path = "src/lib.rs"
-crate-type = ["rlib", "cdylib", "staticlib"]
+crate-type = ["rlib", "staticlib"]
 
 [features]
 default = ["ffi"]
 ffi = []
 python_ffi = ["pyo3"]
+tkzrs = ["tokenizers", "libc"]
 
 [lints.clippy]
 pedantic = "warn"
