@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/cohere-ai/melody/gobindings"
+	melody "github.com/cohere-ai/melody/gobindings"
 	"github.com/cohere-ai/melody/gobindings/tokenizers"
 )
 
