@@ -7,7 +7,8 @@ import (
 	"github.com/cohere-ai/melody/release/go-bindings/tokenizers"
 )
 // main is a test function to ensure the release build is minimally
-// functional (mostly that it's importable and callable)
+// functional (mostly that it's importable and callable). This gets run from
+// the release Dockerfile before finishing the build to ensure it works.
 func main() {
     filter := melody.NewFilter()
     fo := filter.WriteDecoded("Hello", nil)
