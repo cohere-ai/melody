@@ -1,47 +1,124 @@
+//! Core filtering logic and state machine implementation
+//!
+//! This module contains the main filter implementation that processes streaming tokens
+//! and extracts structured information.
+
 use crate::FilterOptions;
 use crate::action_filter::FilterAction;
 use crate::types::{FilterMode, FilterOutput, FilterSearchQueryDelta, TokenIDsWithLogProb};
 use std::collections::HashMap;
 
-/// Filter is the interface used to parse the output of a cohere model.
+/// Core trait for streaming token parsers.
+///
+/// This trait defines the interface for processing decoded tokens from the model
+/// and extracting structured outputs. Implementations maintain internal state to handle
+/// partial tokens and mode transitions.
+///
+/// # Examples
+///
+/// ```rust
+/// use cohere_melody::{Filter, FilterOptions, new_filter, TokenIDsWithLogProb};
+///
+/// let options = FilterOptions::new();
+/// let mut filter = new_filter(options);
+///
+/// // Process tokens one at a time
+/// let outputs = filter.write_decoded("Hello", TokenIDsWithLogProb::new());
+/// let outputs = filter.write_decoded(" world", TokenIDsWithLogProb::new());
+///
+/// // Flush any buffered content at the end
+/// let final_outputs = filter.flush_partials();
+/// ```
 pub trait Filter {
+    /// Process a decoded token and return any completed outputs.
+    ///
+    /// This method is called for each token string as it's decoded from the model. It may
+    /// return zero or more `FilterOutput` instances depending on what structured
+    /// content is found.
+    ///
+    /// # Arguments
+    ///
+    /// * `decoded_token` - The decoded text for this token
+    /// * `prob` - Token IDs and log probabilities for this token
+    ///
+    /// # Returns
+    ///
+    /// A vector of parsed outputs (may be empty if content is still buffered)
     fn write_decoded(
         &mut self,
         decoded_token: &str,
         prob: TokenIDsWithLogProb,
     ) -> Vec<FilterOutput>;
+
+    /// Flush any buffered partial outputs.
+    ///
+    /// This should be called at the end of generation to output any content that
+    /// was buffered waiting for special tokens or complete structures.
+    ///
+    /// # Returns
+    ///
+    /// Any remaining buffered outputs
     fn flush_partials(&mut self) -> Vec<FilterOutput>;
 }
 
+/// Main implementation of the streaming filter state machine.
+///
+/// This struct maintains all the state needed to incrementally parse token streams,
+/// including:
+/// - Current parsing mode and mode transitions
+/// - Buffered content waiting for complete structures
+/// - Position tracking for citations
+/// - Configuration options
+///
+/// # Implementation Notes
+///
+/// The filter operates as a state machine that:
+/// 1. Buffers incoming tokens until they form complete UTF-8 sequences
+/// 2. Checks for special tokens that trigger mode transitions
+/// 3. Processes content based on the current mode
+/// 4. Outputs structured results when complete chunks are available
+///
+/// # Internal State
+///
+/// This struct contains many fields to track various aspects of parsing. Users should
+/// not create instances directly; use `new_filter()` instead.
 #[allow(clippy::struct_excessive_bools)]
 pub struct FilterImpl {
+    // Trimming configuration
     pub(crate) left_trimmed: bool,
     pub(crate) right_trimmed: bool,
 
+    // Mode and special token configuration
     pub(crate) default_mode: FilterMode,
     pub(crate) special_token_map: HashMap<String, FilterMode>,
     pub(crate) stream_non_grounded_answer: bool,
     pub(crate) stream_tool_actions: bool,
     pub(crate) stream_processed_params: bool,
 
+    // Raw parameter parsing state
     pub(crate) raw_param_indent_length_removed: usize,
     pub(crate) saw_non_whitespace_in_current_line: bool,
 
+    // Citation tracking
     pub(crate) cur_text_index: usize,
     pub(crate) cur_text_byte_index: usize,
     pub(crate) cur_citation_byte_index: Option<usize>,
     pub(crate) action_metadata: FilterAction,
 
+    // Search query tracking
     pub(crate) curr_search_query_idx: usize,
     pub(crate) sent_curr_index: bool,
 
+    // Format flags
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
 
+    // Chunking configuration
     pub(crate) chunk_size: usize,
     pub(crate) num_tokens_in_chunk: usize,
     pub(crate) chunk_log_probs: TokenIDsWithLogProb,
 
+    // Buffering state
     pub(crate) buf: Vec<u8>,
     pub(crate) partial_special_token_log_prob: TokenIDsWithLogProb,
     pub(crate) mode: FilterMode,
@@ -425,7 +502,6 @@ impl Filter for FilterImpl {
     }
 }
 
-/// Find partial returns first index in str that might match one of stop sequences.
 pub(crate) fn find_partial<'a>(
     s: &str,
     stops: impl Iterator<Item = &'a String>,

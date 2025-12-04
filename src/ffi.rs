@@ -1,4 +1,25 @@
-//! FFI bindings for the melody parsing library for Go
+//! C Foreign Function Interface (FFI) bindings
+//!
+//! This module provides C-compatible bindings for the Melody parsing library,
+//! primarily intended for use from Go but compatible with any language that can
+//! call C functions.
+//!
+//! # Memory Management
+//!
+//! **Critical**: All pointers returned by this API must be freed using the
+//! corresponding `_free` functions. Failure to do so will result in memory leaks.
+//!
+//! # Ownership Rules
+//!
+//! - Pointers returned by `_new` functions: **Caller owns**, must call `_free`
+//! - Pointers returned by `write_decoded` and `flush_partials`: **Caller owns**, must call `melody_filter_output_array_free`
+//! - Pointers passed as arguments: **Caller retains ownership**, must remain valid for call duration
+//!
+//! # Thread Safety
+//!
+//! Filter instances are NOT thread-safe. Each filter must be used by only one
+//! thread at a time, or protected by external synchronization.
+//!
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;

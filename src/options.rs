@@ -1,7 +1,28 @@
+//! Configuration options for creating filters
+//!
+//! This module provides the `FilterOptions` builder for configuring filter behavior.
+
 use crate::filter::FilterImpl;
 use crate::types::FilterMode;
 use std::collections::HashMap;
 
+/// Configuration builder for creating filters.
+///
+/// This struct uses the builder pattern to configure filter behavior before creating
+/// a `FilterImpl` instance. It supports preset configurations for different Cohere
+/// model output formats (Command 3, Command 4, etc.) as well as fine-grained control.
+///
+/// # Examples
+///
+/// ## Using presets
+///
+/// ```rust
+/// use cohere_melody::{FilterOptions, new_filter};
+///
+/// // Use Command 3 preset configuration
+/// let options = FilterOptions::new().cmd3();
+/// let filter = new_filter(options);
+/// ```
 #[derive(Clone)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct FilterOptions {
@@ -44,8 +65,33 @@ impl FilterOptions {
         Self::default()
     }
 
-    // PUBLIC OPTIONS
+    // PRESET CONFIGURATIONS
 
+    /// Configure for Cohere Command 3 model format.
+    ///
+    /// Command 3 is a structured output format that uses special tokens to delimit
+    /// different sections of the response:
+    /// - `<|START_RESPONSE|>`: Begin grounded answer
+    /// - `<|END_RESPONSE|>`: End response
+    /// - `<|START_THINKING|>`: Begin reasoning block
+    /// - `<|END_THINKING|>`: End reasoning block
+    /// - `<|START_ACTION|>`: Begin tool call
+    /// - `<|END_ACTION|>`: End tool call
+    ///
+    /// This preset enables:
+    /// - Grounded answer parsing with citations (Command 3 citation format)
+    /// - Tool action streaming
+    /// - Right trimming
+    /// - Tool call ID support
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::{FilterOptions, new_filter};
+    ///
+    /// let options = FilterOptions::new().cmd3();
+    /// let mut filter = new_filter(options);
+    /// ```
     #[must_use]
     pub fn cmd3(mut self) -> Self {
         self.default_mode = FilterMode::GroundedAnswer;
@@ -68,6 +114,22 @@ impl FilterOptions {
         self
     }
 
+    /// Configure for Cohere Command 4 model format.
+    ///
+    /// Command 4 is similar to Command 3 but uses slightly different special tokens:
+    /// - `<|START_TEXT|>`: Begin grounded answer (instead of START_RESPONSE)
+    /// - `<|END_TEXT|>`: End text (instead of END_RESPONSE)
+    ///
+    /// All other special tokens and behavior are the same as Command 3.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::{FilterOptions, new_filter};
+    ///
+    /// let options = FilterOptions::new().cmd4();
+    /// let mut filter = new_filter(options);
+    /// ```
     #[must_use]
     pub fn cmd4(mut self) -> Self {
         self.default_mode = FilterMode::GroundedAnswer;
@@ -90,12 +152,46 @@ impl FilterOptions {
         self
     }
 
+    /// Add inclusive stop sequences.
+    ///
+    /// Inclusive stops will halt parsing when encountered, but the stop sequence
+    /// itself will be included in the output.
+    ///
+    /// # Arguments
+    ///
+    /// * `stops` - Vector of stop sequences to recognize
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::FilterOptions;
+    ///
+    /// let options = FilterOptions::new()
+    ///     .with_inclusive_stops(vec!["DONE".to_string()]);
+    /// ```
     #[must_use]
     pub fn with_inclusive_stops(mut self, stops: Vec<String>) -> Self {
         self.inclusive_stops = stops;
         self
     }
 
+    /// Add exclusive stop sequences.
+    ///
+    /// Exclusive stops will halt parsing when encountered, and the stop sequence
+    /// will NOT be included in the output.
+    ///
+    /// # Arguments
+    ///
+    /// * `stops` - Vector of stop sequences to recognize
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::FilterOptions;
+    ///
+    /// let options = FilterOptions::new()
+    ///     .with_exclusive_stops(vec!["</output>".to_string()]);
+    /// ```
     #[must_use]
     pub fn with_exclusive_stops(mut self, stops: Vec<String>) -> Self {
         self.exclusive_stops = stops;
