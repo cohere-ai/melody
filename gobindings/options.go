@@ -1,4 +1,4 @@
-package melody
+package gobindings
 
 // FilterOption is a function that configures a filter
 type FilterOption func(*filterConfig)

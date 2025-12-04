@@ -13,14 +13,14 @@ ARG TARGETPLATFORM
 WORKDIR /workspace
 COPY ./release/go.mod   .
 COPY ./release/main.go  .
-COPY ./go-bindings/*.go ./go-bindings/
-COPY ./go-bindings/melody.h ./go-bindings/
-COPY ./go-bindings/tokenizers/* ./go-bindings/tokenizers/
-COPY ./go-bindings/data/bert-base-uncased.json ./go-bindings/data/
+COPY ./gobindings/*.go ./gobindings/
+COPY ./gobindings/melody.h ./gobindings/
+COPY ./gobindings/tokenizers/* ./gobindings/tokenizers/
+COPY ./gobindings/data/bert-base-uncased.json ./gobindings/data/
 COPY --from=builder-rust \
     /workspace/target/release/libcohere_melody.a \
     ./target/release/
 # Run a simple test (see release/main.go)
 RUN go run .
 # gzip the release to be extracted later with `docker run ... cp ...`
-RUN cd target/release && tar -czf ../../libcohere_melody.linux.tar.gz libcohere_melody.*
+RUN cd target/release && tar -czf ../../libcohere_melody.linux.tar.gz libcohere_melody.a

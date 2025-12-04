@@ -1,4 +1,4 @@
-package melody
+package gobindings
 
 // Filter is the interface used to parse the output of a cohere model
 type Filter interface {
