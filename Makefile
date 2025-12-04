@@ -20,7 +20,7 @@ release-darwin-%:
 	cp target/$*-apple-darwin/release/libcohere_melody.* artifacts/darwin-$*
 	cd artifacts/darwin-$* && \
 		rm -f libcohere_melody.darwin-$*.tar.gz && \
-		tar -czf libcohere_melody.darwin-$*.tar.gz libcohere_melody.*
+		tar -czf libcohere_melody.darwin-$*.tar.gz libcohere_melody.a
 	mkdir -p artifacts/all
 	cp artifacts/darwin-$*/libcohere_melody.darwin-$*.tar.gz artifacts/all/libcohere_melody.darwin-$*.tar.gz
 
