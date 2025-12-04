@@ -17,7 +17,7 @@ const START_FIRST_CIT_CMD3: &str = "<co";
 impl FilterImpl {
     /// Process text response, extracting citations.
     ///
-    /// This method is called when in GroundedAnswer or ToolReason mode. It parses
+    /// This method is called when in `GroundedAnswer` or `ToolReason` mode. It parses
     /// the text stream looking for citation markers and extracts both the text
     /// and source attribution.
     ///
@@ -25,12 +25,12 @@ impl FilterImpl {
     ///
     /// * `bstr` - Byte string to process
     /// * `after_last_token` - Whether this is the final flush (affects buffering)
-    /// * `mode` - Current filter mode (GroundedAnswer or ToolReason)
+    /// * `mode` - Current filter mode (`GroundedAnswer` or `ToolReason`)
     /// * `token_log_probs` - Optional log probabilities for these tokens
     ///
     /// # Returns
     ///
-    /// A tuple of (outputs, bytes_consumed) where bytes_consumed indicates how
+    /// A tuple of (outputs, `bytes_consumed`) where `bytes_consumed` indicates how
     /// many bytes from bstr were processed and can be removed from the buffer.
     pub(crate) fn process_grounded_text(
         &mut self,

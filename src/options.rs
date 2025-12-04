@@ -117,8 +117,8 @@ impl FilterOptions {
     /// Configure for Cohere Command 4 model format.
     ///
     /// Command 4 is similar to Command 3 but uses slightly different special tokens:
-    /// - `<|START_TEXT|>`: Begin grounded answer (instead of START_RESPONSE)
-    /// - `<|END_TEXT|>`: End text (instead of END_RESPONSE)
+    /// - `<|START_TEXT|>`: Begin grounded answer (instead of `START_RESPONSE`)
+    /// - `<|END_TEXT|>`: End text (instead of `END_RESPONSE`)
     ///
     /// All other special tokens and behavior are the same as Command 3.
     ///

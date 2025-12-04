@@ -30,15 +30,15 @@ static PARAM_NAME_REGEX: LazyLock<Regex> =
 ///
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ActionMode {
-    /// Initial state, looking for tool_call_id or tool_name
+    /// Initial state, looking for `tool_call_id` or `tool_name`
     NotStarted,
-    /// Inside tool_call_id value
+    /// Inside `tool_call_id` value
     ToolCallID,
-    /// After tool_call_id closing quote
+    /// After `tool_call_id` closing quote
     ToolCallIDEnd,
-    /// Inside tool_name value
+    /// Inside `tool_name` value
     ToolName,
-    /// After tool_name closing quote
+    /// After `tool_name` closing quote
     ToolNameEnd,
     /// Inside parameter name
     ParamName,
@@ -50,7 +50,7 @@ pub(crate) enum ActionMode {
     ParamNameEnd,
     /// After parameter value
     ParamValueEnd,
-    /// Parsing raw parameter JSON (when stream_processed_params is false)
+    /// Parsing raw parameter JSON (when `stream_processed_params` is false)
     RawParam,
 }
 

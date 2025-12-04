@@ -87,7 +87,7 @@
 //!
 //! The library uses a state machine approach to parse token streams:
 //! - `FilterImpl`: Main state machine that processes tokens
-//! - `FilterMode`: Different parsing modes (PlainText, ToolAction, GroundedAnswer, etc.)
+//! - `FilterMode`: Different parsing modes (`PlainText`, `ToolAction`, `GroundedAnswer`, etc.)
 //! - `FilterOptions`: Configuration for the filter behavior
 //! - `FilterOutput`: Structured output containing parsed text, citations, and tool calls
 //!

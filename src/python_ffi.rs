@@ -1,6 +1,6 @@
 //! Python bindings for the Melody parsing library
 //!
-//! This module provides Python bindings using PyO3, allowing the Melody parser
+//! This module provides Python bindings using `PyO3`, allowing the Melody parser
 //! to be used directly from Python code.
 
 use crate::{Filter, FilterImpl, FilterOptions, FilterOutput, TokenIDsWithLogProb, new_filter};
@@ -21,10 +21,10 @@ impl PyFilter {
     /// Create a new filter with the given options.
     ///
     /// Args:
-    ///     opts: PyFilterOptions instance with desired configuration
+    ///     opts: `PyFilterOptions` instance with desired configuration
     ///
     /// Returns:
-    ///     A new PyFilter instance
+    ///     A new `PyFilter` instance
     #[new]
     fn new(opts: &PyFilterOptions) -> Self {
         PyFilter {
@@ -35,10 +35,10 @@ impl PyFilter {
     /// Process a decoded token and return any completed outputs.
     ///
     /// Args:
-    ///     decoded_token: The decoded text for this token
+    ///     `decoded_token`: The decoded text for this token
     ///
     /// Returns:
-    ///     List of FilterOutput objects (may be empty if content is buffered)
+    ///     List of `FilterOutput` objects (may be empty if content is buffered)
     ///
     /// Note:
     ///     Log probabilities are not currently supported in the Python API
@@ -53,7 +53,7 @@ impl PyFilter {
     /// buffered waiting for special tokens.
     ///
     /// Returns:
-    ///     List of remaining FilterOutput objects
+    ///     List of remaining `FilterOutput` objects
     fn flush_partials(&mut self) -> Vec<FilterOutput> {
         self.inner.flush_partials()
     }
@@ -73,7 +73,7 @@ impl PyFilterOptions {
     /// Create a new options instance with default settings.
     ///
     /// Returns:
-    ///     A new PyFilterOptions instance
+    ///     A new `PyFilterOptions` instance
     #[new]
     fn new() -> Self {
         PyFilterOptions {

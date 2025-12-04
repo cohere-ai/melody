@@ -32,7 +32,7 @@ use pyo3::prelude::*;
 pub struct TokenIDsWithLogProb {
     /// Token IDs from the model's vocabulary
     pub token_ids: Vec<u32>,
-    /// Log probability scores for each token (same length as token_ids)
+    /// Log probability scores for each token (same length as `token_ids`)
     pub logprobs: Vec<f32>,
 }
 
@@ -136,8 +136,8 @@ pub struct FilterSearchQueryDelta {
 /// - `index`: Tool call index (for tracking multiple simultaneous tool calls)
 /// - `id`: Tool call ID (may be empty on early updates)
 /// - `name`: Tool name (may be empty on early updates)
-/// - `param_delta`: Structured parameter update (if stream_processed_params is enabled)
-/// - `raw_param_delta`: Raw JSON parameter text (if stream_processed_params is disabled)
+/// - `param_delta`: Structured parameter update (if `stream_processed_params` is enabled)
+/// - `raw_param_delta`: Raw JSON parameter text (if `stream_processed_params` is disabled)
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FilterToolCallDelta {
@@ -210,10 +210,10 @@ pub struct FilterToolParameter {
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 pub struct FilterCitation {
     /// Character index where the citation starts in the overall text output.
-    /// For example, in "Hello world", if "world" is cited, start_index would be 6.
+    /// For example, in "Hello world", if "world" is cited, `start_index` would be 6.
     pub start_index: usize,
     /// Character index where the citation ends (exclusive) in the overall text output.
-    /// For example, in "Hello world", if "world" is cited, end_index would be 11.
+    /// For example, in "Hello world", if "world" is cited, `end_index` would be 11.
     pub end_index: usize,
     /// The actual cited text content
     pub text: String,
