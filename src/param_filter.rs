@@ -114,14 +114,15 @@ impl FilterImpl {
     }
 }
 
-/// Find the index of the first valid json prefix
+/// Find the (byte) index of the first valid json prefix (returns number of bytes)
 pub(crate) fn find_valid_json_value(buffer: &str, s: &str) -> usize {
     let mut whole_str = buffer.to_string();
 
-    for (i, c) in s.chars().enumerate() {
+    for (i, c) in s.char_indices() {
         whole_str.push(c);
         if serde_json::from_str::<serde_json::Value>(&whole_str).is_ok() {
-            return i + 1;
+            // Return the byte index after this character
+            return i + c.len_utf8();
         }
     }
 
