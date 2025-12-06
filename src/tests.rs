@@ -617,6 +617,26 @@ plt.ylabel('Number of Climbers')
     }
 
     #[test]
+    fn test_filter_command3_tool_unicode() {
+        // This test replicates an issue where unicode characters near the end of an action would cause an "index not a char boundary" panic
+        // because find_valid_json_value was not handling multi-byte characters correctly.
+        run_filter_test(FilterTestCase {
+            name: "tool use unicode",
+            input: r##"<|START_ACTION|>[{"tool_call_id": "0", "tool_name": "order_cancel", "parameters": {"order_id": "#W9284598", "reason": "طلبته بالخطأ"}}]<|END_ACTION|>"##.to_string(),
+            options: FilterOptions::new().cmd3().with_chunk_size(10),
+            want_tool_calls: vec![FilterToolCallDelta {
+                index: 0,
+                id: "0".to_string(),
+                name: "order_cancel".to_string(),
+                param_delta: None,
+                raw_param_delta: r##"{"order_id": "#W9284598", "reason": "طلبته بالخطأ"}"##.to_string(),
+            }],
+            want_num_outputs: 5,
+            ..Default::default()
+        })
+    }
+
+    #[test]
     fn test_filter_command3_tool_multiple_calls() {
         run_filter_test(FilterTestCase {
             name: "tool use multiple calls",
