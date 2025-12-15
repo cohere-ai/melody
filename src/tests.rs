@@ -62,7 +62,7 @@ mod tests {
             token_ids: vec![1, 2, 3],
             logprobs: vec![0.1, 0.2, 0.3],
         };
-        let (outputs, remove) = filter.process_grounded_text(
+        let (outputs, _remove) = filter.process_grounded_text(
             input.as_bytes(),
             true,
             FilterMode::GroundedAnswer,
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_filter_options_cmd3() {
-        let options = FilterOptions::new().cmd3();
+        let options: FilterOptions = FilterOptions::new().cmd3();
 
         assert_eq!(options.default_mode, FilterMode::GroundedAnswer);
         assert!(options.right_trimmed);
@@ -478,7 +478,7 @@ mod tests {
                 ],
                 is_thinking: false,
             }],
-            want_likelihoods: vec![0.001, 0.004, 0.005],
+            want_likelihoods: vec![0.001, 0.004, 0.005, 0.024],
             want_num_outputs: 4,
             ..Default::default()
         })
@@ -521,8 +521,8 @@ mod tests {
                 },
             ],
             want_likelihoods: vec![
-                0.001, 0.002, 0.003, 0.004, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.024, 0.027,
-                0.028,
+                0.001, 0.002, 0.003, 0.004, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.02, 0.024, 0.027,
+                0.028, 0.044
             ],
             want_num_outputs: 13,
             ..Default::default()
@@ -547,7 +547,7 @@ mod tests {
                 is_thinking: false,
             }],
             want_likelihoods: vec![
-                0.001, 0.004, 0.005, 0.007, 0.008, 0.009, 0.018, 0.019, 0.02, 0.021, 0.022, 0.024,
+                0.001, 0.004, 0.005, 0.007, 0.008, 0.009, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.024,
                 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035,
             ],
             want_num_outputs: 24,
