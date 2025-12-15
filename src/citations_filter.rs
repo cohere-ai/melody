@@ -44,10 +44,8 @@ impl FilterImpl {
         res_out.is_post_answer = self.stream_non_grounded_answer && mode != FilterMode::ToolReason;
         res_out.is_reasoning = mode == FilterMode::ToolReason;
 
-        // Don't send logprobs for citations if there's no corresponding text.
-        if let Some(probs) = token_log_probs
-            && (res_out.citations.is_empty() || !res_out.text.is_empty())
-        {
+        // TODO revisit how to handle empty citations https://linear.app/cohereai/issue/PTS-8688/melody-align-log-probs-behavior
+        if let Some(probs) = token_log_probs {
             res_out.logprobs = probs.clone();
         }
 

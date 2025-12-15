@@ -52,6 +52,25 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_citation_still_has_logprobs() {
+        let mut filter = FilterImpl::new();
+        filter.stream_non_grounded_answer = true;
+        filter.cur_citation_byte_index = None;
+
+        let input = "<co: 0></co: 0>";
+        let logprobs = TokenIDsWithLogProb {
+            token_ids: vec![1, 2, 3],
+            logprobs: vec![0.1, 0.2, 0.3],
+        };
+        let (outputs, remove) = filter.process_grounded_text(input.as_bytes(), true, FilterMode::GroundedAnswer, Some(&logprobs));
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].text, "");
+        assert_eq!(outputs[0].logprobs.token_ids, vec![1, 2, 3]);
+        assert_eq!(outputs[0].logprobs.logprobs, vec![0.1, 0.2, 0.3]);
+    }
+
+    #[test]
     fn test_citations_multiple() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
