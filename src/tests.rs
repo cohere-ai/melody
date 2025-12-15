@@ -62,7 +62,12 @@ mod tests {
             token_ids: vec![1, 2, 3],
             logprobs: vec![0.1, 0.2, 0.3],
         };
-        let (outputs, remove) = filter.process_grounded_text(input.as_bytes(), true, FilterMode::GroundedAnswer, Some(&logprobs));
+        let (outputs, remove) = filter.process_grounded_text(
+            input.as_bytes(),
+            true,
+            FilterMode::GroundedAnswer,
+            Some(&logprobs),
+        );
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(outputs[0].text, "");
