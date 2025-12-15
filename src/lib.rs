@@ -10,6 +10,7 @@ pub mod types;
 mod action_filter;
 mod citations_filter;
 mod param_filter;
+mod templating;
 
 // FFI bindings for calling from other languages (Go, Python, etc.)
 #[cfg(feature = "ffi")]

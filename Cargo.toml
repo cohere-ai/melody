@@ -1,6 +1,6 @@
 [package]
 name = "melody-parsing"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
 
 [dependencies]
@@ -10,6 +10,7 @@ log = "0.4"
 pyo3 = { version = "0.27.1", features = ["extension-module"], optional = true }
 tokenizers = { version = "0.20.0", optional = true }
 libc = {  version = "0.2.140", optional = true}
+liquid = "0.26.11"
 
 [dev-dependencies]
 env_logger = "0.11"
