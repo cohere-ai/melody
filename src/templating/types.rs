@@ -206,8 +206,11 @@ pub struct ToolCall {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Message {
     pub role: Role,
+    #[serde(default)]
     pub content: Vec<Content>,
+    #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
     pub tool_call_id: Option<String>,
+    #[serde(default)]
     pub additional_fields: BTreeMap<String, serde_json::Value>,
 }
