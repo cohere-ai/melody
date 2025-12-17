@@ -1,11 +1,12 @@
-use std::collections::BTreeMap;
-use std::error::Error;
-use serde_json::{Map, Value};
 use crate::templating::types::*;
 use crate::templating::util::*;
-
+use serde::Deserialize;
+use serde_json::{Map, Value};
+use std::collections::BTreeMap;
+use std::error::Error;
 
 /// Options for cmd3 rendering.
+#[derive(Debug, Clone, Deserialize)]
 pub struct RenderCmd3Options {
     pub template: String,
     pub dev_instruction: Option<String>,
@@ -23,6 +24,7 @@ pub struct RenderCmd3Options {
 }
 
 /// Options for cmd4 rendering.
+#[derive(Debug, Clone, Deserialize)]
 pub struct RenderCmd4Options {
     pub template: String,
     pub dev_instruction: Option<String>,
@@ -37,7 +39,10 @@ pub struct RenderCmd4Options {
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 
-pub fn render_cmd3(messages: &[Message], opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
+pub fn render_cmd3(
+    messages: &[Message],
+    opts: &RenderCmd3Options,
+) -> Result<String, Box<dyn Error>> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(
         messages,
@@ -63,7 +68,10 @@ pub fn render_cmd3(messages: &[Message], opts: &RenderCmd3Options) -> Result<Str
         "documents".to_string(),
         Value::Array(docs.into_iter().map(Value::String).collect()),
     );
-    substitutions.insert("available_tools".to_string(), Value::Array(template_tools.into_iter().map(Value::Object).collect()));
+    substitutions.insert(
+        "available_tools".to_string(),
+        Value::Array(template_tools.into_iter().map(Value::Object).collect()),
+    );
     substitutions.insert(
         "citation_mode".to_string(),
         opts.citation_quality
@@ -111,14 +119,18 @@ pub fn render_cmd3(messages: &[Message], opts: &RenderCmd3Options) -> Result<Str
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
     let template = liquid::ParserBuilder::with_stdlib()
-        .build().unwrap()
+        .build()
+        .unwrap()
         .parse(&opts.template)
         .unwrap();
 
     Ok(template.render(&liquid::object!(&substitutions)).unwrap())
 }
 
-pub fn render_cmd4(messages: &[Message], opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
+pub fn render_cmd4(
+    messages: &[Message],
+    opts: &RenderCmd4Options,
+) -> Result<String, Box<dyn Error>> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(
         messages,
@@ -151,7 +163,10 @@ pub fn render_cmd4(messages: &[Message], opts: &RenderCmd4Options) -> Result<Str
         "documents".to_string(),
         Value::Array(docs.into_iter().map(Value::String).collect()),
     );
-    substitutions.insert("available_tools".to_string(), Value::Array(template_tools.into_iter().map(Value::Object).collect()));
+    substitutions.insert(
+        "available_tools".to_string(),
+        Value::Array(template_tools.into_iter().map(Value::Object).collect()),
+    );
     substitutions.insert(
         "grounding".to_string(),
         opts.grounding
@@ -176,9 +191,75 @@ pub fn render_cmd4(messages: &[Message], opts: &RenderCmd4Options) -> Result<Str
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
     let template = liquid::ParserBuilder::with_stdlib()
-        .build().unwrap()
+        .build()
+        .unwrap()
         .parse(&opts.template)
         .unwrap();
 
     Ok(template.render(&liquid::object!(&substitutions)).unwrap())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::templating::types::*;
+    use serde_json::Value;
+    use std::fs;
+    use std::path::Path;
+
+    fn read_test_cases(version: &str) -> Vec<(String, Value, String)> {
+        let mut cases = vec![];
+        let test_dir = Path::new("tests").join(version);
+        if !test_dir.exists() {
+            return cases;
+        }
+        for entry in fs::read_dir(&test_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_dir() {
+                let input_path = path.join("input.json");
+                let output_path = path.join("output.txt");
+                if input_path.exists() && output_path.exists() {
+                    let input = fs::read_to_string(&input_path).unwrap();
+                    let input_json: Value = serde_json::from_str(&input).unwrap();
+                    let output = fs::read_to_string(&output_path).unwrap();
+                    let test_name = path.file_name().unwrap().to_string_lossy().to_string();
+                    cases.push((test_name, input_json, output));
+                }
+            }
+        }
+        cases
+    }
+
+    #[test]
+    fn test_render_cmd3_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("cmd3") {
+            let messages: Vec<Message> =
+                serde_json::from_value(input_json["messages"].clone()).unwrap();
+            let opts: RenderCmd3Options = serde_json::from_value(input_json.clone()).unwrap();
+            let rendered = render_cmd3(&messages, &opts).unwrap();
+            assert_eq!(
+                rendered.trim(),
+                expected.trim(),
+                "Failed test: {}",
+                test_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_render_cmd4_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("cmd4") {
+            let messages: Vec<Message> =
+                serde_json::from_value(input_json["messages"].clone()).unwrap();
+            let opts: RenderCmd4Options = serde_json::from_value(input_json.clone()).unwrap();
+            let rendered = render_cmd4(&messages, &opts).unwrap();
+            assert_eq!(
+                rendered.trim(),
+                expected.trim(),
+                "Failed test: {}",
+                test_name
+            );
+        }
+    }
 }

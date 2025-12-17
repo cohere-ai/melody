@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
+use serde::Deserialize;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Role {
     Unknown,
     System,
@@ -21,7 +23,8 @@ impl Role {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ContentType {
     Unknown,
     Text,
@@ -40,7 +43,8 @@ impl ContentType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CitationQuality {
     Unknown,
     Off,
@@ -57,7 +61,8 @@ impl CitationQuality {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Grounding {
     Unknown,
     Enabled,
@@ -74,7 +79,8 @@ impl Grounding {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SafetyMode {
     Unknown,
     None,
@@ -93,7 +99,8 @@ impl SafetyMode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ReasoningType {
     Unknown,
     Enabled,
@@ -112,19 +119,19 @@ impl ReasoningType {
 
 pub type Document = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Tool {
     pub name: String,
     pub description: String,
     pub parameters: serde_json::Value,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Image {
     pub template_placeholder: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Content {
     pub content_type: ContentType,
     pub text: Option<String>,
@@ -132,14 +139,14 @@ pub struct Content {
     pub image: Option<Image>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub parameters: serde_json::Value,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Message {
     pub role: Role,
     pub content: Vec<Content>,
@@ -147,4 +154,3 @@ pub struct Message {
     pub tool_call_id: Option<String>,
     pub additional_fields: BTreeMap<String, serde_json::Value>,
 }
-
