@@ -176,6 +176,7 @@ impl TryFrom<String> for ReasoningType {
 pub type Document = String;
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Tool {
     pub name: String,
     pub description: String,
@@ -183,11 +184,13 @@ pub struct Tool {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Image {
     pub template_placeholder: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Content {
     #[serde(rename = "type")]
     pub content_type: ContentType,
@@ -197,6 +200,7 @@ pub struct Content {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolCall {
     pub id: String,
     pub name: String,
@@ -204,6 +208,7 @@ pub struct ToolCall {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Message {
     pub role: Role,
     #[serde(default)]

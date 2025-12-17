@@ -7,7 +7,7 @@
       "content": [
         {
           "type": "text",
-          "data": "Can you check if I have any reminders for the week?"
+          "text": "Can you check if I have any reminders for the week?"
         }
       ]
     },
@@ -16,7 +16,7 @@
       "content": [
         {
           "type": "text",
-          "data": "I will use the GetReminders tool to check if the user has any reminders."
+          "text": "I will use the GetReminders tool to check if the user has any reminders."
         }
       ],
       "tool_calls": [
