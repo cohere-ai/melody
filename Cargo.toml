@@ -12,6 +12,7 @@ tokenizers = { version = "0.20.0", optional = true }
 libc = {  version = "0.2.140", optional = true}
 liquid = "0.26.11"
 serde = { version = "1.0.228", features = ["derive"] }
+serde_path_to_error = "0.1.20"
 
 [dev-dependencies]
 env_logger = "0.11"

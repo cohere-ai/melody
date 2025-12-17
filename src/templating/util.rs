@@ -1,5 +1,5 @@
 use crate::templating::types::*;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
 pub fn add_spaces_to_json_encoding(input: &str) -> String {
@@ -19,7 +19,7 @@ pub fn add_spaces_to_json_encoding(input: &str) -> String {
     b
 }
 
-pub fn marshal_json_formatted(v: &Value) -> Result<String, serde_json::Error> {
+pub fn marshal_json_formatted(v: &Map<String, Value>) -> Result<String, serde_json::Error> {
     let schema_string = serde_json::to_string_pretty(v)?;
     let mut s = schema_string
         .replace("{\n", "{")

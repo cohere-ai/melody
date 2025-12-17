@@ -1,5 +1,6 @@
 use crate::templating::types::*;
 use crate::templating::util::*;
+use serde_path_to_error::deserialize;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -7,7 +8,10 @@ use std::error::Error;
 
 /// Options for cmd3 rendering.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct RenderCmd3Options {
+    pub messages: Vec<Message>,
     pub template: String,
     pub dev_instruction: Option<String>,
     pub documents: Vec<Document>,
@@ -23,9 +27,33 @@ pub struct RenderCmd3Options {
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 
+impl Default for RenderCmd3Options {
+    fn default() -> Self {
+        Self {
+            messages: Vec::new(),
+            template: String::new(),
+            dev_instruction: None,
+            documents: Vec::new(),
+            available_tools: Vec::new(),
+            safety_mode: None,
+            citation_quality: Some(CitationQuality::On),
+            reasoning_type: None,
+            skip_preamble: false,
+            response_prefix: None,
+            json_schema: None,
+            json_mode: false,
+            additional_template_fields: BTreeMap::new(),
+            escaped_special_tokens: BTreeMap::new(),
+        }
+    }
+}
+
 /// Options for cmd4 rendering.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct RenderCmd4Options {
+    pub messages: Vec<Message>,
     pub template: String,
     pub dev_instruction: Option<String>,
     pub platform_instruction: Option<String>,
@@ -39,13 +67,29 @@ pub struct RenderCmd4Options {
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 
-pub fn render_cmd3(
-    messages: &[Message],
-    opts: &RenderCmd3Options,
-) -> Result<String, Box<dyn Error>> {
+impl Default for RenderCmd4Options {
+    fn default() -> Self {
+        Self {
+            messages: Vec::new(),
+            template: String::new(),
+            dev_instruction: None,
+            platform_instruction: None,
+            documents: Vec::new(),
+            available_tools: Vec::new(),
+            grounding: Some(Grounding::Enabled),
+            response_prefix: None,
+            json_schema: None,
+            json_mode: false,
+            additional_template_fields: BTreeMap::new(),
+            escaped_special_tokens: BTreeMap::new(),
+        }
+    }
+}
+
+pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(
-        messages,
+        &opts.messages,
         !opts.documents.is_empty(),
         &opts.escaped_special_tokens,
     )?;
@@ -127,13 +171,10 @@ pub fn render_cmd3(
     Ok(template.render(&liquid::object!(&substitutions)).unwrap())
 }
 
-pub fn render_cmd4(
-    messages: &[Message],
-    opts: &RenderCmd4Options,
-) -> Result<String, Box<dyn Error>> {
+pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(
-        messages,
+        &opts.messages,
         !opts.documents.is_empty(),
         &opts.escaped_special_tokens,
     )?;
@@ -202,16 +243,17 @@ pub fn render_cmd4(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::templating::types::*;
     use serde_json::Value;
     use std::fs;
     use std::path::Path;
 
     fn read_test_cases(version: &str) -> Vec<(String, Value, String)> {
         let mut cases = vec![];
-        let test_dir = Path::new("tests").join(version);
+        let cur_file = file!();
+        let cur_dir = Path::new(cur_file).parent().unwrap();
+        let test_dir = cur_dir.join("tests").join(version);
         if !test_dir.exists() {
-            return cases;
+            panic!("Test directory {:?} does not exist.", test_dir);
         }
         for entry in fs::read_dir(&test_dir).unwrap() {
             let entry = entry.unwrap();
@@ -233,11 +275,12 @@ mod tests {
 
     #[test]
     fn test_render_cmd3_from_dir() {
+        // for now always set the template to cmd3v1.
+        let cmd3v1_template = include_str!("templates/cmd3-v1.tmpl").to_string();
         for (test_name, input_json, expected) in read_test_cases("cmd3") {
-            let messages: Vec<Message> =
-                serde_json::from_value(input_json["messages"].clone()).unwrap();
-            let opts: RenderCmd3Options = serde_json::from_value(input_json.clone()).unwrap();
-            let rendered = render_cmd3(&messages, &opts).unwrap();
+            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
+            opts.template = cmd3v1_template.clone();
+            let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(
                 rendered.trim(),
                 expected.trim(),
@@ -250,10 +293,8 @@ mod tests {
     #[test]
     fn test_render_cmd4_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd4") {
-            let messages: Vec<Message> =
-                serde_json::from_value(input_json["messages"].clone()).unwrap();
-            let opts: RenderCmd4Options = serde_json::from_value(input_json.clone()).unwrap();
-            let rendered = render_cmd4(&messages, &opts).unwrap();
+            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(
                 rendered.trim(),
                 expected.trim(),

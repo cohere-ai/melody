@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use serde::Deserialize;
+use serde_json::{Map, Value};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -30,17 +31,6 @@ pub enum ContentType {
     Text,
     Thinking,
     Image,
-}
-
-impl ContentType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ContentType::Unknown => "UNKNOWN",
-            ContentType::Text => "TEXT",
-            ContentType::Thinking => "THINKING",
-            ContentType::Image => "IMAGE",
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -107,23 +97,13 @@ pub enum ReasoningType {
     Disabled,
 }
 
-impl ReasoningType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ReasoningType::Unknown => "UNKNOWN",
-            ReasoningType::Enabled => "ENABLED",
-            ReasoningType::Disabled => "DISABLED",
-        }
-    }
-}
-
 pub type Document = String;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Tool {
     pub name: String,
     pub description: String,
-    pub parameters: serde_json::Value,
+    pub parameters: Map<String, Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
