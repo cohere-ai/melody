@@ -291,7 +291,10 @@ mod tests {
 
         let mut filter = crate::options::new_filter(tt.options);
         for (i, chunk) in text_chunks.iter().enumerate() {
-            let out = filter.write_decoded(chunk, likelihoods_chunks[i].clone());
+            let mut out = filter.write_decoded(chunk, likelihoods_chunks[i].clone());
+            if i == text_chunks.len() - 1 {
+                out.append(&mut filter.flush_partials())
+            }
             num_outputs += out.len();
             for o in out.iter() {
                 if o.is_reasoning {
