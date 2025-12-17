@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn test_render_cmd4_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd4") {
-            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            let opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(
                 rendered.trim(),
