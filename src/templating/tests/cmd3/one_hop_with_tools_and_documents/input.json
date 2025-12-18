@@ -23,7 +23,7 @@
         {
           "id": "2",
           "name": "GetReminders",
-          "parameters": {}
+          "parameters": "{}"
         }
       ]
     },

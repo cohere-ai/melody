@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
@@ -204,7 +203,7 @@ pub struct Content {
 pub struct ToolCall {
     pub id: String,
     pub name: String,
-    pub parameters: serde_json::Value,
+    pub parameters: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -216,6 +215,4 @@ pub struct Message {
     #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
     pub tool_call_id: Option<String>,
-    #[serde(default)]
-    pub additional_fields: BTreeMap<String, serde_json::Value>,
 }

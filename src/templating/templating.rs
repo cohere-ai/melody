@@ -6,6 +6,7 @@ use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::error::Error;
 
+
 /// Options for cmd3 rendering.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
@@ -246,6 +247,7 @@ mod tests {
     use serde_json::Value;
     use std::fs;
     use std::path::Path;
+    use pretty_assertions::assert_eq;
 
     fn read_test_cases(version: &str) -> Vec<(String, Value, String)> {
         let mut cases = vec![];
@@ -278,7 +280,6 @@ mod tests {
         // for now always set the template to cmd3v1.
         let cmd3v1_template = include_str!("templates/cmd3-v1.tmpl").to_string();
         for (test_name, input_json, expected) in read_test_cases("cmd3") {
-            if test_name == "one_hop_with_tools_and_documents" { continue; }
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.template = cmd3v1_template.clone();
             let rendered = render_cmd3(&opts).unwrap();

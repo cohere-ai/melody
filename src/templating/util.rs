@@ -18,18 +18,6 @@ pub fn add_spaces_to_json_encoding(input: &str) -> String {
     }
     b
 }
-
-pub fn marshal_json_formatted(v: &Map<String, Value>) -> Result<String, serde_json::Error> {
-    let schema_string = serde_json::to_string_pretty(v)?;
-    let mut s = schema_string
-        .replace("{\n", "{")
-        .replace("\n}", "}")
-        .replace("[\n", "[")
-        .replace("\n]", "]");
-    s = s.replace('\n', " ");
-    Ok(s)
-}
-
 pub fn json_escape_string(s: &str) -> String {
     let b = serde_json::to_string(s).unwrap_or_default();
     if b.len() < 2 {
@@ -64,7 +52,6 @@ pub struct TemplateMessage {
     pub tool_calls: Vec<String>,
     pub content: Vec<TemplateContent>,
     pub tool_results: Vec<TemplateToolResult>,
-    pub additional_fields: BTreeMap<String, Value>,
 }
 
 // Convert TemplateContent to map
@@ -106,7 +93,7 @@ fn tool_result_to_map(trs: &[TemplateToolResult]) -> Vec<Value> {
 fn message_to_map(ms: &[TemplateMessage]) -> Vec<Value> {
     ms.iter()
         .map(|m| {
-            let mut map: Map<String, Value> = m.additional_fields.clone().into_iter().collect();
+            let mut map: Map<String, Value> = Map::new();
             map.insert("role".to_string(), Value::String(m.role.clone()));
             map.insert(
                 "tool_calls".to_string(),
@@ -130,16 +117,38 @@ fn message_to_map(ms: &[TemplateMessage]) -> Vec<Value> {
         .collect()
 }
 
+// Custom type for raw JSON parameters which omits quotes when serialized
+struct RawJsonString(String);
+
+impl serde::Serialize for RawJsonString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Parse the underlying string into serde_json::Value and serialize that.
+        // This makes the serializer emit proper JSON (no surrounding quotes).
+        let val: serde_json::Value =
+            serde_json::from_str(&self.0).map_err(serde::ser::Error::custom)?;
+        val.serialize(serializer)
+    }
+}
+
+// Helper struct for serializing the tool call with raw parameters
+#[derive(serde::Serialize)]
+struct ToolCallTemplate {
+    tool_call_id: String,
+    tool_name: String,
+    parameters: RawJsonString,
+}
+
 // Convert ToolCall to template string
 fn tool_call_to_template(tc: &ToolCall, tc_index: usize) -> Result<String, String> {
-    let mut obj = BTreeMap::new();
-    obj.insert(
-        "tool_call_id".to_string(),
-        Value::String(tc_index.to_string()),
-    );
-    obj.insert("tool_name".to_string(), Value::String(tc.name.clone()));
-    obj.insert("parameters".to_string(), tc.parameters.clone());
-    let rendered = serde_json::to_string(&obj).map_err(|e| e.to_string())?;
+    let tpl = ToolCallTemplate {
+        tool_call_id: tc_index.to_string(),
+        tool_name: tc.name.clone(),
+        parameters: RawJsonString(tc.parameters.clone()),
+    };
+    let rendered = serde_json::to_string(&tpl).map_err(|e| e.to_string())?;
     Ok(add_spaces_to_json_encoding(&rendered))
 }
 
@@ -147,7 +156,9 @@ fn tool_call_to_template(tc: &ToolCall, tc_index: usize) -> Result<String, Strin
 pub fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, String> {
     let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
     for tool in tools {
-        let schema = marshal_json_formatted(&tool.parameters).map_err(|e| e.to_string())?;
+        let schema = serde_json::to_string(&tool.parameters)
+            .map(|s| add_spaces_to_json_encoding(&s))
+            .map_err(|e| e.to_string())?;
         let mut def = Map::new();
         def.insert(
             "description".to_string(),
@@ -190,18 +201,6 @@ pub fn messages_to_template(
                     idx
                 });
 
-            let mut tool_document = String::new();
-            for (j, content_item) in msg.content.iter().enumerate() {
-                if content_item.content_type != ContentType::Text {
-                    return Err(format!(
-                        "tool message[{i}].content[{j}] invalid content type"
-                    ));
-                }
-                if let Some(ref text) = content_item.text {
-                    tool_document.push_str(text);
-                }
-            }
-
             if template_messages.is_empty()
                 || template_messages.last().unwrap().role != Role::Tool.as_str()
             {
@@ -210,7 +209,6 @@ pub fn messages_to_template(
                     tool_calls: vec![],
                     content: vec![],
                     tool_results: vec![],
-                    additional_fields: BTreeMap::new(),
                 });
             }
             let m = template_messages.last_mut().unwrap();
@@ -223,9 +221,20 @@ pub fn messages_to_template(
                     });
                     m.tool_results.len() - 1
                 });
-            m.tool_results[tool_result_idx]
-                .documents
-                .push(escape_special_tokens(&tool_document, special_token_map));
+
+            for (j, content_item) in msg.content.iter().enumerate() {
+                if content_item.content_type != ContentType::Text {
+                    return Err(format!(
+                        "tool message[{i}].content[{j}] invalid content type"
+                    ));
+                }
+                if let Some(ref text) = content_item.text {
+                    m.tool_results[tool_result_idx]
+                        .documents
+                        .push(escape_special_tokens(&text, special_token_map));
+                }
+            }
+
             continue;
         }
 
@@ -306,7 +315,6 @@ pub fn messages_to_template(
             tool_calls: rendered_tool_calls,
             content: template_msg_content,
             tool_results: vec![],
-            additional_fields: msg.additional_fields.clone(),
         });
     }
     Ok(message_to_map(&template_messages))
