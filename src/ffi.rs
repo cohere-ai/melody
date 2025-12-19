@@ -3,9 +3,14 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::slice;
-
+use serde_json::Value;
 use crate::filter::{Filter, FilterImpl};
 use crate::options::{FilterOptions, new_filter};
+use crate::templating::templating::{render_cmd3, render_cmd4, RenderCmd3Options, RenderCmd4Options};
+use crate::templating::types::{
+    CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType, Role,
+    SafetyMode, Tool, ToolCall,
+};
 use crate::types::{FilterCitation, FilterOutput, TokenIDsWithLogProb};
 
 /// Opaque pointer to a Filter instance
@@ -696,3 +701,475 @@ pub unsafe extern "C" fn melody_filter_output_array_free(arr: *mut CFilterOutput
         }
     }
 }
+
+// ============================================================================
+// Templating FFI types (C-compatible equivalents)
+// ============================================================================
+
+#[repr(C)]
+pub enum CRole {
+    Unknown = 0,
+    System = 1,
+    User = 2,
+    Chatbot = 3,
+    Tool = 4,
+}
+
+#[repr(C)]
+pub enum CContentType {
+    Unknown = 0,
+    Text = 1,
+    Thinking = 2,
+    Image = 3,
+    Document = 4,
+}
+
+#[repr(C)]
+pub enum CCitationQuality {
+    Unknown = 0,
+    Off = 1,
+    On = 2,
+}
+
+#[repr(C)]
+pub enum CGrounding {
+    Unknown = 0,
+    Enabled = 1,
+    Disabled = 2,
+}
+
+#[repr(C)]
+pub enum CSafetyMode {
+    Unknown = 0,
+    None = 1,
+    Strict = 2,
+    Contextual = 3,
+}
+
+#[repr(C)]
+pub enum CReasoningType {
+    Unknown = 0,
+    Enabled = 1,
+    Disabled = 2,
+}
+
+#[repr(C)]
+pub struct CTool {
+    pub name: *const c_char,
+    pub description: *const c_char,
+    // JSON string representing Map<String, Value>
+    pub parameters_json: *const c_char,
+}
+
+#[repr(C)]
+pub struct CImage {
+    pub template_placeholder: *const c_char,
+}
+
+#[repr(C)]
+pub struct CContent {
+    pub content_type: CContentType,
+    pub text: *const c_char,
+    pub thinking: *const c_char,
+    pub image: *const CImage,    // null if None
+    pub document_json: *const c_char, // null if None; JSON Map<String, Value>
+}
+
+#[repr(C)]
+pub struct CToolCall {
+    pub id: *const c_char,
+    pub name: *const c_char,
+    pub parameters_json: *const c_char,
+}
+
+#[repr(C)]
+pub struct CMessage {
+    pub role: CRole,
+    pub content: *const CContent,
+    pub content_len: usize,
+    pub tool_calls: *const CToolCall,
+    pub tool_calls_len: usize,
+    pub tool_call_id: *const c_char, // null if None
+}
+
+#[repr(C)]
+pub struct CRenderCmd3Options {
+    pub messages: *const CMessage,
+    pub messages_len: usize,
+    pub template: *const c_char,
+    pub dev_instruction: *const c_char,
+    pub documents_json: *const *const c_char,
+    pub documents_len: usize,
+    pub available_tools: *const CTool,
+    pub available_tools_len: usize,
+    pub safety_mode: CSafetyMode,
+    pub has_safety_mode: bool,
+    pub citation_quality: CCitationQuality,
+    pub has_citation_quality: bool,
+    pub reasoning_type: CReasoningType,
+    pub has_reasoning_type: bool,
+    pub skip_preamble: bool,
+    pub response_prefix: *const c_char,
+    pub json_schema: *const c_char,
+    pub json_mode: bool,
+    // JSON string representing BTreeMap<String, Value>
+    pub additional_template_fields_json: *const c_char,
+    // JSON string representing BTreeMap<String, String>
+    pub escaped_special_tokens_json: *const c_char,
+}
+
+#[repr(C)]
+pub struct CRenderCmd4Options {
+    pub messages: *const CMessage,
+    pub messages_len: usize,
+    pub template: *const c_char,
+    pub dev_instruction: *const c_char,
+    pub platform_instruction: *const c_char,
+    pub documents_json: *const *const c_char,
+    pub documents_len: usize,
+    pub available_tools: *const CTool,
+    pub available_tools_len: usize,
+    pub grounding: CGrounding,
+    pub has_grounding: bool,
+    pub response_prefix: *const c_char,
+    pub json_schema: *const c_char,
+    pub json_mode: bool,
+    pub additional_template_fields_json: *const c_char,
+    pub escaped_special_tokens_json: *const c_char,
+}
+
+// ============================================================================
+// Templating FFI conversion helpers
+// ============================================================================
+
+fn map_role(r: CRole) -> Role {
+    match r {
+        CRole::Unknown => Role::Unknown,
+        CRole::System => Role::System,
+        CRole::User => Role::User,
+        CRole::Chatbot => Role::Chatbot,
+        CRole::Tool => Role::Tool,
+    }
+}
+
+fn map_content_type(t: CContentType) -> ContentType {
+    match t {
+        CContentType::Unknown => ContentType::Unknown,
+        CContentType::Text => ContentType::Text,
+        CContentType::Thinking => ContentType::Thinking,
+        CContentType::Image => ContentType::Image,
+        CContentType::Document => ContentType::Document,
+    }
+}
+
+fn map_citation_quality(c: CCitationQuality) -> CitationQuality {
+    match c {
+        CCitationQuality::Unknown => CitationQuality::Unknown,
+        CCitationQuality::Off => CitationQuality::Off,
+        CCitationQuality::On => CitationQuality::On,
+    }
+}
+
+fn map_grounding(g: CGrounding) -> Grounding {
+    match g {
+        CGrounding::Unknown => Grounding::Unknown,
+        CGrounding::Enabled => Grounding::Enabled,
+        CGrounding::Disabled => Grounding::Disabled,
+    }
+}
+
+fn map_safety_mode(s: CSafetyMode) -> SafetyMode {
+    match s {
+        CSafetyMode::Unknown => SafetyMode::Unknown,
+        CSafetyMode::None => SafetyMode::None,
+        CSafetyMode::Strict => SafetyMode::Strict,
+        CSafetyMode::Contextual => SafetyMode::Contextual,
+    }
+}
+
+fn map_reasoning_type(r: CReasoningType) -> ReasoningType {
+    match r {
+        CReasoningType::Unknown => ReasoningType::Unknown,
+        CReasoningType::Enabled => ReasoningType::Enabled,
+        CReasoningType::Disabled => ReasoningType::Disabled,
+    }
+}
+
+unsafe fn cstr_opt(ptr: *const c_char) -> Option<String> {
+    if ptr.is_null() {
+        None
+    } else {
+        Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+    }
+}
+
+unsafe fn parse_json_object(ptr: *const c_char) -> Map<String, Value> {
+    if ptr.is_null() {
+        Map::new()
+    } else {
+        let s = CStr::from_ptr(ptr).to_string_lossy();
+        serde_json::from_str::<Map<String, Value>>(&s).unwrap_or_else(|_| Map::new())
+    }
+}
+
+unsafe fn parse_json_value(ptr: *const c_char) -> Value {
+    if ptr.is_null() {
+        Value::Null
+    } else {
+        let s = CStr::from_ptr(ptr).to_string_lossy();
+        serde_json::from_str::<Value>(&s).unwrap_or(Value::Null)
+    }
+}
+
+unsafe fn convert_ctool(tool: &CTool) -> Tool {
+    Tool {
+        name: CStr::from_ptr(tool.name).to_string_lossy().into_owned(),
+        description: CStr::from_ptr(tool.description).to_string_lossy().into_owned(),
+        parameters: parse_json_object(tool.parameters_json),
+    }
+}
+
+unsafe fn convert_cimage(image: &CImage) -> Image {
+    Image {
+        template_placeholder: CStr::from_ptr(image.template_placeholder)
+            .to_string_lossy()
+            .into_owned(),
+    }
+}
+
+unsafe fn convert_ccontent(content: &CContent) -> Content {
+    let image = if content.image.is_null() {
+        None
+    } else {
+        Some(convert_cimage(&*content.image))
+    };
+    let document = if content.document_json.is_null() {
+        None
+    } else {
+        match parse_json_value(content.document_json) {
+            Value::Object(m) => Some(m),
+            _ => None,
+        }
+    };
+    Content {
+        content_type: map_content_type(content.content_type),
+        text: cstr_opt(content.text),
+        thinking: cstr_opt(content.thinking),
+        image,
+        document,
+    }
+}
+
+unsafe fn convert_ctool_call(tc: &CToolCall) -> ToolCall {
+    ToolCall {
+        id: CStr::from_ptr(tc.id).to_string_lossy().into_owned(),
+        name: CStr::from_ptr(tc.name).to_string_lossy().into_owned(),
+        parameters: CStr::from_ptr(tc.parameters_json).to_string_lossy().into_owned(),
+    }
+}
+
+unsafe fn convert_cmessage(msg: &CMessage) -> Message {
+    let contents = if !msg.content.is_null() && msg.content_len > 0 {
+        slice::from_raw_parts(msg.content, msg.content_len)
+            .iter()
+            .map(convert_ccontent)
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let tool_calls = if !msg.tool_calls.is_null() && msg.tool_calls_len > 0 {
+        slice::from_raw_parts(msg.tool_calls, msg.tool_calls_len)
+            .iter()
+            .map(convert_ctool_call)
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    Message {
+        role: map_role(msg.role),
+        content: contents,
+        tool_calls,
+        tool_call_id: cstr_opt(msg.tool_call_id),
+    }
+}
+
+unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
+    let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
+        slice::from_raw_parts(opts.messages, opts.messages_len)
+            .iter()
+            .map(convert_cmessage)
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let documents: Vec<Document> = if !opts.documents_json.is_null() && opts.documents_len > 0 {
+        slice::from_raw_parts(opts.documents_json, opts.documents_len)
+            .iter()
+            .map(|&ptr| {
+                if ptr.is_null() {
+                    Map::new()
+                } else {
+                    match parse_json_value(ptr) {
+                        Value::Object(m) => m,
+                        _ => Map::new(),
+                    }
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let tools = if !opts.available_tools.is_null() && opts.available_tools_len > 0 {
+        slice::from_raw_parts(opts.available_tools, opts.available_tools_len)
+            .iter()
+            .map(convert_ctool)
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let additional_template_fields = parse_json_object(opts.additional_template_fields_json);
+    let escaped_special_tokens_raw = parse_json_object(opts.escaped_special_tokens_json);
+    let escaped_special_tokens = escaped_special_tokens_raw
+        .into_iter()
+        .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
+        .collect();
+
+    RenderCmd3Options {
+        messages,
+        template: CStr::from_ptr(opts.template).to_string_lossy().into_owned(),
+        dev_instruction: cstr_opt(opts.dev_instruction),
+        documents,
+        available_tools: tools,
+        safety_mode: if opts.has_safety_mode {
+            Some(map_safety_mode(opts.safety_mode))
+        } else {
+            None
+        },
+        citation_quality: if opts.has_citation_quality {
+            Some(map_citation_quality(opts.citation_quality))
+        } else {
+            None
+        },
+        reasoning_type: if opts.has_reasoning_type {
+            Some(map_reasoning_type(opts.reasoning_type))
+        } else {
+            None
+        },
+        skip_preamble: opts.skip_preamble,
+        response_prefix: cstr_opt(opts.response_prefix),
+        json_schema: cstr_opt(opts.json_schema),
+        json_mode: opts.json_mode,
+        additional_template_fields,
+        escaped_special_tokens,
+    }
+}
+
+unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
+    let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
+        slice::from_raw_parts(opts.messages, opts.messages_len)
+            .iter()
+            .map(convert_cmessage)
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let documents: Vec<Document> = if !opts.documents_json.is_null() && opts.documents_len > 0 {
+        slice::from_raw_parts(opts.documents_json, opts.documents_len)
+            .iter()
+            .map(|&ptr| {
+                if ptr.is_null() {
+                    Map::new()
+                } else {
+                    match parse_json_value(ptr) {
+                        Value::Object(m) => m,
+                        _ => Map::new(),
+                    }
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let tools = if !opts.available_tools.is_null() && opts.available_tools_len > 0 {
+        slice::from_raw_parts(opts.available_tools, opts.available_tools_len)
+            .iter()
+            .map(convert_ctool)
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let additional_template_fields = parse_json_object(opts.additional_template_fields_json);
+    let escaped_special_tokens_raw = parse_json_object(opts.escaped_special_tokens_json);
+    let escaped_special_tokens = escaped_special_tokens_raw
+        .into_iter()
+        .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
+        .collect();
+
+    RenderCmd4Options {
+        messages,
+        template: CStr::from_ptr(opts.template).to_string_lossy().into_owned(),
+        dev_instruction: cstr_opt(opts.dev_instruction),
+        platform_instruction: cstr_opt(opts.platform_instruction),
+        documents,
+        available_tools: tools,
+        grounding: if opts.has_grounding {
+            Some(map_grounding(opts.grounding))
+        } else {
+            None
+        },
+        response_prefix: cstr_opt(opts.response_prefix),
+        json_schema: cstr_opt(opts.json_schema),
+        json_mode: opts.json_mode,
+        additional_template_fields,
+        escaped_special_tokens,
+    }
+}
+
+// ============================================================================
+// Templating FFI functions
+// ============================================================================
+
+/// Renders CMD3 template and returns a newly allocated C string.
+/// Caller must free with `melody_string_free`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> *mut c_char {
+    if opts.is_null() {
+        return std::ptr::null_mut();
+    }
+    let rust_opts = convert_cmd3_options(&*opts);
+    match render_cmd3(&rust_opts) {
+        Ok(s) => CString::new(s).unwrap().into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Renders CMD4 template and returns a newly allocated C string.
+/// Caller must free with `melody_string_free`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> *mut c_char {
+    if opts.is_null() {
+        return std::ptr::null_mut();
+    }
+    let rust_opts = convert_cmd4_options(&*opts);
+    match render_cmd4(&rust_opts) {
+        Ok(s) => CString::new(s).unwrap().into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Frees a C string returned by render functions.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_string_free(s: *mut c_char) {
+    if !s.is_null() {
+        let _ = CString::from_raw(s);
+    }
+}
+
