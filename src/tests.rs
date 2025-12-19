@@ -762,4 +762,17 @@ plt.ylabel('Number of Climbers')
             ..Default::default()
         });
     }
+
+    #[test]
+    fn test_filter_command3_flush_partials_bug() {
+        run_filter_test(FilterTestCase {
+            name: "flushing partials of ' hello <'",
+            input: "<|START_THINKING|>hello <".to_string(),
+            options: FilterOptions::new().cmd3(),
+            want_thinking: "hello <",
+            want_likelihoods: vec![0.001, 0.002],
+            want_num_outputs: 2,
+            ..Default::default()
+        });
+    }
 }
