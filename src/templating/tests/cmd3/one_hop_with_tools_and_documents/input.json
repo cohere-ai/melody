@@ -32,27 +32,31 @@
       "tool_call_id": "2",
       "content": [
         {
-          "type": "text",
-          "text": "{\"reminder_id\": \"59-80bc\", \"task\": \"Buy groceries\", \"due_date\": \"2023-09-11 23:59:59\", \"status\": \"pending\"}"
+          "type": "document",
+          "document": {"reminder_id": "59-80bc", "task": "Buy groceries", "due_date": "2023-09-11 23:59:59", "status": "pending"}
         },
         {
-          "type": "text",
-          "text": "{\"reminder_id\": \"14-579a\", \"task\": \"Call Amy\", \"due_date\": \"2023-09-11 23:59:59\", \"status\": \"pending\"}"
+          "type": "document",
+          "document": {"reminder_id": "14-579a", "task": "Call Amy", "due_date": "2023-09-11 23:59:59", "status": "pending"}
         },
         {
-          "type": "text",
-          "text": "{\"reminder_id\": \"5b-dd80\", \"task\": \"finish your report\", \"due_date\": \"2023-09-15 23:59:59\", \"status\": \"pending\"}"
+          "type": "document",
+          "document": {"reminder_id": "5b-dd80", "task": "finish your report", "due_date": "2023-09-15 23:59:59", "status": "pending"}
         },
         {
-          "type": "text",
-          "text": "{\"reminder_id\": \"20-d9ca\", \"task\": \"call your mom\", \"due_date\": \"2023-09-17 23:59:59\", \"status\": \"pending\"}"
+          "type": "document",
+          "document": {"reminder_id": "20-d9ca", "task": "call your mom", "due_date": "2023-09-17 23:59:59", "status": "pending"}
         }
       ]
     }
   ],
   "documents": [
-    "{ \"content\": \"pdf chunk 1\" }",
-    "{ \"content\": \"pdf chunk 2\" }"
+    {
+      "content": "pdf chunk 1"
+    },
+    {
+      "content": "pdf chunk 2"
+    }
   ],
   "available_tools": [
     {

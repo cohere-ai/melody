@@ -1,5 +1,5 @@
 use crate::templating::types::*;
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
 
 pub fn add_spaces_to_json_encoding(input: &str) -> String {
@@ -223,15 +223,26 @@ pub fn messages_to_template(
                 });
 
             for (j, content_item) in msg.content.iter().enumerate() {
-                if content_item.content_type != ContentType::Text {
+                if content_item.content_type == ContentType::Text {
+                    if let Some(ref text) = content_item.text {
+                        let mut obj : Map<String, Value> = Map::new();
+                        obj.insert("content".to_string(), Value::String(text.clone()));
+                        let rendered_obj = add_spaces_to_json_encoding(&to_string(&obj).map_err(|e| e.to_string())?);
+                        m.tool_results[tool_result_idx]
+                            .documents
+                            .push(escape_special_tokens(&rendered_obj, special_token_map));
+                    }
+                } else if content_item.content_type == ContentType::Document {
+                    if let Some(ref obj) = content_item.document {
+                        let rendered_obj = add_spaces_to_json_encoding(&to_string(obj).map_err(|e| e.to_string())?);
+                        m.tool_results[tool_result_idx]
+                            .documents
+                            .push(escape_special_tokens(&rendered_obj, special_token_map));
+                    }
+                } else {
                     return Err(format!(
                         "tool message[{i}].content[{j}] invalid content type"
                     ));
-                }
-                if let Some(ref text) = content_item.text {
-                    m.tool_results[tool_result_idx]
-                        .documents
-                        .push(escape_special_tokens(&text, special_token_map));
                 }
             }
 
@@ -241,6 +252,22 @@ pub fn messages_to_template(
         let mut template_msg_content = Vec::new();
         for content_item in &msg.content {
             match content_item.content_type {
+                ContentType::Document => {
+                    if msg.role != Role::Tool {
+                        return Err("content type object is not supported for non-tool messages"
+                            .to_string());
+                    }
+                    let data = if let Some(ref obj) = content_item.document {
+                        let serialized = serde_json::to_string(obj).map_err(|e| e.to_string())?;
+                        add_spaces_to_json_encoding(&serialized)
+                    } else {
+                        "{}".to_string()
+                    };
+                    template_msg_content.push(TemplateContent {
+                        content_type: "text".to_string(),
+                        data: escape_special_tokens(&data, special_token_map),
+                    });
+                }
                 ContentType::Text => {
                     let data = if msg.role == Role::System {
                         content_item.text.clone().unwrap_or_default()

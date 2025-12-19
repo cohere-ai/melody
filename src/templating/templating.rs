@@ -2,7 +2,7 @@ use crate::templating::types::*;
 use crate::templating::util::*;
 use serde_path_to_error::deserialize;
 use serde::Deserialize;
-use serde_json::{Map, Value};
+use serde_json::{to_string, Map, Value};
 use std::collections::BTreeMap;
 use std::error::Error;
 
@@ -97,7 +97,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
     let docs: Vec<String> = opts
         .documents
         .iter()
-        .map(|d| escape_special_tokens(d, &opts.escaped_special_tokens))
+        .map(|d| add_spaces_to_json_encoding(&escape_special_tokens(&to_string(d).unwrap_or_default(), &opts.escaped_special_tokens)))
         .collect();
 
     let mut substitutions = opts.additional_template_fields.clone();
@@ -182,7 +182,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
     let docs: Vec<String> = opts
         .documents
         .iter()
-        .map(|d| escape_special_tokens(d, &opts.escaped_special_tokens))
+        .map(|d| add_spaces_to_json_encoding(&escape_special_tokens(&to_string(d).unwrap_or_default(), &opts.escaped_special_tokens)))
         .collect();
 
     let mut substitutions = opts.additional_template_fields.clone();

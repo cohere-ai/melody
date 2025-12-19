@@ -64,8 +64,8 @@ The following instructions are your defaults unless specified elsewhere in devel
     {
         "tool_call_id": "0",
         "results": {
-            "0": { "content": "pdf chunk 1" },
-            "1": { "content": "pdf chunk 2" }
+            "0": {"content": "pdf chunk 1"},
+            "1": {"content": "pdf chunk 2"}
         },
         "is_error": null
     }

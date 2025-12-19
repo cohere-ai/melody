@@ -44,6 +44,7 @@ pub enum ContentType {
     Text,
     Thinking,
     Image,
+    Document,
 }
 
 impl TryFrom<String> for ContentType {
@@ -54,7 +55,8 @@ impl TryFrom<String> for ContentType {
             "text" => Ok(ContentType::Text),
             "thinking" => Ok(ContentType::Thinking),
             "image" => Ok(ContentType::Image),
-            other => Err(format!("invalid ContentType '{}', expected one of: unknown, text, thinking, image", other)),
+            "document" => Ok(ContentType::Document),
+            other => Err(format!("invalid ContentType '{}', expected one of: unknown, text, thinking, image, document", other)),
         }
     }
 }
@@ -172,7 +174,7 @@ impl TryFrom<String> for ReasoningType {
     }
 }
 
-pub type Document = String;
+pub type Document = Map<String, Value>;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -196,6 +198,8 @@ pub struct Content {
     pub text: Option<String>,
     pub thinking: Option<String>,
     pub image: Option<Image>,
+    pub document: Option<Map<String, Value>>
+
 }
 
 #[derive(Debug, Clone, Deserialize)]
