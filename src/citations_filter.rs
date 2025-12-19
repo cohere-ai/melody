@@ -32,7 +32,7 @@ impl FilterImpl {
                 return (Vec::new(), remove + remove_cit);
             }
             res_out = Some(FilterOutput {
-                text: send.to_string(),
+                text: send.clone(),
                 ..Default::default()
             });
         }
