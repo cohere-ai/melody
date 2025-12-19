@@ -1,17 +1,19 @@
 //! FFI bindings for the melody parsing library for Go
 
+use crate::filter::{Filter, FilterImpl};
+use crate::options::{FilterOptions, new_filter};
+use crate::templating::templating::{
+    RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4,
+};
+use crate::templating::types::{
+    CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
+    Role, SafetyMode, Tool, ToolCall,
+};
+use crate::types::{FilterCitation, FilterOutput, TokenIDsWithLogProb};
+use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::slice;
-use serde_json::Value;
-use crate::filter::{Filter, FilterImpl};
-use crate::options::{FilterOptions, new_filter};
-use crate::templating::templating::{render_cmd3, render_cmd4, RenderCmd3Options, RenderCmd4Options};
-use crate::templating::types::{
-    CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType, Role,
-    SafetyMode, Tool, ToolCall,
-};
-use crate::types::{FilterCitation, FilterOutput, TokenIDsWithLogProb};
 
 /// Opaque pointer to a Filter instance
 #[repr(C)]
@@ -707,6 +709,7 @@ pub unsafe extern "C" fn melody_filter_output_array_free(arr: *mut CFilterOutput
 // ============================================================================
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub enum CRole {
     Unknown = 0,
     System = 1,
@@ -716,6 +719,7 @@ pub enum CRole {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub enum CContentType {
     Unknown = 0,
     Text = 1,
@@ -725,6 +729,7 @@ pub enum CContentType {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub enum CCitationQuality {
     Unknown = 0,
     Off = 1,
@@ -732,6 +737,7 @@ pub enum CCitationQuality {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub enum CGrounding {
     Unknown = 0,
     Enabled = 1,
@@ -739,6 +745,7 @@ pub enum CGrounding {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub enum CSafetyMode {
     Unknown = 0,
     None = 1,
@@ -747,6 +754,7 @@ pub enum CSafetyMode {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub enum CReasoningType {
     Unknown = 0,
     Enabled = 1,
@@ -771,7 +779,7 @@ pub struct CContent {
     pub content_type: CContentType,
     pub text: *const c_char,
     pub thinking: *const c_char,
-    pub image: *const CImage,    // null if None
+    pub image: *const CImage,         // null if None
     pub document_json: *const c_char, // null if None; JSON Map<String, Value>
 }
 
@@ -911,7 +919,6 @@ unsafe fn parse_json_object(ptr: *const c_char) -> Map<String, Value> {
         serde_json::from_str::<Map<String, Value>>(&s).unwrap_or_else(|_| Map::new())
     }
 }
-
 unsafe fn parse_json_value(ptr: *const c_char) -> Value {
     if ptr.is_null() {
         Value::Null
@@ -924,7 +931,9 @@ unsafe fn parse_json_value(ptr: *const c_char) -> Value {
 unsafe fn convert_ctool(tool: &CTool) -> Tool {
     Tool {
         name: CStr::from_ptr(tool.name).to_string_lossy().into_owned(),
-        description: CStr::from_ptr(tool.description).to_string_lossy().into_owned(),
+        description: CStr::from_ptr(tool.description)
+            .to_string_lossy()
+            .into_owned(),
         parameters: parse_json_object(tool.parameters_json),
     }
 }
@@ -964,7 +973,9 @@ unsafe fn convert_ctool_call(tc: &CToolCall) -> ToolCall {
     ToolCall {
         id: CStr::from_ptr(tc.id).to_string_lossy().into_owned(),
         name: CStr::from_ptr(tc.name).to_string_lossy().into_owned(),
-        parameters: CStr::from_ptr(tc.parameters_json).to_string_lossy().into_owned(),
+        parameters: CStr::from_ptr(tc.parameters_json)
+            .to_string_lossy()
+            .into_owned(),
     }
 }
 
@@ -972,7 +983,7 @@ unsafe fn convert_cmessage(msg: &CMessage) -> Message {
     let contents = if !msg.content.is_null() && msg.content_len > 0 {
         slice::from_raw_parts(msg.content, msg.content_len)
             .iter()
-            .map(convert_ccontent)
+            .map(|c| unsafe { convert_ccontent(c) })
             .collect()
     } else {
         Vec::new()
@@ -981,7 +992,7 @@ unsafe fn convert_cmessage(msg: &CMessage) -> Message {
     let tool_calls = if !msg.tool_calls.is_null() && msg.tool_calls_len > 0 {
         slice::from_raw_parts(msg.tool_calls, msg.tool_calls_len)
             .iter()
-            .map(convert_ctool_call)
+            .map(|c| unsafe { convert_ctool_call(c) })
             .collect()
     } else {
         Vec::new()
@@ -999,7 +1010,7 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
     let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
         slice::from_raw_parts(opts.messages, opts.messages_len)
             .iter()
-            .map(convert_cmessage)
+            .map(|m| unsafe { convert_cmessage(m) })
             .collect()
     } else {
         Vec::new()
@@ -1026,7 +1037,7 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
     let tools = if !opts.available_tools.is_null() && opts.available_tools_len > 0 {
         slice::from_raw_parts(opts.available_tools, opts.available_tools_len)
             .iter()
-            .map(convert_ctool)
+            .map(|t| unsafe { convert_ctool(t) })
             .collect()
     } else {
         Vec::new()
@@ -1073,7 +1084,7 @@ unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
     let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
         slice::from_raw_parts(opts.messages, opts.messages_len)
             .iter()
-            .map(convert_cmessage)
+            .map(|m| unsafe { convert_cmessage(m) })
             .collect()
     } else {
         Vec::new()
@@ -1100,7 +1111,7 @@ unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
     let tools = if !opts.available_tools.is_null() && opts.available_tools_len > 0 {
         slice::from_raw_parts(opts.available_tools, opts.available_tools_len)
             .iter()
-            .map(convert_ctool)
+            .map(|t| unsafe { convert_ctool(t) })
             .collect()
     } else {
         Vec::new()
@@ -1172,4 +1183,3 @@ pub unsafe extern "C" fn melody_string_free(s: *mut c_char) {
         let _ = CString::from_raw(s);
     }
 }
-

@@ -1,3 +1,3 @@
 pub mod templating;
 mod util;
-mod types;
+pub(crate) mod types;

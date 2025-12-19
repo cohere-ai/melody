@@ -1,11 +1,10 @@
 use crate::templating::types::*;
 use crate::templating::util::*;
-use serde_path_to_error::deserialize;
 use serde::Deserialize;
-use serde_json::{to_string, Map, Value};
+use serde_json::{Map, Value, to_string};
+use serde_path_to_error::deserialize;
 use std::collections::BTreeMap;
 use std::error::Error;
-
 
 /// Options for cmd3 rendering.
 #[derive(Debug, Clone, Deserialize)]
@@ -24,7 +23,7 @@ pub struct RenderCmd3Options {
     pub response_prefix: Option<String>,
     pub json_schema: Option<String>,
     pub json_mode: bool,
-    pub additional_template_fields: BTreeMap<String, Value>,
+    pub additional_template_fields: Map<String, Value>,
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 
@@ -43,7 +42,7 @@ impl Default for RenderCmd3Options {
             response_prefix: None,
             json_schema: None,
             json_mode: false,
-            additional_template_fields: BTreeMap::new(),
+            additional_template_fields: Map::new(),
             escaped_special_tokens: BTreeMap::new(),
         }
     }
@@ -64,7 +63,7 @@ pub struct RenderCmd4Options {
     pub response_prefix: Option<String>,
     pub json_schema: Option<String>,
     pub json_mode: bool,
-    pub additional_template_fields: BTreeMap<String, Value>,
+    pub additional_template_fields: Map<String, Value>,
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 
@@ -81,7 +80,7 @@ impl Default for RenderCmd4Options {
             response_prefix: None,
             json_schema: None,
             json_mode: false,
-            additional_template_fields: BTreeMap::new(),
+            additional_template_fields: Map::new(),
             escaped_special_tokens: BTreeMap::new(),
         }
     }
@@ -97,7 +96,12 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
     let docs: Vec<String> = opts
         .documents
         .iter()
-        .map(|d| add_spaces_to_json_encoding(&escape_special_tokens(&to_string(d).unwrap_or_default(), &opts.escaped_special_tokens)))
+        .map(|d| {
+            add_spaces_to_json_encoding(&escape_special_tokens(
+                &to_string(d).unwrap_or_default(),
+                &opts.escaped_special_tokens,
+            ))
+        })
         .collect();
 
     let mut substitutions = opts.additional_template_fields.clone();
@@ -182,7 +186,12 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
     let docs: Vec<String> = opts
         .documents
         .iter()
-        .map(|d| add_spaces_to_json_encoding(&escape_special_tokens(&to_string(d).unwrap_or_default(), &opts.escaped_special_tokens)))
+        .map(|d| {
+            add_spaces_to_json_encoding(&escape_special_tokens(
+                &to_string(d).unwrap_or_default(),
+                &opts.escaped_special_tokens,
+            ))
+        })
         .collect();
 
     let mut substitutions = opts.additional_template_fields.clone();
@@ -244,10 +253,10 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
     use serde_json::Value;
     use std::fs;
     use std::path::Path;
-    use pretty_assertions::assert_eq;
 
     fn read_test_cases(version: &str) -> Vec<(String, Value, String)> {
         let mut cases = vec![];
