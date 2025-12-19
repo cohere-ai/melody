@@ -22,7 +22,7 @@ impl FilterImpl {
         let (send, rem_right) = self.trim_space(&send);
         let remove = bstr.len() - send.len() - rem_right;
 
-        let (res_out, remove_cit) = self.parse_citations(&send, mode);
+        let (mut res_out, remove_cit) = self.parse_citations(&send, mode);
 
         if res_out.is_none()
             || (res_out.as_ref().unwrap().text.is_empty()
@@ -31,13 +31,10 @@ impl FilterImpl {
             if send.is_empty() || !after_last_token {
                 return (Vec::new(), remove + remove_cit);
             }
-            return (
-                vec![FilterOutput {
-                    text: send,
-                    ..Default::default()
-                }],
-                remove + remove_cit,
-            );
+            res_out = Some(FilterOutput {
+                text: send.to_string(),
+                ..Default::default()
+            });
         }
 
         let mut res_out = res_out.unwrap();
