@@ -1,9 +1,9 @@
 package gobindings_test
 
 import (
+	_ "embed"
 	"strings"
 	"testing"
-	_ "embed"
 
 	"github.com/stretchr/testify/require"
 
@@ -17,9 +17,8 @@ var tokenizerCommand3 []byte
 func TestFilter_Command3(t *testing.T) {
 	t.Parallel()
 
-
-    tkzr, err := tokenizers.FromBytes(tokenizerCommand3)
-    require.NoError(t, err)
+	tkzr, err := tokenizers.FromBytes(tokenizerCommand3)
+	require.NoError(t, err)
 
 	// for simplicity's sake lets just generate likelihoods in intervals of thousandths
 	testLikelihoods := make([]float32, 999)
@@ -101,7 +100,7 @@ func TestFilter_Command3(t *testing.T) {
 				{IsReasoning: true, Text: "emoji", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{104150}, Logprobs: []float32{0.008}}},
 				{IsReasoning: true, Text: ":", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{33}, Logprobs: []float32{0.009}}},
 				{IsReasoning: true, Text: " 🌈", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{11254, 242, 238}, Logprobs: []float32{0.01, 0.011, 0.012}}},
-				{IsReasoning: true, Citations: []melody.FilterCitation{{
+				{IsReasoning: true, Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{70118}, Logprobs: []float32{0.02}}, Citations: []melody.FilterCitation{{
 					StartIndex: 18,
 					EndIndex:   26,
 					Text:       "emoji: 🌈",
@@ -111,7 +110,7 @@ func TestFilter_Command3(t *testing.T) {
 				{Text: "foo", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{15579}, Logprobs: []float32{0.024}}},
 				{Text: " ", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{37}, Logprobs: []float32{0.027}}},
 				{Text: "bar", Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{4962}, Logprobs: []float32{0.028}}},
-				{Citations: []melody.FilterCitation{{
+				{Logprobs: melody.TokenIDsWithLogProb{TokenIDs: []uint32{70118}, Logprobs: []float32{0.044}}, Citations: []melody.FilterCitation{{
 					StartIndex: 4,
 					EndIndex:   7,
 					Text:       "bar",
