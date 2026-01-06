@@ -907,7 +907,7 @@ unsafe fn cstr_opt(ptr: *const c_char) -> Option<String> {
     if ptr.is_null() {
         None
     } else {
-        Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+        unsafe { Some(CStr::from_ptr(ptr).to_string_lossy().into_owned()) }
     }
 }
 
@@ -915,34 +915,38 @@ unsafe fn parse_json_object(ptr: *const c_char) -> Map<String, Value> {
     if ptr.is_null() {
         Map::new()
     } else {
-        let s = CStr::from_ptr(ptr).to_string_lossy();
-        serde_json::from_str::<Map<String, Value>>(&s).unwrap_or_else(|_| Map::new())
+        unsafe {
+            let s = CStr::from_ptr(ptr).to_string_lossy();
+            serde_json::from_str::<Map<String, Value>>(&s).unwrap_or_else(|_| Map::new())
+        }
     }
 }
 unsafe fn parse_json_value(ptr: *const c_char) -> Value {
     if ptr.is_null() {
         Value::Null
     } else {
-        let s = CStr::from_ptr(ptr).to_string_lossy();
-        serde_json::from_str::<Value>(&s).unwrap_or(Value::Null)
+        unsafe {
+            let s = CStr::from_ptr(ptr).to_string_lossy();
+            serde_json::from_str::<Value>(&s).unwrap_or(Value::Null)
+        }
     }
 }
 
 unsafe fn convert_ctool(tool: &CTool) -> Tool {
     Tool {
-        name: CStr::from_ptr(tool.name).to_string_lossy().into_owned(),
-        description: CStr::from_ptr(tool.description)
-            .to_string_lossy()
-            .into_owned(),
-        parameters: parse_json_object(tool.parameters_json),
+        name: unsafe { CStr::from_ptr(tool.name).to_string_lossy().into_owned() },
+        description: unsafe { CStr::from_ptr(tool.description).to_string_lossy().into_owned() },
+        parameters: unsafe { parse_json_object(tool.parameters_json) },
     }
 }
 
 unsafe fn convert_cimage(image: &CImage) -> Image {
     Image {
-        template_placeholder: CStr::from_ptr(image.template_placeholder)
-            .to_string_lossy()
-            .into_owned(),
+        template_placeholder: unsafe {
+            CStr::from_ptr(image.template_placeholder)
+                .to_string_lossy()
+                .into_owned()
+        },
     }
 }
 
@@ -950,20 +954,20 @@ unsafe fn convert_ccontent(content: &CContent) -> Content {
     let image = if content.image.is_null() {
         None
     } else {
-        Some(convert_cimage(&*content.image))
+        Some(unsafe { convert_cimage(&*content.image) })
     };
     let document = if content.document_json.is_null() {
         None
     } else {
-        match parse_json_value(content.document_json) {
+        match unsafe { parse_json_value(content.document_json) } {
             Value::Object(m) => Some(m),
             _ => None,
         }
     };
     Content {
         content_type: map_content_type(content.content_type),
-        text: cstr_opt(content.text),
-        thinking: cstr_opt(content.thinking),
+        text: unsafe { cstr_opt(content.text) },
+        thinking: unsafe { cstr_opt(content.thinking) },
         image,
         document,
     }
@@ -971,17 +975,15 @@ unsafe fn convert_ccontent(content: &CContent) -> Content {
 
 unsafe fn convert_ctool_call(tc: &CToolCall) -> ToolCall {
     ToolCall {
-        id: CStr::from_ptr(tc.id).to_string_lossy().into_owned(),
-        name: CStr::from_ptr(tc.name).to_string_lossy().into_owned(),
-        parameters: CStr::from_ptr(tc.parameters_json)
-            .to_string_lossy()
-            .into_owned(),
+        id: unsafe { CStr::from_ptr(tc.id).to_string_lossy().into_owned() },
+        name: unsafe { CStr::from_ptr(tc.name).to_string_lossy().into_owned() },
+        parameters: unsafe { CStr::from_ptr(tc.parameters_json).to_string_lossy().into_owned() },
     }
 }
 
 unsafe fn convert_cmessage(msg: &CMessage) -> Message {
     let contents = if !msg.content.is_null() && msg.content_len > 0 {
-        slice::from_raw_parts(msg.content, msg.content_len)
+        unsafe { slice::from_raw_parts(msg.content, msg.content_len) }
             .iter()
             .map(|c| unsafe { convert_ccontent(c) })
             .collect()
@@ -990,7 +992,7 @@ unsafe fn convert_cmessage(msg: &CMessage) -> Message {
     };
 
     let tool_calls = if !msg.tool_calls.is_null() && msg.tool_calls_len > 0 {
-        slice::from_raw_parts(msg.tool_calls, msg.tool_calls_len)
+        unsafe { slice::from_raw_parts(msg.tool_calls, msg.tool_calls_len) }
             .iter()
             .map(|c| unsafe { convert_ctool_call(c) })
             .collect()
@@ -1002,13 +1004,13 @@ unsafe fn convert_cmessage(msg: &CMessage) -> Message {
         role: map_role(msg.role),
         content: contents,
         tool_calls,
-        tool_call_id: cstr_opt(msg.tool_call_id),
+        tool_call_id: unsafe { cstr_opt(msg.tool_call_id) },
     }
 }
 
 unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
     let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
-        slice::from_raw_parts(opts.messages, opts.messages_len)
+        unsafe { slice::from_raw_parts(opts.messages, opts.messages_len) }
             .iter()
             .map(|m| unsafe { convert_cmessage(m) })
             .collect()
@@ -1017,13 +1019,13 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
     };
 
     let documents: Vec<Document> = if !opts.documents_json.is_null() && opts.documents_len > 0 {
-        slice::from_raw_parts(opts.documents_json, opts.documents_len)
+        unsafe { slice::from_raw_parts(opts.documents_json, opts.documents_len) }
             .iter()
             .map(|&ptr| {
                 if ptr.is_null() {
                     Map::new()
                 } else {
-                    match parse_json_value(ptr) {
+                    match unsafe { parse_json_value(ptr) } {
                         Value::Object(m) => m,
                         _ => Map::new(),
                     }
@@ -1035,7 +1037,7 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
     };
 
     let tools = if !opts.available_tools.is_null() && opts.available_tools_len > 0 {
-        slice::from_raw_parts(opts.available_tools, opts.available_tools_len)
+        unsafe { slice::from_raw_parts(opts.available_tools, opts.available_tools_len) }
             .iter()
             .map(|t| unsafe { convert_ctool(t) })
             .collect()
@@ -1043,8 +1045,8 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
         Vec::new()
     };
 
-    let additional_template_fields = parse_json_object(opts.additional_template_fields_json);
-    let escaped_special_tokens_raw = parse_json_object(opts.escaped_special_tokens_json);
+    let additional_template_fields = unsafe { parse_json_object(opts.additional_template_fields_json) };
+    let escaped_special_tokens_raw = unsafe { parse_json_object(opts.escaped_special_tokens_json) };
     let escaped_special_tokens = escaped_special_tokens_raw
         .into_iter()
         .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
@@ -1052,8 +1054,8 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
 
     RenderCmd3Options {
         messages,
-        template: CStr::from_ptr(opts.template).to_string_lossy().into_owned(),
-        dev_instruction: cstr_opt(opts.dev_instruction),
+        template: unsafe { CStr::from_ptr(opts.template).to_string_lossy().into_owned() },
+        dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
         documents,
         available_tools: tools,
         safety_mode: if opts.has_safety_mode {
@@ -1072,8 +1074,8 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
             None
         },
         skip_preamble: opts.skip_preamble,
-        response_prefix: cstr_opt(opts.response_prefix),
-        json_schema: cstr_opt(opts.json_schema),
+        response_prefix: unsafe { cstr_opt(opts.response_prefix) },
+        json_schema: unsafe { cstr_opt(opts.json_schema) },
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
@@ -1082,7 +1084,7 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
 
 unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
     let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
-        slice::from_raw_parts(opts.messages, opts.messages_len)
+        unsafe { slice::from_raw_parts(opts.messages, opts.messages_len) }
             .iter()
             .map(|m| unsafe { convert_cmessage(m) })
             .collect()
@@ -1091,13 +1093,13 @@ unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
     };
 
     let documents: Vec<Document> = if !opts.documents_json.is_null() && opts.documents_len > 0 {
-        slice::from_raw_parts(opts.documents_json, opts.documents_len)
+        unsafe { slice::from_raw_parts(opts.documents_json, opts.documents_len) }
             .iter()
             .map(|&ptr| {
                 if ptr.is_null() {
                     Map::new()
                 } else {
-                    match parse_json_value(ptr) {
+                    match unsafe { parse_json_value(ptr) } {
                         Value::Object(m) => m,
                         _ => Map::new(),
                     }
@@ -1109,7 +1111,7 @@ unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
     };
 
     let tools = if !opts.available_tools.is_null() && opts.available_tools_len > 0 {
-        slice::from_raw_parts(opts.available_tools, opts.available_tools_len)
+        unsafe { slice::from_raw_parts(opts.available_tools, opts.available_tools_len) }
             .iter()
             .map(|t| unsafe { convert_ctool(t) })
             .collect()
@@ -1117,8 +1119,8 @@ unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
         Vec::new()
     };
 
-    let additional_template_fields = parse_json_object(opts.additional_template_fields_json);
-    let escaped_special_tokens_raw = parse_json_object(opts.escaped_special_tokens_json);
+    let additional_template_fields = unsafe { parse_json_object(opts.additional_template_fields_json) };
+    let escaped_special_tokens_raw = unsafe { parse_json_object(opts.escaped_special_tokens_json) };
     let escaped_special_tokens = escaped_special_tokens_raw
         .into_iter()
         .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
@@ -1126,9 +1128,9 @@ unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
 
     RenderCmd4Options {
         messages,
-        template: CStr::from_ptr(opts.template).to_string_lossy().into_owned(),
-        dev_instruction: cstr_opt(opts.dev_instruction),
-        platform_instruction: cstr_opt(opts.platform_instruction),
+        template: unsafe { CStr::from_ptr(opts.template).to_string_lossy().into_owned() },
+        dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
+        platform_instruction: unsafe { cstr_opt(opts.platform_instruction) },
         documents,
         available_tools: tools,
         grounding: if opts.has_grounding {
@@ -1136,8 +1138,8 @@ unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
         } else {
             None
         },
-        response_prefix: cstr_opt(opts.response_prefix),
-        json_schema: cstr_opt(opts.json_schema),
+        response_prefix: unsafe { cstr_opt(opts.response_prefix) },
+        json_schema: unsafe { cstr_opt(opts.json_schema) },
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
@@ -1155,7 +1157,7 @@ pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> 
     if opts.is_null() {
         return std::ptr::null_mut();
     }
-    let rust_opts = convert_cmd3_options(&*opts);
+    let rust_opts = unsafe { convert_cmd3_options(&*opts) };
     match render_cmd3(&rust_opts) {
         Ok(s) => CString::new(s).unwrap().into_raw(),
         Err(_) => std::ptr::null_mut(),
@@ -1169,7 +1171,7 @@ pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> 
     if opts.is_null() {
         return std::ptr::null_mut();
     }
-    let rust_opts = convert_cmd4_options(&*opts);
+    let rust_opts = unsafe { convert_cmd4_options(&*opts) };
     match render_cmd4(&rust_opts) {
         Ok(s) => CString::new(s).unwrap().into_raw(),
         Err(_) => std::ptr::null_mut(),
@@ -1179,7 +1181,9 @@ pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> 
 /// Frees a C string returned by render functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_string_free(s: *mut c_char) {
-    if !s.is_null() {
-        let _ = CString::from_raw(s);
+    unsafe {
+        if !s.is_null() {
+            let _ = CString::from_raw(s);
+        }
     }
 }
