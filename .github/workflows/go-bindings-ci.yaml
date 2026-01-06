@@ -77,4 +77,4 @@ jobs:
       - name: Run Go tests
         run: |
           go env -w GOPRIVATE=github.com/cohere-ai
-          go test ./gobindings/... -v -count=1
+          go test -v -count=1 ./gobindings/...
