@@ -541,12 +541,12 @@ func buildCDocuments(a *cAllocator, docs []map[string]any) (**C.char, C.size_t) 
 	n := len(docs)
 	// allocate array of *char in C memory
 	size := uintptr(n) * unsafe.Sizeof((*C.char)(nil))
-	base := a.Malloc(size)
-	arr := unsafe.Slice((**C.char)(base), n)
+	base := (**C.char)(a.Malloc(size))
+	arr := unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		arr[i] = jsonCString(a, docs[i])
 	}
-	return (**C.char)(base), C.size_t(n)
+	return base, C.size_t(n)
 }
 
 func buildCTools(a *cAllocator, tools []Tool) (*C.CTool, C.size_t) {
@@ -556,14 +556,14 @@ func buildCTools(a *cAllocator, tools []Tool) (*C.CTool, C.size_t) {
 	n := len(tools)
 	var sample C.CTool
 	size := uintptr(n) * unsafe.Sizeof(sample)
-	base := a.Malloc(size)
+	base := (*C.CTool)(a.Malloc(size))
 	var arr []C.CTool = unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		arr[i].name = a.CString(tools[i].Name)
 		arr[i].description = a.CString(tools[i].Description)
 		arr[i].parameters_json = jsonCString(a, tools[i].Parameters)
 	}
-	return (*C.CTool)(base), C.size_t(n)
+	return base, C.size_t(n)
 }
 
 func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
@@ -573,7 +573,7 @@ func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
 	n := len(contents)
 	var sample C.CContent
 	size := uintptr(n) * unsafe.Sizeof(sample)
-	base := a.Malloc(size)
+	base := (*C.CContent)(a.Malloc(size))
 	var arr []C.CContent = unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		c := contents[i]
@@ -597,7 +597,7 @@ func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
 			arr[i].document_json = jsonCString(a, c.Document)
 		}
 	}
-	return (*C.CContent)(base), C.size_t(n)
+	return base, C.size_t(n)
 }
 
 func buildCToolCalls(a *cAllocator, calls []ToolCall) (*C.CToolCall, C.size_t) {
@@ -607,15 +607,15 @@ func buildCToolCalls(a *cAllocator, calls []ToolCall) (*C.CToolCall, C.size_t) {
 	n := len(calls)
 	var sample C.CToolCall
 	size := uintptr(n) * unsafe.Sizeof(sample)
-	base := a.Malloc(size)
-	arr := (*C.CToolCall)(base)
+	base := (*C.CToolCall)(a.Malloc(size))
+	var arr []C.CToolCall = unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		tc := calls[i]
 		arr[i].id = a.CString(tc.ID)
 		arr[i].name = a.CString(tc.Name)
 		arr[i].parameters_json = jsonCString(a, tc.Parameters)
 	}
-	return arr, C.size_t(n)
+	return base, C.size_t(n)
 }
 
 func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
@@ -625,7 +625,7 @@ func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 	n := len(msgs)
 	var sample C.CMessage
 	size := uintptr(n) * unsafe.Sizeof(sample)
-	base := a.Malloc(size)
+	base := (*C.CMessage)(a.Malloc(size))
 	var arr []C.CMessage = unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		m := msgs[i]
@@ -646,7 +646,7 @@ func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 			arr[i].tool_call_id = a.CString(m.ToolCallID)
 		}
 	}
-	return (*C.CMessage)(base), C.size_t(n)
+	return base, C.size_t(n)
 }
 
 // RenderCMD3 renders CMD3 using the Rust templating engine via FFI.

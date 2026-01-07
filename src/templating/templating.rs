@@ -2,7 +2,6 @@ use crate::templating::types::*;
 use crate::templating::util::*;
 use serde::Deserialize;
 use serde_json::{Map, Value, to_string};
-use serde_path_to_error::deserialize;
 use std::collections::BTreeMap;
 use std::error::Error;
 
@@ -257,6 +256,7 @@ mod tests {
     use serde_json::Value;
     use std::fs;
     use std::path::Path;
+    use serde_path_to_error::deserialize;
 
     fn read_test_cases(version: &str) -> Vec<(String, Value, String)> {
         let mut cases = vec![];
