@@ -1061,9 +1061,8 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
         .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
         .collect();
 
-    RenderCmd3Options {
+    let rs_opts = RenderCmd3Options {
         messages,
-        template: unsafe { CStr::from_ptr(opts.template).to_str().unwrap() },
         dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
         documents,
         available_tools: tools,
@@ -1088,6 +1087,17 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
+        ..Default::default()
+    };
+
+    let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
+    if template == "" {
+        rs_opts
+    } else {
+        RenderCmd3Options {
+            template,
+            ..rs_opts
+        }
     }
 }
 
@@ -1136,7 +1146,7 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
         .collect();
 
-    RenderCmd4Options {
+    let rs_opts = RenderCmd4Options {
         messages,
         template: unsafe { CStr::from_ptr(opts.template).to_str().unwrap() },
         dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
@@ -1153,6 +1163,15 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
+    };
+    let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
+    if template == "" {
+        rs_opts
+    } else {
+        RenderCmd4Options {
+            template,
+            ..rs_opts
+        }
     }
 }
 

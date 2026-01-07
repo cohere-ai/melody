@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"runtime"
+	"strings"
 	"unsafe"
 )
 
@@ -421,6 +422,156 @@ const (
 	ReasoningTypeDisabled ReasoningType = 2
 )
 
+// Unmarshalers for enums (case-insensitive string support; numbers map directly)
+
+func (r *Role) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*r = RoleUnknown
+		case "system":
+			*r = RoleSystem
+		case "user":
+			*r = RoleUser
+		case "chatbot", "assistant":
+			*r = RoleChatbot
+		case "tool":
+			*r = RoleTool
+		default:
+			return errors.New("invalid Role: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*r = Role(n)
+		return nil
+	}
+	return errors.New("Role must be a string or number")
+}
+
+func (t *ContentType) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*t = ContentUnknown
+		case "text":
+			*t = ContentText
+		case "thinking":
+			*t = ContentThinking
+		case "image":
+			*t = ContentImage
+		case "document":
+			*t = ContentDocument
+		default:
+			return errors.New("invalid ContentType: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*t = ContentType(n)
+		return nil
+	}
+	return errors.New("ContentType must be a string or number")
+}
+
+func (q *CitationQuality) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*q = CitationQualityUnknown
+		case "off", "disabled", "false", "0":
+			*q = CitationQualityOff
+		case "on", "enabled", "true", "1":
+			*q = CitationQualityOn
+		default:
+			return errors.New("invalid CitationQuality: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*q = CitationQuality(n)
+		return nil
+	}
+	return errors.New("CitationQuality must be a string or number")
+}
+
+func (g *Grounding) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*g = GroundingUnknown
+		case "enabled", "on", "true", "1":
+			*g = GroundingEnabled
+		case "disabled", "off", "false", "0":
+			*g = GroundingDisabled
+		default:
+			return errors.New("invalid Grounding: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*g = Grounding(n)
+		return nil
+	}
+	return errors.New("Grounding must be a string or number")
+}
+
+func (s *SafetyMode) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		switch strings.ToLower(strings.TrimSpace(str)) {
+		case "unknown":
+			*s = SafetyModeUnknown
+		case "none":
+			*s = SafetyModeNone
+		case "strict":
+			*s = SafetyModeStrict
+		case "contextual":
+			*s = SafetyModeContextual
+		default:
+			return errors.New("invalid SafetyMode: " + str)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*s = SafetyMode(n)
+		return nil
+	}
+	return errors.New("SafetyMode must be a string or number")
+}
+
+func (rt *ReasoningType) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*rt = ReasoningTypeUnknown
+		case "enabled", "on", "true", "1":
+			*rt = ReasoningTypeEnabled
+		case "disabled", "off", "false", "0":
+			*rt = ReasoningTypeDisabled
+		default:
+			return errors.New("invalid ReasoningType: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*rt = ReasoningType(n)
+		return nil
+	}
+	return errors.New("ReasoningType must be a string or number")
+}
+
 // Templating Go-side types
 type Tool struct {
 	Name        string
@@ -491,9 +642,6 @@ type cAllocator struct {
 }
 
 func (a *cAllocator) CString(s string) *C.char {
-	if s == "" {
-		return nil
-	}
 	p := C.CString(s)
 	a.ptrs = append(a.ptrs, unsafe.Pointer(p))
 	return p
@@ -651,10 +799,6 @@ func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 
 // RenderCMD3 renders CMD3 using the Rust templating engine via FFI.
 func RenderCMD3(opts RenderCmd3Options) (string, error) {
-	if opts.Template == "" {
-		return "", errors.New("template is required")
-	}
-
 	var a cAllocator
 	defer a.FreeAll()
 
@@ -715,7 +859,6 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 		additional_template_fields_json: additionalFields,
 		escaped_special_tokens_json:     escapedTokens,
 	}
-
 	// Call into Rust
 	cs := C.melody_render_cmd3(&cOpts)
 	if cs == nil {
@@ -729,10 +872,6 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 
 // RenderCMD4 renders CMD4 using the Rust templating engine via FFI.
 func RenderCMD4(opts RenderCmd4Options) (string, error) {
-	if opts.Template == "" {
-		return "", errors.New("template is required")
-	}
-
 	var a cAllocator
 	defer a.FreeAll()
 

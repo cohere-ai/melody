@@ -68,7 +68,7 @@ pub struct RenderCmd4Options<'a> {
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 
-static CMD4V1_TEMPLATE: &str = "";
+static CMD4V1_TEMPLATE: &str = include_str!("templates/cmd4-v1.tmpl");
 impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
