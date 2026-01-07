@@ -10,12 +10,25 @@ import (
 // functional (mostly that it's importable and callable). This gets run from
 // the release Dockerfile before finishing the build to ensure it works.
 func main() {
+
+    // **********
+    // TEMPLATING
+    // **********
+
+
+
+    // *******
+    // PARSING
+    // *******
     filter := melody.NewFilter()
     fo := filter.WriteDecoded("Hello", nil)
     for _, output := range fo {
         fmt.Println(output.Text)
     }
 
+    // **********
+    // TOKENIZERS
+    // **********
     tk, err := tokenizers.FromFile("./gobindings/data/bert-base-uncased.json")
     if err != nil {
         panic(err)
