@@ -1,12 +1,37 @@
+//! Citation parsing functionality
+//!
+//! This module handles parsing of inline citations from grounded model outputs.
+//! Citations are used to attribute generated text to specific source documents or
+//! tool results.
+//!
+
 use crate::filter::{FilterImpl, find_partial};
 use crate::types::{FilterCitation, FilterMode, FilterOutput, Source, TokenIDsWithLogProb};
 
+// Citation marker constants
 const START_FIRST_CIT: &str = "<co: ";
 const START_LAST_CIT: &str = "</co: ";
 const END_OF_CIT: &str = ">";
 const START_FIRST_CIT_CMD3: &str = "<co";
 
 impl FilterImpl {
+    /// Process text response, extracting citations.
+    ///
+    /// This method is called when in `GroundedAnswer` or `ToolReason` mode. It parses
+    /// the text stream looking for citation markers and extracts both the text
+    /// and source attribution.
+    ///
+    /// # Arguments
+    ///
+    /// * `bstr` - Byte string to process
+    /// * `after_last_token` - Whether this is the final flush (affects buffering)
+    /// * `mode` - Current filter mode (`GroundedAnswer` or `ToolReason`)
+    /// * `token_log_probs` - Optional log probabilities for these tokens
+    ///
+    /// # Returns
+    ///
+    /// A tuple of (outputs, `bytes_consumed`) where `bytes_consumed` indicates how
+    /// many bytes from bstr were processed and can be removed from the buffer.
     pub(crate) fn process_grounded_text(
         &mut self,
         bstr: &[u8],
