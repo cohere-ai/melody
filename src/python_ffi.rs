@@ -25,6 +25,7 @@ impl PyFilter {
     ///
     /// Returns:
     ///     A new `PyFilter` instance
+    // TODO: figure out how we want to pass log probs (if we do)
     #[new]
     fn new(opts: &PyFilterOptions) -> Self {
         PyFilter {

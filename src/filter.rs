@@ -502,6 +502,7 @@ impl Filter for FilterImpl {
     }
 }
 
+/// Find partial returns first index in str that might match one of stop sequences.
 pub(crate) fn find_partial<'a>(
     s: &str,
     stops: impl Iterator<Item = &'a String>,

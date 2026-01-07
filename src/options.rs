@@ -65,7 +65,7 @@ impl FilterOptions {
         Self::default()
     }
 
-    // PRESET CONFIGURATIONS
+    // CONFIGURATION FOR BINDINGS
 
     /// Configure for Cohere Command 3 model format.
     ///
