@@ -448,7 +448,7 @@ type ToolCall struct {
 
 type Message struct {
 	Role       Role
-	Contents   []Content
+	Content    []Content
 	ToolCalls  []ToolCall
 	ToolCallID string // optional: empty means omitted
 }
@@ -632,7 +632,7 @@ func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 		arr[i].role = roleToC(m.Role)
 
 		// contents
-		cContent, cContentLen := buildCContents(a, m.Contents)
+		cContent, cContentLen := buildCContents(a, m.Content)
 		arr[i].content = cContent
 		arr[i].content_len = cContentLen
 

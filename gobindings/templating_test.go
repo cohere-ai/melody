@@ -19,6 +19,35 @@ func TestTemplating_RenderCMD3(t *testing.T) {
 				Template: "Hello!",
 			},
 			want: "Hello!",
+		}, {
+			name: "with basic substitutions",
+			input: RenderCmd3Options{
+				Messages: []Message{
+					{
+						Role: RoleChatbot,
+						Content: []Content{
+							{
+								Type: ContentText,
+								Text: "Hello user!",
+							},
+						},
+					},
+					{
+						Role: RoleUser,
+						Content: []Content{
+							{
+								Type: ContentText,
+								Text: "Some content",
+							}, {
+								Type: ContentText,
+								Text: ". More content",
+							},
+						},
+					},
+				},
+				Template: "{% for message in messages %}{{message.role}}: {% for content_item in message.content %}{{content_item.data}}{% endfor %}\n{% endfor %}",
+			},
+			want: "CHATBOT: Hello user!\nUSER: Some content. More content\n",
 		},
 	}
 	for _, tt := range tests {
