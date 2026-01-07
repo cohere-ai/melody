@@ -381,10 +381,10 @@ const (
 type ContentType int32
 
 const (
-	ContentUnknown ContentType = 0
-	ContentText    ContentType = 1
+	ContentUnknown  ContentType = 0
+	ContentText     ContentType = 1
 	ContentThinking ContentType = 2
-	ContentImage   ContentType = 3
+	ContentImage    ContentType = 3
 	ContentDocument ContentType = 4
 )
 
@@ -399,25 +399,25 @@ const (
 type Grounding int32
 
 const (
-	GroundingUnknown Grounding = 0
-	GroundingEnabled Grounding = 1
+	GroundingUnknown  Grounding = 0
+	GroundingEnabled  Grounding = 1
 	GroundingDisabled Grounding = 2
 )
 
 type SafetyMode int32
 
 const (
-	SafetyModeUnknown   SafetyMode = 0
-	SafetyModeNone      SafetyMode = 1
-	SafetyModeStrict    SafetyMode = 2
+	SafetyModeUnknown    SafetyMode = 0
+	SafetyModeNone       SafetyMode = 1
+	SafetyModeStrict     SafetyMode = 2
 	SafetyModeContextual SafetyMode = 3
 )
 
 type ReasoningType int32
 
 const (
-	ReasoningTypeUnknown ReasoningType = 0
-	ReasoningTypeEnabled ReasoningType = 1
+	ReasoningTypeUnknown  ReasoningType = 0
+	ReasoningTypeEnabled  ReasoningType = 1
 	ReasoningTypeDisabled ReasoningType = 2
 )
 
@@ -434,10 +434,10 @@ type Image struct {
 
 type Content struct {
 	Type     ContentType
-	Text     string            // optional: empty means omitted
-	Thinking string            // optional: empty means omitted
-	Image    *Image            // optional
-	Document map[string]any    // optional: will be JSON-encoded
+	Text     string         // optional: empty means omitted
+	Thinking string         // optional: empty means omitted
+	Image    *Image         // optional
+	Document map[string]any // optional: will be JSON-encoded
 }
 
 type ToolCall struct {
@@ -456,33 +456,33 @@ type Message struct {
 type RenderCmd3Options struct {
 	Messages                 []Message
 	Template                 string
-	DevInstruction           string                       // optional: empty means omitted
-	Documents                []map[string]any             // JSON objects
+	DevInstruction           string           // optional: empty means omitted
+	Documents                []map[string]any // JSON objects
 	AvailableTools           []Tool
-	SafetyMode               *SafetyMode                  // optional
-	CitationQuality          *CitationQuality             // optional
-	ReasoningType            *ReasoningType               // optional
+	SafetyMode               *SafetyMode      // optional
+	CitationQuality          *CitationQuality // optional
+	ReasoningType            *ReasoningType   // optional
 	SkipPreamble             bool
-	ResponsePrefix           string                       // optional: empty means omitted
-	JSONSchema               string                       // optional: empty means omitted
+	ResponsePrefix           string // optional: empty means omitted
+	JSONSchema               string // optional: empty means omitted
 	JSONMode                 bool
-	AdditionalTemplateFields map[string]any               // optional: JSON-encoded
-	EscapedSpecialTokens     map[string]string            // optional: JSON-encoded
+	AdditionalTemplateFields map[string]any    // optional: JSON-encoded
+	EscapedSpecialTokens     map[string]string // optional: JSON-encoded
 }
 
 type RenderCmd4Options struct {
 	Messages                 []Message
 	Template                 string
-	DevInstruction           string                       // optional: empty means omitted
-	PlatformInstruction      string                       // optional: empty means omitted
+	DevInstruction           string // optional: empty means omitted
+	PlatformInstruction      string // optional: empty means omitted
 	Documents                []map[string]any
 	AvailableTools           []Tool
-	Grounding                *Grounding                   // optional
-	ResponsePrefix           string                       // optional: empty means omitted
-	JSONSchema               string                       // optional: empty means omitted
+	Grounding                *Grounding // optional
+	ResponsePrefix           string     // optional: empty means omitted
+	JSONSchema               string     // optional: empty means omitted
 	JSONMode                 bool
-	AdditionalTemplateFields map[string]any               // optional
-	EscapedSpecialTokens     map[string]string            // optional
+	AdditionalTemplateFields map[string]any    // optional
+	EscapedSpecialTokens     map[string]string // optional
 }
 
 // Internal C allocator helper to track and free C allocations
@@ -516,12 +516,12 @@ func (a *cAllocator) FreeAll() {
 }
 
 // Helpers to map Go enums to C enums
-func roleToC(r Role) C.CRole                         { return C.CRole(r) }
-func contentTypeToC(t ContentType) C.CContentType    { return C.CContentType(t) }
+func roleToC(r Role) C.CRole                                  { return C.CRole(r) }
+func contentTypeToC(t ContentType) C.CContentType             { return C.CContentType(t) }
 func citationQualityToC(q CitationQuality) C.CCitationQuality { return C.CCitationQuality(q) }
-func groundingToC(g Grounding) C.CGrounding          { return C.CGrounding(g) }
-func safetyModeToC(s SafetyMode) C.CSafetyMode       { return C.CSafetyMode(s) }
-func reasoningTypeToC(rt ReasoningType) C.CReasoningType { return C.CReasoningType(rt) }
+func groundingToC(g Grounding) C.CGrounding                   { return C.CGrounding(g) }
+func safetyModeToC(s SafetyMode) C.CSafetyMode                { return C.CSafetyMode(s) }
+func reasoningTypeToC(rt ReasoningType) C.CReasoningType      { return C.CReasoningType(rt) }
 
 func jsonCString(a *cAllocator, v any) *C.char {
 	if v == nil {
@@ -557,7 +557,7 @@ func buildCTools(a *cAllocator, tools []Tool) (*C.CTool, C.size_t) {
 	var sample C.CTool
 	size := uintptr(n) * unsafe.Sizeof(sample)
 	base := a.Malloc(size)
-	arr := unsafe.Slice((*C.CTool)(base), n)
+	var arr []C.CTool = unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		arr[i].name = a.CString(tools[i].Name)
 		arr[i].description = a.CString(tools[i].Description)
@@ -574,7 +574,7 @@ func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
 	var sample C.CContent
 	size := uintptr(n) * unsafe.Sizeof(sample)
 	base := a.Malloc(size)
-	arr := unsafe.Slice((*C.CContent)(base), n)
+	var arr []C.CContent = unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		c := contents[i]
 		arr[i].content_type = contentTypeToC(c.Type)
@@ -608,14 +608,14 @@ func buildCToolCalls(a *cAllocator, calls []ToolCall) (*C.CToolCall, C.size_t) {
 	var sample C.CToolCall
 	size := uintptr(n) * unsafe.Sizeof(sample)
 	base := a.Malloc(size)
-	arr := unsafe.Slice((*C.CToolCall)(base), n)
+	arr := (*C.CToolCall)(base)
 	for i := 0; i < n; i++ {
 		tc := calls[i]
 		arr[i].id = a.CString(tc.ID)
 		arr[i].name = a.CString(tc.Name)
 		arr[i].parameters_json = jsonCString(a, tc.Parameters)
 	}
-	return (*C.CToolCall)(base), C.size_t(n)
+	return arr, C.size_t(n)
 }
 
 func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
@@ -626,7 +626,7 @@ func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 	var sample C.CMessage
 	size := uintptr(n) * unsafe.Sizeof(sample)
 	base := a.Malloc(size)
-	arr := unsafe.Slice((*C.CMessage)(base), n)
+	var arr []C.CMessage = unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		m := msgs[i]
 		arr[i].role = roleToC(m.Role)
@@ -694,24 +694,24 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 
 	// Build options struct (lives on Go stack; nested buffers are C-allocated)
 	cOpts := C.CRenderCmd3Options{
-		messages:                   cMsgs,
-		messages_len:               cMsgsLen,
-		template:                   a.CString(opts.Template),
-		dev_instruction:            devInstr,
-		documents_json:             cDocs,
-		documents_len:              cDocsLen,
-		available_tools:            cTools,
-		available_tools_len:        cToolsLen,
-		safety_mode:                cSafety,
-		has_safety_mode:            hasSafety,
-		citation_quality:           cCitation,
-		has_citation_quality:       hasCitation,
-		reasoning_type:             cReason,
-		has_reasoning_type:         hasReason,
-		skip_preamble:              C.bool(opts.SkipPreamble),
-		response_prefix:            respPrefix,
-		json_schema:                jsonSchema,
-		json_mode:                  C.bool(opts.JSONMode),
+		messages:                        cMsgs,
+		messages_len:                    cMsgsLen,
+		template:                        a.CString(opts.Template),
+		dev_instruction:                 devInstr,
+		documents_json:                  cDocs,
+		documents_len:                   cDocsLen,
+		available_tools:                 cTools,
+		available_tools_len:             cToolsLen,
+		safety_mode:                     cSafety,
+		has_safety_mode:                 hasSafety,
+		citation_quality:                cCitation,
+		has_citation_quality:            hasCitation,
+		reasoning_type:                  cReason,
+		has_reasoning_type:              hasReason,
+		skip_preamble:                   C.bool(opts.SkipPreamble),
+		response_prefix:                 respPrefix,
+		json_schema:                     jsonSchema,
+		json_mode:                       C.bool(opts.JSONMode),
 		additional_template_fields_json: additionalFields,
 		escaped_special_tokens_json:     escapedTokens,
 	}
@@ -756,20 +756,20 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 	escapedTokens := jsonCString(&a, opts.EscapedSpecialTokens)
 
 	cOpts := C.CRenderCmd4Options{
-		messages:                   cMsgs,
-		messages_len:               cMsgsLen,
-		template:                   a.CString(opts.Template),
-		dev_instruction:            devInstr,
-		platform_instruction:       platInstr,
-		documents_json:             cDocs,
-		documents_len:              cDocsLen,
-		available_tools:            cTools,
-		available_tools_len:        cToolsLen,
-		grounding:                  cGround,
-		has_grounding:              hasGround,
-		response_prefix:            respPrefix,
-		json_schema:                jsonSchema,
-		json_mode:                  C.bool(opts.JSONMode),
+		messages:                        cMsgs,
+		messages_len:                    cMsgsLen,
+		template:                        a.CString(opts.Template),
+		dev_instruction:                 devInstr,
+		platform_instruction:            platInstr,
+		documents_json:                  cDocs,
+		documents_len:                   cDocsLen,
+		available_tools:                 cTools,
+		available_tools_len:             cToolsLen,
+		grounding:                       cGround,
+		has_grounding:                   hasGround,
+		response_prefix:                 respPrefix,
+		json_schema:                     jsonSchema,
+		json_mode:                       C.bool(opts.JSONMode),
 		additional_template_fields_json: additionalFields,
 		escaped_special_tokens_json:     escapedTokens,
 	}
@@ -784,4 +784,3 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 	runtime.KeepAlive(&cOpts)
 	return result, nil
 }
-
