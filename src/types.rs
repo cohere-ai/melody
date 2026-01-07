@@ -37,6 +37,17 @@ pub struct TokenIDsWithLogProb {
 }
 
 impl TokenIDsWithLogProb {
+    /// Creates a new empty `TokenIDsWithLogProb` instance.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::TokenIDsWithLogProb;
+    ///
+    /// let logprobs = TokenIDsWithLogProb::new();
+    /// assert!(logprobs.token_ids.is_empty());
+    /// assert!(logprobs.logprobs.is_empty());
+    /// ```
     #[must_use]
     pub fn new() -> Self {
         Self {

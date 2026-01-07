@@ -44,54 +44,83 @@ pub struct CFilterOptions {
 /// C-compatible representation of `FilterOutput`
 #[repr(C)]
 pub struct CFilterOutput {
+    /// Null-terminated C string containing the output text
     pub text: *mut c_char,
+    /// Length of the text in bytes (excluding null terminator)
     pub text_len: usize,
 
+    /// Array of token IDs
     pub token_ids: *mut u32,
+    /// Number of token IDs
     pub token_ids_len: usize,
+    /// Array of log probabilities (parallel to `token_ids`)
     pub logprobs: *mut f32,
+    /// Number of log probabilities
     pub logprobs_len: usize,
 
+    /// Index of the search query (-1 if None)
     pub search_query_index: i32, // -1 if None
+    /// Null-terminated C string containing the search query text
     pub search_query_text: *mut c_char,
 
+    /// Array of citations
     pub citations: *mut CFilterCitation,
+    /// Number of citations
     pub citations_len: usize,
 
+    /// Index of the tool call (-1 if None)
     pub tool_call_index: i32, // -1 if None
+    /// Null-terminated C string containing the tool call ID
     pub tool_call_id: *mut c_char,
+    /// Null-terminated C string containing the tool call name
     pub tool_call_name: *mut c_char,
+    /// Null-terminated C string containing the parameter name
     pub tool_call_param_name: *mut c_char,
+    /// Null-terminated C string containing the parameter value delta
     pub tool_call_param_value_delta: *mut c_char,
+    /// Null-terminated C string containing the raw parameter delta
     pub tool_call_raw_param_delta: *mut c_char,
 
+    /// Whether this is post-answer content
     pub is_post_answer: bool,
+    /// Whether this is reasoning/thinking content
     pub is_reasoning: bool,
 }
 
 /// C-compatible representation of `FilterCitation`
 #[repr(C)]
 pub struct CFilterCitation {
+    /// Character index where the citation starts
     pub start_index: usize,
+    /// Character index where the citation ends (exclusive)
     pub end_index: usize,
+    /// Null-terminated C string containing the cited text
     pub text: *mut c_char,
+    /// Array of sources for this citation
     pub sources: *mut CSource,
+    /// Number of sources
     pub sources_len: usize,
+    /// Whether this citation appears in a thinking block
     pub is_thinking: bool,
 }
 
 /// C-compatible representation of Source
 #[repr(C)]
 pub struct CSource {
+    /// Index of the tool call that produced these results
     pub tool_call_index: usize,
+    /// Array of tool result indices
     pub tool_result_indices: *mut usize,
+    /// Number of tool result indices
     pub tool_result_indices_len: usize,
 }
 
 /// C-compatible representation of an array of `FilterOutput`
 #[repr(C)]
 pub struct CFilterOutputArray {
+    /// Array of filter outputs
     pub outputs: *mut CFilterOutput,
+    /// Number of outputs in the array
     pub len: usize,
 }
 

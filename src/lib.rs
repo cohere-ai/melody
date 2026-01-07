@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Melody Parsing - Rust port of the Cohere token stream parsing library
 //!
 //! This library provides functionality for parsing and filtering token streams from language models,
@@ -113,6 +114,25 @@ pub mod ffi;
 mod python_ffi;
 
 #[cfg(feature = "tkzrs")]
+/// Tokenizer FFI bindings for cross-language tokenization support.
+///
+/// This module provides C-compatible bindings for `HuggingFace` tokenizers,
+/// primarily intended for use from Go but compatible with any language that
+/// can call C functions.
+///
+/// # Features
+///
+/// - Load tokenizers from bytes or file
+/// - Encode text to token IDs with various options
+/// - Decode token IDs back to text
+/// - Query vocabulary size
+/// - Configurable truncation and special token handling
+///
+/// # Safety
+///
+/// All functions in this module are `unsafe extern "C"` and require careful
+/// memory management. See the module documentation for details on ownership
+/// and memory safety requirements.
 pub mod tokenizers;
 
 #[cfg(test)]
