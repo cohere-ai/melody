@@ -724,7 +724,6 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 	defer C.melody_string_free(cs)
 
 	result := C.GoString(cs)
-	runtime.KeepAlive(&cOpts)
 	return result, nil
 }
 
@@ -781,6 +780,5 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 	defer C.melody_string_free(cs)
 
 	result := C.GoString(cs)
-	runtime.KeepAlive(&cOpts)
 	return result, nil
 }
