@@ -935,7 +935,11 @@ unsafe fn parse_json_value(ptr: *const c_char) -> Value {
 unsafe fn convert_ctool(tool: &CTool) -> Tool {
     Tool {
         name: unsafe { CStr::from_ptr(tool.name).to_string_lossy().into_owned() },
-        description: unsafe { CStr::from_ptr(tool.description).to_string_lossy().into_owned() },
+        description: unsafe {
+            CStr::from_ptr(tool.description)
+                .to_string_lossy()
+                .into_owned()
+        },
         parameters: unsafe { parse_json_object(tool.parameters_json) },
     }
 }
@@ -977,7 +981,11 @@ unsafe fn convert_ctool_call(tc: &CToolCall) -> ToolCall {
     ToolCall {
         id: unsafe { CStr::from_ptr(tc.id).to_string_lossy().into_owned() },
         name: unsafe { CStr::from_ptr(tc.name).to_string_lossy().into_owned() },
-        parameters: unsafe { CStr::from_ptr(tc.parameters_json).to_string_lossy().into_owned() },
+        parameters: unsafe {
+            CStr::from_ptr(tc.parameters_json)
+                .to_string_lossy()
+                .into_owned()
+        },
     }
 }
 
@@ -1008,7 +1016,7 @@ unsafe fn convert_cmessage(msg: &CMessage) -> Message {
     }
 }
 
-unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
+unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Options<'a> {
     let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
         unsafe { slice::from_raw_parts(opts.messages, opts.messages_len) }
             .iter()
@@ -1045,7 +1053,8 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
         Vec::new()
     };
 
-    let additional_template_fields = unsafe { parse_json_object(opts.additional_template_fields_json) };
+    let additional_template_fields =
+        unsafe { parse_json_object(opts.additional_template_fields_json) };
     let escaped_special_tokens_raw = unsafe { parse_json_object(opts.escaped_special_tokens_json) };
     let escaped_special_tokens = escaped_special_tokens_raw
         .into_iter()
@@ -1054,7 +1063,7 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
 
     RenderCmd3Options {
         messages,
-        template: unsafe { CStr::from_ptr(opts.template).to_string_lossy().into_owned() },
+        template: unsafe { CStr::from_ptr(opts.template).to_str().unwrap() },
         dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
         documents,
         available_tools: tools,
@@ -1082,7 +1091,7 @@ unsafe fn convert_cmd3_options(opts: &CRenderCmd3Options) -> RenderCmd3Options {
     }
 }
 
-unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
+unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Options<'a> {
     let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
         unsafe { slice::from_raw_parts(opts.messages, opts.messages_len) }
             .iter()
@@ -1119,7 +1128,8 @@ unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
         Vec::new()
     };
 
-    let additional_template_fields = unsafe { parse_json_object(opts.additional_template_fields_json) };
+    let additional_template_fields =
+        unsafe { parse_json_object(opts.additional_template_fields_json) };
     let escaped_special_tokens_raw = unsafe { parse_json_object(opts.escaped_special_tokens_json) };
     let escaped_special_tokens = escaped_special_tokens_raw
         .into_iter()
@@ -1128,7 +1138,7 @@ unsafe fn convert_cmd4_options(opts: &CRenderCmd4Options) -> RenderCmd4Options {
 
     RenderCmd4Options {
         messages,
-        template: unsafe { CStr::from_ptr(opts.template).to_string_lossy().into_owned() },
+        template: unsafe { CStr::from_ptr(opts.template).to_str().unwrap() },
         dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
         platform_instruction: unsafe { cstr_opt(opts.platform_instruction) },
         documents,

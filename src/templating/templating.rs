@@ -9,9 +9,9 @@ use std::error::Error;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 #[serde(deny_unknown_fields)]
-pub struct RenderCmd3Options {
+pub struct RenderCmd3Options<'a> {
     pub messages: Vec<Message>,
-    pub template: String,
+    pub template: &'a str,
     pub dev_instruction: Option<String>,
     pub documents: Vec<Document>,
     pub available_tools: Vec<Tool>,
@@ -25,12 +25,14 @@ pub struct RenderCmd3Options {
     pub additional_template_fields: Map<String, Value>,
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
+// for now always set the template to cmd3v1.
+static CMD3V1_TEMPLATE: &str = include_str!("templates/cmd3-v1.tmpl");
 
-impl Default for RenderCmd3Options {
+impl Default for RenderCmd3Options<'_> {
     fn default() -> Self {
         Self {
             messages: Vec::new(),
-            template: String::new(),
+            template: CMD3V1_TEMPLATE,
             dev_instruction: None,
             documents: Vec::new(),
             available_tools: Vec::new(),
@@ -51,9 +53,9 @@ impl Default for RenderCmd3Options {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 #[serde(deny_unknown_fields)]
-pub struct RenderCmd4Options {
+pub struct RenderCmd4Options<'a> {
     pub messages: Vec<Message>,
-    pub template: String,
+    pub template: &'a str,
     pub dev_instruction: Option<String>,
     pub platform_instruction: Option<String>,
     pub documents: Vec<Document>,
@@ -66,11 +68,12 @@ pub struct RenderCmd4Options {
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 
-impl Default for RenderCmd4Options {
+static CMD4V1_TEMPLATE: &str = "";
+impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
             messages: Vec::new(),
-            template: String::new(),
+            template: CMD4V1_TEMPLATE,
             dev_instruction: None,
             platform_instruction: None,
             documents: Vec::new(),
@@ -286,12 +289,9 @@ mod tests {
 
     #[test]
     fn test_render_cmd3_from_dir() {
-        // for now always set the template to cmd3v1.
-        let cmd3v1_template = include_str!("templates/cmd3-v1.tmpl").to_string();
         for (test_name, input_json, expected) in read_test_cases("cmd3") {
             println!("Running cmd3 test case: {}", test_name);
-            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
-            opts.template = cmd3v1_template.clone();
+            let opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(
                 rendered.trim(),
