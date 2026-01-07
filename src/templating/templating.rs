@@ -261,8 +261,8 @@ mod tests {
     fn read_test_cases(version: &str) -> Vec<(String, Value, String)> {
         let mut cases = vec![];
         let cur_file = file!();
-        let cur_dir = Path::new(cur_file).parent().unwrap();
-        let test_dir = cur_dir.join("tests").join(version);
+        let cur_dir = Path::new(cur_file).parent().unwrap().parent().unwrap().parent().unwrap();
+        let test_dir = cur_dir.join("tests/templating").join(version);
         if !test_dir.exists() {
             panic!("Test directory {:?} does not exist.", test_dir);
         }
@@ -289,6 +289,7 @@ mod tests {
         // for now always set the template to cmd3v1.
         let cmd3v1_template = include_str!("templates/cmd3-v1.tmpl").to_string();
         for (test_name, input_json, expected) in read_test_cases("cmd3") {
+            println!("Running cmd3 test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.template = cmd3v1_template.clone();
             let rendered = render_cmd3(&opts).unwrap();
@@ -304,6 +305,7 @@ mod tests {
     #[test]
     fn test_render_cmd4_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd4") {
+            println!("Running cmd4 test case: {}", test_name);
             let opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(
