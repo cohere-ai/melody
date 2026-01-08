@@ -67,7 +67,7 @@ typedef struct {
 typedef struct {
     const char* id;
     const char* name;
-    const char* parameters_json;
+    const char* parameters;
 } CToolCall;
 
 typedef struct {

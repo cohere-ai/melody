@@ -574,66 +574,66 @@ func (rt *ReasoningType) UnmarshalJSON(data []byte) error {
 
 // Templating Go-side types
 type Tool struct {
-	Name        string
-	Description string
-	Parameters  map[string]any // will be JSON-encoded
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"` // will be JSON-encoded
 }
 
 type Image struct {
-	TemplatePlaceholder string
+	TemplatePlaceholder string `json:"template_placeholder"`
 }
 
 type Content struct {
-	Type     ContentType
-	Text     string         // optional: empty means omitted
-	Thinking string         // optional: empty means omitted
-	Image    *Image         // optional
-	Document map[string]any // optional: will be JSON-encoded
+	Type     ContentType    `json:"type"`
+	Text     string         `json:"text,omitempty"`     // optional: empty means omitted
+	Thinking string         `json:"thinking,omitempty"` // optional: empty means omitted
+	Image    *Image         `json:"image,omitempty"`    // optional
+	Document map[string]any `json:"document,omitempty"` // optional: will be JSON-encoded
 }
 
 type ToolCall struct {
-	ID         string
-	Name       string
-	Parameters map[string]any // will be JSON-encoded
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Parameters string `json:"parameters,omitempty"`
 }
 
 type Message struct {
-	Role       Role
-	Content    []Content
-	ToolCalls  []ToolCall
-	ToolCallID string // optional: empty means omitted
+	Role       Role       `json:"role"`
+	Content    []Content  `json:"content"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"` // optional: empty means omitted
 }
 
 type RenderCmd3Options struct {
-	Messages                 []Message
-	Template                 string
-	DevInstruction           string           // optional: empty means omitted
-	Documents                []map[string]any // JSON objects
-	AvailableTools           []Tool
-	SafetyMode               *SafetyMode      // optional
-	CitationQuality          *CitationQuality // optional
-	ReasoningType            *ReasoningType   // optional
-	SkipPreamble             bool
-	ResponsePrefix           string // optional: empty means omitted
-	JSONSchema               string // optional: empty means omitted
-	JSONMode                 bool
-	AdditionalTemplateFields map[string]any    // optional: JSON-encoded
-	EscapedSpecialTokens     map[string]string // optional: JSON-encoded
+	Messages                 []Message         `json:"messages"`
+	Template                 string            `json:"template"`
+	DevInstruction           *string           `json:"dev_instruction,omitempty"`
+	Documents                []map[string]any  `json:"documents,omitempty"` // JSON objects
+	AvailableTools           []Tool            `json:"available_tools,omitempty"`
+	SafetyMode               *SafetyMode       `json:"safety_mode,omitempty"`      // optional
+	CitationQuality          *CitationQuality  `json:"citation_quality,omitempty"` // optional
+	ReasoningType            *ReasoningType    `json:"reasoning_type,omitempty"`   // optional
+	SkipPreamble             bool              `json:"skip_preamble,omitempty"`
+	ResponsePrefix           *string           `json:"response_prefix,omitempty"`
+	JSONSchema               *string           `json:"json_schema,omitempty"`
+	JSONMode                 bool              `json:"json_mode,omitempty"`
+	AdditionalTemplateFields map[string]any    `json:"additional_template_fields,omitempty"` // optional: JSON-encoded
+	EscapedSpecialTokens     map[string]string `json:"escaped_special_tokens,omitempty"`     // optional: JSON-encoded
 }
 
 type RenderCmd4Options struct {
-	Messages                 []Message
-	Template                 string
-	DevInstruction           string // optional: empty means omitted
-	PlatformInstruction      string // optional: empty means omitted
-	Documents                []map[string]any
-	AvailableTools           []Tool
-	Grounding                *Grounding // optional
-	ResponsePrefix           string     // optional: empty means omitted
-	JSONSchema               string     // optional: empty means omitted
-	JSONMode                 bool
-	AdditionalTemplateFields map[string]any    // optional
-	EscapedSpecialTokens     map[string]string // optional
+	Messages                 []Message         `json:"messages"`
+	Template                 string            `json:"template"`
+	DevInstruction           *string           `json:"dev_instruction,omitempty"`
+	PlatformInstruction      *string           `json:"platform_instruction,omitempty"`
+	Documents                []map[string]any  `json:"documents,omitempty"`
+	AvailableTools           []Tool            `json:"available_tools,omitempty"`
+	Grounding                *Grounding        `json:"grounding,omitempty"` // optional
+	ResponsePrefix           *string           `json:"response_prefix,omitempty"`
+	JSONSchema               *string           `json:"json_schema,omitempty"`
+	JSONMode                 bool              `json:"json_mode,omitempty"`
+	AdditionalTemplateFields map[string]any    `json:"additional_template_fields,omitempty"` // optional
+	EscapedSpecialTokens     map[string]string `json:"escaped_special_tokens,omitempty"`     // optional
 }
 
 // Internal C allocator helper to track and free C allocations
@@ -761,7 +761,7 @@ func buildCToolCalls(a *cAllocator, calls []ToolCall) (*C.CToolCall, C.size_t) {
 		tc := calls[i]
 		arr[i].id = a.CString(tc.ID)
 		arr[i].name = a.CString(tc.Name)
-		arr[i].parameters_json = jsonCString(a, tc.Parameters)
+		arr[i].parameters = a.CString(tc.Parameters)
 	}
 	return base, C.size_t(n)
 }
@@ -830,9 +830,6 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 	}
 
 	// Optional strings
-	devInstr := a.CString(opts.DevInstruction)
-	respPrefix := a.CString(opts.ResponsePrefix)
-	jsonSchema := a.CString(opts.JSONSchema)
 	additionalFields := jsonCString(&a, opts.AdditionalTemplateFields)
 	escapedTokens := jsonCString(&a, opts.EscapedSpecialTokens)
 
@@ -841,7 +838,6 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 		messages:                        cMsgs,
 		messages_len:                    cMsgsLen,
 		template:                        a.CString(opts.Template),
-		dev_instruction:                 devInstr,
 		documents_json:                  cDocs,
 		documents_len:                   cDocsLen,
 		available_tools:                 cTools,
@@ -853,12 +849,21 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 		reasoning_type:                  cReason,
 		has_reasoning_type:              hasReason,
 		skip_preamble:                   C.bool(opts.SkipPreamble),
-		response_prefix:                 respPrefix,
-		json_schema:                     jsonSchema,
 		json_mode:                       C.bool(opts.JSONMode),
 		additional_template_fields_json: additionalFields,
 		escaped_special_tokens_json:     escapedTokens,
 	}
+
+	if opts.DevInstruction != nil {
+		cOpts.dev_instruction = a.CString(*opts.DevInstruction)
+	}
+	if opts.ResponsePrefix != nil {
+		cOpts.response_prefix = a.CString(*opts.ResponsePrefix)
+	}
+	if opts.JSONSchema != nil {
+		cOpts.json_schema = a.CString(*opts.JSONSchema)
+	}
+
 	// Call into Rust
 	cs := C.melody_render_cmd3(&cOpts)
 	if cs == nil {
@@ -886,10 +891,6 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		hasGround = C.bool(true)
 	}
 
-	devInstr := a.CString(opts.DevInstruction)
-	platInstr := a.CString(opts.PlatformInstruction)
-	respPrefix := a.CString(opts.ResponsePrefix)
-	jsonSchema := a.CString(opts.JSONSchema)
 	additionalFields := jsonCString(&a, opts.AdditionalTemplateFields)
 	escapedTokens := jsonCString(&a, opts.EscapedSpecialTokens)
 
@@ -897,19 +898,28 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		messages:                        cMsgs,
 		messages_len:                    cMsgsLen,
 		template:                        a.CString(opts.Template),
-		dev_instruction:                 devInstr,
-		platform_instruction:            platInstr,
 		documents_json:                  cDocs,
 		documents_len:                   cDocsLen,
 		available_tools:                 cTools,
 		available_tools_len:             cToolsLen,
 		grounding:                       cGround,
 		has_grounding:                   hasGround,
-		response_prefix:                 respPrefix,
-		json_schema:                     jsonSchema,
 		json_mode:                       C.bool(opts.JSONMode),
 		additional_template_fields_json: additionalFields,
 		escaped_special_tokens_json:     escapedTokens,
+	}
+
+	if opts.DevInstruction != nil {
+		cOpts.dev_instruction = a.CString(*opts.DevInstruction)
+	}
+	if opts.PlatformInstruction != nil {
+		cOpts.platform_instruction = a.CString(*opts.PlatformInstruction)
+	}
+	if opts.ResponsePrefix != nil {
+		cOpts.response_prefix = a.CString(*opts.ResponsePrefix)
+	}
+	if opts.JSONSchema != nil {
+		cOpts.json_schema = a.CString(*opts.JSONSchema)
 	}
 
 	cs := C.melody_render_cmd4(&cOpts)

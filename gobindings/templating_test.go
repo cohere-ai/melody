@@ -2,7 +2,6 @@ package gobindings
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,7 +58,6 @@ func TestTemplating_RenderCMD3_DirCases(t *testing.T) {
 			var opts RenderCmd3Options
 			err := json.Unmarshal(tc.input, &opts)
 			require.NoError(t, err)
-			fmt.Printf("%v", opts)
 			got, err := RenderCMD3(opts)
 			require.NoError(t, err)
 			require.Equal(t, tc.output, got)
