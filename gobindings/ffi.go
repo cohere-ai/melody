@@ -10,8 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"unsafe"
-
-	"github.com/cohere-ai/melody/gobindings/orderedjson"
 )
 
 // FilterOptions is the Go wrapper around CFilterOptions
@@ -576,9 +574,9 @@ func (rt *ReasoningType) UnmarshalJSON(data []byte) error {
 
 // Templating Go-side types
 type Tool struct {
-	Name        string             `json:"name"`
-	Description string             `json:"description,omitempty"`
-	Parameters  orderedjson.Object `json:"parameters,omitempty"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Parameters  Object `json:"parameters,omitempty"`
 }
 
 type Image struct {
@@ -586,11 +584,11 @@ type Image struct {
 }
 
 type Content struct {
-	Type     ContentType        `json:"type"`
-	Text     string             `json:"text,omitempty"`     // optional: empty means omitted
-	Thinking string             `json:"thinking,omitempty"` // optional: empty means omitted
-	Image    *Image             `json:"image,omitempty"`    // optional
-	Document orderedjson.Object `json:"document,omitempty"`
+	Type     ContentType `json:"type"`
+	Text     string      `json:"text,omitempty"`     // optional: empty means omitted
+	Thinking string      `json:"thinking,omitempty"` // optional: empty means omitted
+	Image    *Image      `json:"image,omitempty"`    // optional
+	Document Object      `json:"document,omitempty"`
 }
 
 type ToolCall struct {
@@ -607,35 +605,35 @@ type Message struct {
 }
 
 type RenderCmd3Options struct {
-	Messages                 []Message            `json:"messages"`
-	Template                 string               `json:"template"`
-	DevInstruction           *string              `json:"dev_instruction,omitempty"`
-	Documents                []orderedjson.Object `json:"documents,omitempty"` // JSON objects
-	AvailableTools           []Tool               `json:"available_tools,omitempty"`
-	SafetyMode               *SafetyMode          `json:"safety_mode,omitempty"`      // optional
-	CitationQuality          *CitationQuality     `json:"citation_quality,omitempty"` // optional
-	ReasoningType            *ReasoningType       `json:"reasoning_type,omitempty"`   // optional
-	SkipPreamble             bool                 `json:"skip_preamble,omitempty"`
-	ResponsePrefix           *string              `json:"response_prefix,omitempty"`
-	JSONSchema               *string              `json:"json_schema,omitempty"`
-	JSONMode                 bool                 `json:"json_mode,omitempty"`
-	AdditionalTemplateFields map[string]any       `json:"additional_template_fields,omitempty"` // optional: JSON-encoded
-	EscapedSpecialTokens     map[string]string    `json:"escaped_special_tokens,omitempty"`     // optional: JSON-encoded
+	Messages                 []Message         `json:"messages"`
+	Template                 string            `json:"template"`
+	DevInstruction           *string           `json:"dev_instruction,omitempty"`
+	Documents                []Object          `json:"documents,omitempty"` // JSON objects
+	AvailableTools           []Tool            `json:"available_tools,omitempty"`
+	SafetyMode               *SafetyMode       `json:"safety_mode,omitempty"`      // optional
+	CitationQuality          *CitationQuality  `json:"citation_quality,omitempty"` // optional
+	ReasoningType            *ReasoningType    `json:"reasoning_type,omitempty"`   // optional
+	SkipPreamble             bool              `json:"skip_preamble,omitempty"`
+	ResponsePrefix           *string           `json:"response_prefix,omitempty"`
+	JSONSchema               *string           `json:"json_schema,omitempty"`
+	JSONMode                 bool              `json:"json_mode,omitempty"`
+	AdditionalTemplateFields map[string]any    `json:"additional_template_fields,omitempty"` // optional: JSON-encoded
+	EscapedSpecialTokens     map[string]string `json:"escaped_special_tokens,omitempty"`     // optional: JSON-encoded
 }
 
 type RenderCmd4Options struct {
-	Messages                 []Message            `json:"messages"`
-	Template                 string               `json:"template"`
-	DevInstruction           *string              `json:"dev_instruction,omitempty"`
-	PlatformInstruction      *string              `json:"platform_instruction,omitempty"`
-	Documents                []orderedjson.Object `json:"documents,omitempty"`
-	AvailableTools           []Tool               `json:"available_tools,omitempty"`
-	Grounding                *Grounding           `json:"grounding,omitempty"` // optional
-	ResponsePrefix           *string              `json:"response_prefix,omitempty"`
-	JSONSchema               *string              `json:"json_schema,omitempty"`
-	JSONMode                 bool                 `json:"json_mode,omitempty"`
-	AdditionalTemplateFields map[string]any       `json:"additional_template_fields,omitempty"` // optional
-	EscapedSpecialTokens     map[string]string    `json:"escaped_special_tokens,omitempty"`     // optional
+	Messages                 []Message         `json:"messages"`
+	Template                 string            `json:"template"`
+	DevInstruction           *string           `json:"dev_instruction,omitempty"`
+	PlatformInstruction      *string           `json:"platform_instruction,omitempty"`
+	Documents                []Object          `json:"documents,omitempty"`
+	AvailableTools           []Tool            `json:"available_tools,omitempty"`
+	Grounding                *Grounding        `json:"grounding,omitempty"` // optional
+	ResponsePrefix           *string           `json:"response_prefix,omitempty"`
+	JSONSchema               *string           `json:"json_schema,omitempty"`
+	JSONMode                 bool              `json:"json_mode,omitempty"`
+	AdditionalTemplateFields map[string]any    `json:"additional_template_fields,omitempty"` // optional
+	EscapedSpecialTokens     map[string]string `json:"escaped_special_tokens,omitempty"`     // optional
 }
 
 // Internal C allocator helper to track and free C allocations
@@ -684,7 +682,7 @@ func jsonCString(a *cAllocator, v any) *C.char {
 	return a.CString(string(b))
 }
 
-func buildCDocuments(a *cAllocator, docs []orderedjson.Object) (**C.char, C.size_t) {
+func buildCDocuments(a *cAllocator, docs []Object) (**C.char, C.size_t) {
 	if len(docs) == 0 {
 		return nil, 0
 	}

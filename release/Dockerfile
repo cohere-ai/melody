@@ -11,12 +11,13 @@ RUN cargo build --release --features tkzrs
 FROM golang:1.25 as builder-go
 ARG TARGETPLATFORM
 WORKDIR /workspace
-COPY ./release/go.mod   .
+COPY ./go.mod   .
 COPY ./release/main.go  .
 COPY ./gobindings/*.go ./gobindings/
 COPY ./gobindings/melody.h ./gobindings/
 COPY ./gobindings/tokenizers/* ./gobindings/tokenizers/
 COPY ./gobindings/data/bert-base-uncased.json ./gobindings/data/
+COPY ./vendor ./vendor
 COPY --from=builder-rust \
     /workspace/target/release/libcohere_melody.a \
     ./target/release/

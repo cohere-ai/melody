@@ -4,7 +4,6 @@ go 1.25
 
 require (
 	github.com/buger/jsonparser v1.1.1
-	github.com/cohere-ai/blobheart v0.22.3
 	github.com/mailru/easyjson v0.9.1
 	github.com/stretchr/testify v1.11.1
 )
