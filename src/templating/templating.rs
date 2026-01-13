@@ -294,8 +294,8 @@ mod tests {
             let opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(
-                rendered.trim(),
-                expected.trim(),
+                expected,
+                rendered,
                 "Failed test: {}",
                 test_name
             );
@@ -309,8 +309,8 @@ mod tests {
             let opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(
-                rendered.trim(),
-                expected.trim(),
+                expected,
+                rendered,
                 "Failed test: {}",
                 test_name
             );

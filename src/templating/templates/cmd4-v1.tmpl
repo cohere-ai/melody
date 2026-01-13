@@ -11,18 +11,19 @@
 {%- endif %}
 
 {%- assign grounding = grounding | default: "disabled" | upcase %}
-{%- assign grounding_enabled = grounding == "ENABLED" %}
-{%- assign tools_or_docs_exist = tools_exist or documents_exist %}
+{%- assign grounding_enabled = false %}
+{%- if grounding == "ENABLED" %}{%- assign grounding_enabled = true %}{%- endif %}
+{%- assign tools_or_docs_exist = false %}
+{%- if tools_exist or documents_exist %}{%- assign tools_or_docs_exist = true %}{%- endif %}
 {%- assign render_tools_section = true %}
-{%- assign render_grounding = grounding_enabled and tools_or_docs_exist %}
+{%- assign render_grounding = false %}
+{%- if grounding_enabled and tools_or_docs_exist %}{%- assign render_grounding = true %}{%- endif %}
 
 {%- assign render_platform_instruction_override = false %}
 {%- if platform_instruction_override and platform_instruction_override != "" %}{% assign render_platform_instruction_override = true %}{% endif -%}
 
 {%- assign render_developer_instruction = false %}
 {%- if developer_instruction and developer_instruction != "" %}{% assign render_developer_instruction = true %}{% endif -%}
-
-{%- assign render_platform_instruction_override = platform_instruction_override and platform_instruction_override != "" -%}
 
 <BOS_TOKEN>
 
@@ -160,7 +161,10 @@ Your output should adhere to the following json schema:
         {%- for content_item in message.content -%}
           {%- assign prev_index = forloop.index0 | minus: 1 -%}
           {%- if content_item.type == 'text' %}
-            {%- assign prev_item_not_text = prev_index >= 0 and message.content[prev_index].type != 'text' %}
+            {%- assign prev_item_not_text = false %}
+            {%- if prev_index >= 0 and message.content[prev_index].type != 'text' %}
+              {%- assign prev_item_not_text = true %}
+            {%- endif %}
             {%- if forloop.first or prev_item_not_text -%}
               <|START_TEXT|>
             {%- endif %}
