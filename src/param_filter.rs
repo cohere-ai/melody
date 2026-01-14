@@ -1,12 +1,33 @@
+//! Parameter value parsing for tool calls
+//!
+//! This module handles parsing of parameter values from tool action JSON.
+//! It supports both basic types (numbers, booleans, null) and complex types
+//! (strings, objects, arrays) with proper JSON validation.
+
 use crate::action_filter::ActionMode;
 use crate::filter::{FilterImpl, find_partial};
 use crate::types::FilterOutput;
 
+/// State machine for parsing parameter values.
+///
+/// Parameter values can be simple (numbers, booleans) or complex (strings, objects, arrays).
+/// This state machine tracks which type is being parsed to know when the value is complete.
+///
+/// # Examples
+///
+/// - `Beginning` → sees `"` → transitions to `ComplexType` (string)
+/// - `Beginning` → sees `{` → transitions to `ComplexType` (object)
+/// - `Beginning` → sees digit → transitions to `BasicType` (number)
+/// - `BasicType` → sees `,` or `}` → transitions to `End`
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ParamState {
+    /// Initial state, haven't determined value type yet
     Beginning,
+    /// Parsing a complex value (string, object, or array)
     ComplexType,
+    /// Parsing a basic value (number, boolean, null)
     BasicType,
+    /// Value parsing complete
     End,
 }
 
@@ -115,7 +136,31 @@ impl FilterImpl {
 }
 
 /// Find the (byte) index of the first valid json prefix (returns number of bytes)
+///
+/// This function incrementally tests each character position to see if appending
+/// it would complete a valid JSON value. This is used for streaming JSON parsing
+/// where we need to know when we have a complete value.
+///
+/// # Arguments
+///
+/// * `buffer` - Previously buffered content
+/// * `s` - New content to process
+///
+/// # Returns
+///
+/// The index in `s` where a valid JSON value completes, or `usize::MAX` if no
+/// complete value is found yet.
+///
+/// # Performance Note
+///
+/// This function calls `serde_json::from_str` for each character position, which
+/// can be expensive for large values. For production use with large parameters,
+/// consider a more efficient streaming JSON parser.
 pub(crate) fn find_valid_json_value(buffer: &str, s: &str) -> usize {
+    // PERFORMANCE: This approach of testing JSON validity at each character position
+    // can be slow for large parameter values. The repeated string allocations and
+    // JSON parsing could be replaced with a dedicated streaming JSON parser that
+    // tracks nesting depth and quotes.
     let mut whole_str = buffer.to_string();
 
     for (i, c) in s.char_indices() {

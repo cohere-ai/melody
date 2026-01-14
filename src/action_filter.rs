@@ -1,3 +1,9 @@
+//! Tool call parsing functionality
+//!
+//! This module handles parsing of tool calls from JSON-formatted action blocks in the
+//! model output. It uses a state machine to incrementally parse tool names, IDs, and
+//! parameters as tokens arrive.
+
 use crate::filter::FilterImpl;
 use crate::param_filter::ParamState;
 use crate::types::{FilterOutput, FilterToolCallDelta, FilterToolParameter};
@@ -16,28 +22,55 @@ static RAW_PARAM_REGEX: LazyLock<Regex> =
 static PARAM_NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\s*:\s*").expect("Invalid param name regex"));
 
+/// State machine modes for parsing tool call JSON.
+///
+/// The action parser uses this state machine to track where it is in the
+/// JSON structure of a tool call. Transitions occur as specific elements
+/// are recognized.
+///
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ActionMode {
+    /// Initial state, looking for `tool_call_id` or `tool_name`
     NotStarted,
+    /// Inside `tool_call_id` value
     ToolCallID,
+    /// After `tool_call_id` closing quote
     ToolCallIDEnd,
+    /// Inside `tool_name` value
     ToolName,
+    /// After `tool_name` closing quote
     ToolNameEnd,
+    /// Inside parameter name
     ParamName,
+    /// Inside parameter value
     ParamValue,
+    /// After tool closing brace
     ToolEnd,
+    /// After parameter name closing quote
     ParamNameEnd,
+    /// After parameter value
     ParamValueEnd,
+    /// Parsing raw parameter JSON (when `stream_processed_params` is false)
     RawParam,
 }
 
+/// Metadata for tracking the current state of action parsing.
+///
+/// This structure holds all the state needed to incrementally parse
+/// tool calls from streaming JSON.
 #[derive(Debug, Clone)]
 pub(crate) struct FilterAction {
+    /// Current parsing mode in the action state machine
     pub mode: ActionMode,
+    /// Index of the current tool call being parsed
     pub cur_tool_call_index: usize,
+    /// Whether to trim leading whitespace from next output
     pub trim_left: bool,
+    /// Name of the parameter currently being parsed
     pub cur_param_name: String,
+    /// State for parsing complex parameter values
     pub cur_param_state: ParamState,
+    /// Buffer for accumulating parameter value content
     pub param_value_buffer: String,
 }
 
