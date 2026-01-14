@@ -1,7 +1,7 @@
 use crate::templating::types::*;
 use crate::templating::util::*;
 use serde::Deserialize;
-use serde_json::{Map, Value, to_string};
+use serde_json::{to_string, Map, Value};
 use std::collections::BTreeMap;
 use std::error::Error;
 
@@ -257,14 +257,20 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
     use serde_json::Value;
+    use serde_path_to_error::deserialize;
     use std::fs;
     use std::path::Path;
-    use serde_path_to_error::deserialize;
 
     fn read_test_cases(version: &str) -> Vec<(String, Value, String)> {
         let mut cases = vec![];
         let cur_file = file!();
-        let cur_dir = Path::new(cur_file).parent().unwrap().parent().unwrap().parent().unwrap();
+        let cur_dir = Path::new(cur_file)
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
         let test_dir = cur_dir.join("tests/templating").join(version);
         if !test_dir.exists() {
             panic!("Test directory {:?} does not exist.", test_dir);
@@ -293,12 +299,7 @@ mod tests {
             println!("Running cmd3 test case: {}", test_name);
             let opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             let rendered = render_cmd3(&opts).unwrap();
-            assert_eq!(
-                expected,
-                rendered,
-                "Failed test: {}",
-                test_name
-            );
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
     }
 
@@ -308,12 +309,7 @@ mod tests {
             println!("Running cmd4 test case: {}", test_name);
             let opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             let rendered = render_cmd4(&opts).unwrap();
-            assert_eq!(
-                expected,
-                rendered,
-                "Failed test: {}",
-                test_name
-            );
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::templating::types::*;
-use serde_json::{Map, Value, to_string};
+use serde_json::{to_string, Map, Value};
 use std::collections::BTreeMap;
 
 pub fn add_spaces_to_json_encoding(input: &str) -> String {
@@ -225,16 +225,20 @@ pub fn messages_to_template(
             for (j, content_item) in msg.content.iter().enumerate() {
                 if content_item.content_type == ContentType::Text {
                     if let Some(ref text) = content_item.text {
-                        let mut obj : Map<String, Value> = Map::new();
+                        let mut obj: Map<String, Value> = Map::new();
                         obj.insert("content".to_string(), Value::String(text.clone()));
-                        let rendered_obj = add_spaces_to_json_encoding(&to_string(&obj).map_err(|e| e.to_string())?);
+                        let rendered_obj = add_spaces_to_json_encoding(
+                            &to_string(&obj).map_err(|e| e.to_string())?,
+                        );
                         m.tool_results[tool_result_idx]
                             .documents
                             .push(escape_special_tokens(&rendered_obj, special_token_map));
                     }
                 } else if content_item.content_type == ContentType::Document {
                     if let Some(ref obj) = content_item.document {
-                        let rendered_obj = add_spaces_to_json_encoding(&to_string(obj).map_err(|e| e.to_string())?);
+                        let rendered_obj = add_spaces_to_json_encoding(
+                            &to_string(obj).map_err(|e| e.to_string())?,
+                        );
                         m.tool_results[tool_result_idx]
                             .documents
                             .push(escape_special_tokens(&rendered_obj, special_token_map));

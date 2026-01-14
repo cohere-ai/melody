@@ -20,7 +20,10 @@ impl TryFrom<String> for Role {
             "user" => Ok(Role::User),
             "chatbot" => Ok(Role::Chatbot),
             "tool" => Ok(Role::Tool),
-            other => Err(format!("invalid Role '{}', expected one of: unknown, system, user, chatbot, tool", other)),
+            other => Err(format!(
+                "invalid Role '{}', expected one of: unknown, system, user, chatbot, tool",
+                other
+            )),
         }
     }
 }
@@ -76,7 +79,10 @@ impl TryFrom<String> for CitationQuality {
             "unknown" => Ok(CitationQuality::Unknown),
             "off" => Ok(CitationQuality::Off),
             "on" => Ok(CitationQuality::On),
-            other => Err(format!("invalid CitationQuality '{}', expected one of: unknown, off, on", other)),
+            other => Err(format!(
+                "invalid CitationQuality '{}', expected one of: unknown, off, on",
+                other
+            )),
         }
     }
 }
@@ -106,7 +112,10 @@ impl TryFrom<String> for Grounding {
             "unknown" => Ok(Grounding::Unknown),
             "enabled" => Ok(Grounding::Enabled),
             "disabled" => Ok(Grounding::Disabled),
-            other => Err(format!("invalid Grounding '{}', expected one of: unknown, enabled, disabled", other)),
+            other => Err(format!(
+                "invalid Grounding '{}', expected one of: unknown, enabled, disabled",
+                other
+            )),
         }
     }
 }
@@ -138,7 +147,10 @@ impl TryFrom<String> for SafetyMode {
             "none" => Ok(SafetyMode::None),
             "strict" => Ok(SafetyMode::Strict),
             "contextual" => Ok(SafetyMode::Contextual),
-            other => Err(format!("invalid SafetyMode '{}', expected one of: unknown, none, strict, contextual", other)),
+            other => Err(format!(
+                "invalid SafetyMode '{}', expected one of: unknown, none, strict, contextual",
+                other
+            )),
         }
     }
 }
@@ -169,7 +181,10 @@ impl TryFrom<String> for ReasoningType {
             "unknown" => Ok(ReasoningType::Unknown),
             "enabled" => Ok(ReasoningType::Enabled),
             "disabled" => Ok(ReasoningType::Disabled),
-            other => Err(format!("invalid ReasoningType '{}', expected one of: unknown, enabled, disabled", other)),
+            other => Err(format!(
+                "invalid ReasoningType '{}', expected one of: unknown, enabled, disabled",
+                other
+            )),
         }
     }
 }
@@ -198,8 +213,7 @@ pub struct Content {
     pub text: Option<String>,
     pub thinking: Option<String>,
     pub image: Option<Image>,
-    pub document: Option<Map<String, Value>>
-
+    pub document: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
