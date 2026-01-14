@@ -1,5 +1,9 @@
-use crate::templating::types::{Message, Document, Tool, SafetyMode, CitationQuality, ReasoningType, Grounding};
-use crate::templating::util::{tools_to_template, messages_to_template, add_spaces_to_json_encoding, escape_special_tokens};
+use crate::templating::types::{
+    CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
+};
+use crate::templating::util::{
+    add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template,
+};
 use serde::Deserialize;
 use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
@@ -158,9 +162,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
     );
     substitutions.insert(
         "json_schema".to_string(),
-        opts.json_schema
-            .clone()
-            .map_or(Value::Null, Value::String),
+        opts.json_schema.clone().map_or(Value::Null, Value::String),
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
@@ -227,9 +229,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
     );
     substitutions.insert(
         "json_schema".to_string(),
-        opts.json_schema
-            .clone()
-            .map_or(Value::Null, Value::String),
+        opts.json_schema.clone().map_or(Value::Null, Value::String),
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 

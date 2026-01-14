@@ -1,4 +1,4 @@
-use crate::templating::types::{ToolCall, Tool, Message, Role, ContentType};
+use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
 use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
 
