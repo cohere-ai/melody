@@ -39,12 +39,14 @@ use std::slice;
 /// Opaque pointer to a Filter instance
 #[repr(C)]
 pub struct CFilter {
+    /// Internal marker for opaque pointer
     _private: [u8; 0],
 }
 
 /// Opaque pointer to `FilterOptions`
 #[repr(C)]
 pub struct CFilterOptions {
+    /// Internal marker for opaque pointer
     _private: [u8; 0],
 }
 
@@ -66,7 +68,7 @@ pub struct CFilterOutput {
     pub logprobs_len: usize,
 
     /// Index of the search query (-1 if None)
-    pub search_query_index: i32, // -1 if None
+    pub search_query_index: i32,
     /// Null-terminated C string containing the search query text
     pub search_query_text: *mut c_char,
 
@@ -76,7 +78,7 @@ pub struct CFilterOutput {
     pub citations_len: usize,
 
     /// Index of the tool call (-1 if None)
-    pub tool_call_index: i32, // -1 if None
+    pub tool_call_index: i32,
     /// Null-terminated C string containing the tool call ID
     pub tool_call_id: *mut c_char,
     /// Null-terminated C string containing the tool call name
@@ -831,92 +833,143 @@ pub enum CReasoningType {
 /// C-compatible struct for tool definitions.
 #[repr(C)]
 pub struct CTool {
+    /// Tool name as a null-terminated C string
     pub name: *const c_char,
+    /// Tool description as a null-terminated C string
     pub description: *const c_char,
-    // JSON string representing Map<String, Value>
+    /// JSON string representing parameters (Map<String, Value>)
     pub parameters_json: *const c_char,
 }
 
 /// C-compatible struct for image placeholders.
 #[repr(C)]
 pub struct CImage {
+    /// Image template placeholder as a null-terminated C string
     pub template_placeholder: *const c_char,
 }
 
 /// C-compatible struct for content.
 #[repr(C)]
 pub struct CContent {
+    /// Content type enum
     pub content_type: CContentType,
+    /// Text content as a null-terminated C string
     pub text: *const c_char,
+    /// Thinking content as a null-terminated C string
     pub thinking: *const c_char,
-    pub image: *const CImage,         // null if None
-    pub document_json: *const c_char, // null if None; JSON Map<String, Value>
+    /// Pointer to image struct (null if None)
+    pub image: *const CImage,
+    /// Document as a JSON string (null if None)
+    pub document_json: *const c_char,
 }
 
 /// C-compatible struct for tool calls.
 #[repr(C)]
 pub struct CToolCall {
+    /// Tool call ID as a null-terminated C string
     pub id: *const c_char,
+    /// Tool call name as a null-terminated C string
     pub name: *const c_char,
+    /// Parameters as a JSON string
     pub parameters_json: *const c_char,
 }
 
 /// C-compatible struct for messages.
 #[repr(C)]
 pub struct CMessage {
+    /// Message role enum
     pub role: CRole,
+    /// Pointer to array of content structs
     pub content: *const CContent,
+    /// Number of content items
     pub content_len: usize,
+    /// Pointer to array of tool calls
     pub tool_calls: *const CToolCall,
+    /// Number of tool calls
     pub tool_calls_len: usize,
-    pub tool_call_id: *const c_char, // null if None
+    /// Tool call ID as a null-terminated C string (null if None)
+    pub tool_call_id: *const c_char,
 }
 
 /// C-compatible struct for CMD3 render options.
 #[repr(C)]
 pub struct CRenderCmd3Options {
+    /// Pointer to array of messages
     pub messages: *const CMessage,
+    /// Number of messages
     pub messages_len: usize,
+    /// Template as a null-terminated C string
     pub template: *const c_char,
+    /// Developer instruction as a null-terminated C string
     pub dev_instruction: *const c_char,
+    /// Pointer to array of document JSON strings
     pub documents_json: *const *const c_char,
+    /// Number of documents
     pub documents_len: usize,
+    /// Pointer to array of available tools
     pub available_tools: *const CTool,
+    /// Number of available tools
     pub available_tools_len: usize,
+    /// Safety mode enum
     pub safety_mode: CSafetyMode,
+    /// Whether safety mode is set
     pub has_safety_mode: bool,
+    /// Citation quality enum
     pub citation_quality: CCitationQuality,
+    /// Whether citation quality is set
     pub has_citation_quality: bool,
+    /// Reasoning type enum
     pub reasoning_type: CReasoningType,
+    /// Whether reasoning type is set
     pub has_reasoning_type: bool,
+    /// Whether to skip preamble
     pub skip_preamble: bool,
+    /// Response prefix as a null-terminated C string
     pub response_prefix: *const c_char,
+    /// JSON schema as a null-terminated C string
     pub json_schema: *const c_char,
+    /// Whether JSON mode is enabled
     pub json_mode: bool,
-    // JSON string representing BTreeMap<String, Value>
+    /// Additional template fields as a JSON string
     pub additional_template_fields_json: *const c_char,
-    // JSON string representing BTreeMap<String, String>
+    /// Escaped special tokens as a JSON string
     pub escaped_special_tokens_json: *const c_char,
 }
 
 /// C-compatible struct for CMD4 render options.
 #[repr(C)]
 pub struct CRenderCmd4Options {
+    /// Pointer to array of messages
     pub messages: *const CMessage,
+    /// Number of messages
     pub messages_len: usize,
+    /// Template as a null-terminated C string
     pub template: *const c_char,
+    /// Developer instruction as a null-terminated C string
     pub dev_instruction: *const c_char,
+    /// Platform instruction as a null-terminated C string
     pub platform_instruction: *const c_char,
+    /// Pointer to array of document JSON strings
     pub documents_json: *const *const c_char,
+    /// Number of documents
     pub documents_len: usize,
+    /// Pointer to array of available tools
     pub available_tools: *const CTool,
+    /// Number of available tools
     pub available_tools_len: usize,
+    /// Grounding enum
     pub grounding: CGrounding,
+    /// Whether grounding is set
     pub has_grounding: bool,
+    /// Response prefix as a null-terminated C string
     pub response_prefix: *const c_char,
+    /// JSON schema as a null-terminated C string
     pub json_schema: *const c_char,
+    /// Whether JSON mode is enabled
     pub json_mode: bool,
+    /// Additional template fields as a JSON string
     pub additional_template_fields_json: *const c_char,
+    /// Escaped special tokens as a JSON string
     pub escaped_special_tokens_json: *const c_char,
 }
 
