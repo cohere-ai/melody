@@ -772,61 +772,96 @@ pub unsafe extern "C" fn melody_filter_output_array_free(arr: *mut CFilterOutput
 // ============================================================================
 
 /// C-compatible enum for role types.
+///
+/// Represents the role of a message in the conversation.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CRole {
+    /// Unknown or unspecified role.
     Unknown = 0,
+    /// System message role.
     System = 1,
+    /// User message role.
     User = 2,
+    /// Chatbot message role.
     Chatbot = 3,
+    /// Tool message role.
     Tool = 4,
 }
 
 /// C-compatible enum for content types.
+///
+/// Represents the type of content in a message.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CContentType {
+    /// Unknown or unspecified content type.
     Unknown = 0,
+    /// Text content.
     Text = 1,
+    /// Thinking/reasoning content.
     Thinking = 2,
+    /// Image content.
     Image = 3,
+    /// Document content.
     Document = 4,
 }
 
 /// C-compatible enum for citation quality.
+///
+/// Indicates the quality or presence of citations.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CCitationQuality {
+    /// Unknown or unspecified citation quality.
     Unknown = 0,
+    /// Citations are off.
     Off = 1,
+    /// Citations are on.
     On = 2,
 }
 
 /// C-compatible enum for grounding options.
+///
+/// Specifies whether grounding is enabled or disabled.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CGrounding {
+    /// Unknown or unspecified grounding.
     Unknown = 0,
+    /// Grounding is enabled.
     Enabled = 1,
+    /// Grounding is disabled.
     Disabled = 2,
 }
 
 /// C-compatible enum for safety modes.
+///
+/// Represents the safety mode for rendering.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CSafetyMode {
+    /// Unknown or unspecified safety mode.
     Unknown = 0,
+    /// No safety mode.
     None = 1,
+    /// Strict safety mode.
     Strict = 2,
+    /// Contextual safety mode.
     Contextual = 3,
 }
 
 /// C-compatible enum for reasoning types.
+///
+/// Indicates whether reasoning is enabled or disabled.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CReasoningType {
+    /// Unknown or unspecified reasoning type.
     Unknown = 0,
+    /// Reasoning is enabled.
     Enabled = 1,
+    /// Reasoning is disabled.
     Disabled = 2,
 }
 
