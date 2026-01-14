@@ -1012,7 +1012,7 @@ pub struct CRenderCmd4Options {
 // Templating FFI conversion helpers
 // ============================================================================
 
-/// Maps a CRole to a Rust Role.
+/// Maps a `CRole` to a Rust Role.
 fn map_role(r: CRole) -> Role {
     match r {
         CRole::Unknown => Role::Unknown,
@@ -1023,7 +1023,7 @@ fn map_role(r: CRole) -> Role {
     }
 }
 
-/// Maps a CContentType to a Rust ContentType.
+/// Maps a `CContentType` to a Rust `ContentType`.
 fn map_content_type(t: CContentType) -> ContentType {
     match t {
         CContentType::Unknown => ContentType::Unknown,
@@ -1034,7 +1034,7 @@ fn map_content_type(t: CContentType) -> ContentType {
     }
 }
 
-/// Maps a CCitationQuality to a Rust CitationQuality.
+/// Maps a `CCitationQuality` to a Rust `CitationQuality`.
 fn map_citation_quality(c: CCitationQuality) -> CitationQuality {
     match c {
         CCitationQuality::Unknown => CitationQuality::Unknown,
@@ -1043,7 +1043,7 @@ fn map_citation_quality(c: CCitationQuality) -> CitationQuality {
     }
 }
 
-/// Maps a CGrounding to a Rust Grounding.
+/// Maps a `CGrounding` to a Rust Grounding.
 fn map_grounding(g: CGrounding) -> Grounding {
     match g {
         CGrounding::Unknown => Grounding::Unknown,
@@ -1052,7 +1052,7 @@ fn map_grounding(g: CGrounding) -> Grounding {
     }
 }
 
-/// Maps a CSafetyMode to a Rust SafetyMode.
+/// Maps a `CSafetyMode` to a Rust `SafetyMode`.
 fn map_safety_mode(s: CSafetyMode) -> SafetyMode {
     match s {
         CSafetyMode::Unknown => SafetyMode::Unknown,
@@ -1062,7 +1062,7 @@ fn map_safety_mode(s: CSafetyMode) -> SafetyMode {
     }
 }
 
-/// Maps a CReasoningType to a Rust ReasoningType.
+/// Maps a `CReasoningType` to a Rust `ReasoningType`.
 fn map_reasoning_type(r: CReasoningType) -> ReasoningType {
     match r {
         CReasoningType::Unknown => ReasoningType::Unknown,
@@ -1261,7 +1261,7 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
     };
 
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
-    if template == "" {
+    if template.is_empty() {
         rs_opts
     } else {
         RenderCmd3Options {
@@ -1335,7 +1335,7 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         escaped_special_tokens,
     };
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
-    if template == "" {
+    if template.is_empty() {
         rs_opts
     } else {
         RenderCmd4Options {

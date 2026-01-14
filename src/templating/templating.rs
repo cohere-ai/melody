@@ -1,5 +1,5 @@
-use crate::templating::types::*;
-use crate::templating::util::*;
+use crate::templating::types::{Message, Document, Tool, SafetyMode, CitationQuality, ReasoningType, Grounding};
+use crate::templating::util::{tools_to_template, messages_to_template, add_spaces_to_json_encoding, escape_special_tokens};
 use serde::Deserialize;
 use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
@@ -111,8 +111,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
         "preamble".to_string(),
         opts.dev_instruction
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert("messages".to_string(), Value::Array(messages));
     substitutions.insert(
@@ -127,15 +126,13 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
         "citation_mode".to_string(),
         opts.citation_quality
             .as_ref()
-            .map(|c| Value::String(c.as_str().to_string()))
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, |c| Value::String(c.as_str().to_string())),
     );
     substitutions.insert(
         "safety_mode".to_string(),
         opts.safety_mode
             .as_ref()
-            .map(|s| Value::String(s.as_str().to_string()))
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, |s| Value::String(s.as_str().to_string())),
     );
     substitutions.insert(
         "reasoning_options".to_string(),
@@ -157,22 +154,20 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
         "response_prefix".to_string(),
         opts.response_prefix
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert(
         "json_schema".to_string(),
         opts.json_schema
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
     let template = liquid::ParserBuilder::with_stdlib()
         .build()
         .unwrap()
-        .parse(&opts.template)
+        .parse(opts.template)
         .unwrap();
 
     Ok(template.render(&liquid::object!(&substitutions)).unwrap())
@@ -201,15 +196,13 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
         "developer_instruction".to_string(),
         opts.dev_instruction
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert(
         "platform_instruction_override".to_string(),
         opts.platform_instruction
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert("messages".to_string(), Value::Array(messages));
     substitutions.insert(
@@ -224,29 +217,26 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
         "grounding".to_string(),
         opts.grounding
             .as_ref()
-            .map(|g| Value::String(g.as_str().to_string()))
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, |g| Value::String(g.as_str().to_string())),
     );
     substitutions.insert(
         "response_prefix".to_string(),
         opts.response_prefix
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert(
         "json_schema".to_string(),
         opts.json_schema
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
     let template = liquid::ParserBuilder::with_stdlib()
         .build()
         .unwrap()
-        .parse(&opts.template)
+        .parse(opts.template)
         .unwrap();
 
     Ok(template.render(&liquid::object!(&substitutions)).unwrap())

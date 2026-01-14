@@ -1,4 +1,4 @@
-use crate::templating::types::*;
+use crate::templating::types::{ToolCall, Tool, Message, Role, ContentType};
 use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
 
@@ -183,7 +183,7 @@ pub fn messages_to_template(
     special_token_map: &BTreeMap<String, String>,
 ) -> Result<Vec<Value>, String> {
     let mut template_messages: Vec<TemplateMessage> = Vec::new();
-    let mut running_tool_call_idx = if docs_present { 1 } else { 0 };
+    let mut running_tool_call_idx = usize::from(docs_present);
     let mut tool_call_id_to_tool_result_idx = BTreeMap::new();
     let mut tool_call_id_to_prompt_id = BTreeMap::new();
 

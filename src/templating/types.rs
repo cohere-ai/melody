@@ -21,8 +21,7 @@ impl TryFrom<String> for Role {
             "chatbot" => Ok(Role::Chatbot),
             "tool" => Ok(Role::Tool),
             other => Err(format!(
-                "invalid Role '{}', expected one of: unknown, system, user, chatbot, tool",
-                other
+                "invalid Role '{other}', expected one of: unknown, system, user, chatbot, tool"
             )),
         }
     }
@@ -60,8 +59,7 @@ impl TryFrom<String> for ContentType {
             "image" => Ok(ContentType::Image),
             "document" => Ok(ContentType::Document),
             other => Err(format!(
-                "invalid ContentType '{}', expected one of: unknown, text, thinking, image, document",
-                other
+                "invalid ContentType '{other}', expected one of: unknown, text, thinking, image, document"
             )),
         }
     }
@@ -83,8 +81,7 @@ impl TryFrom<String> for CitationQuality {
             "off" => Ok(CitationQuality::Off),
             "on" => Ok(CitationQuality::On),
             other => Err(format!(
-                "invalid CitationQuality '{}', expected one of: unknown, off, on",
-                other
+                "invalid CitationQuality '{other}', expected one of: unknown, off, on"
             )),
         }
     }
@@ -116,8 +113,7 @@ impl TryFrom<String> for Grounding {
             "enabled" => Ok(Grounding::Enabled),
             "disabled" => Ok(Grounding::Disabled),
             other => Err(format!(
-                "invalid Grounding '{}', expected one of: unknown, enabled, disabled",
-                other
+                "invalid Grounding '{other}', expected one of: unknown, enabled, disabled"
             )),
         }
     }
@@ -151,8 +147,7 @@ impl TryFrom<String> for SafetyMode {
             "strict" => Ok(SafetyMode::Strict),
             "contextual" => Ok(SafetyMode::Contextual),
             other => Err(format!(
-                "invalid SafetyMode '{}', expected one of: unknown, none, strict, contextual",
-                other
+                "invalid SafetyMode '{other}', expected one of: unknown, none, strict, contextual"
             )),
         }
     }
@@ -185,8 +180,7 @@ impl TryFrom<String> for ReasoningType {
             "enabled" => Ok(ReasoningType::Enabled),
             "disabled" => Ok(ReasoningType::Disabled),
             other => Err(format!(
-                "invalid ReasoningType '{}', expected one of: unknown, enabled, disabled",
-                other
+                "invalid ReasoningType '{other}', expected one of: unknown, enabled, disabled"
             )),
         }
     }
