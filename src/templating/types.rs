@@ -59,7 +59,10 @@ impl TryFrom<String> for ContentType {
             "thinking" => Ok(ContentType::Thinking),
             "image" => Ok(ContentType::Image),
             "document" => Ok(ContentType::Document),
-            other => Err(format!("invalid ContentType '{}', expected one of: unknown, text, thinking, image, document", other)),
+            other => Err(format!(
+                "invalid ContentType '{}', expected one of: unknown, text, thinking, image, document",
+                other
+            )),
         }
     }
 }
