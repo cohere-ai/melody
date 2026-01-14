@@ -1,0 +1,15 @@
+{
+  "skip_preamble": true,
+  "response_prefix": "something",
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    }
+  ]
+}
