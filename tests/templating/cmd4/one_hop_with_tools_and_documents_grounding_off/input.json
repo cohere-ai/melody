@@ -1,6 +1,5 @@
 {
-  "safety_mode": "CONTEXTUAL",
-  "citation_quality": "on",
+  "grounding": "disabled",
   "messages": [
     {
       "role": "User",
