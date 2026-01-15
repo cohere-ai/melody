@@ -23,6 +23,7 @@ pub fn json_escape_string(s: &str) -> String {
     if b.len() < 2 {
         return String::new();
     }
+    // drop the surrounding quotes since serde_json::to_string will add them.
     b[1..b.len() - 1].to_string()
 }
 
