@@ -1316,7 +1316,6 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
 
     let rs_opts = RenderCmd4Options {
         messages,
-        template: unsafe { CStr::from_ptr(opts.template).to_str().unwrap() },
         dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
         platform_instruction: unsafe { cstr_opt(opts.platform_instruction) },
         documents,
@@ -1331,6 +1330,7 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
+        ..Default::default()
     };
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
     if template.is_empty() {
