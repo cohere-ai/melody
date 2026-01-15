@@ -1,5 +1,5 @@
-mod types;
 mod templating;
+mod types;
 mod util;
 
 pub use templating::*;
