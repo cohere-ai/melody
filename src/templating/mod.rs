@@ -1,6 +1,6 @@
-mod templating;
+mod lib;
 mod types;
 mod util;
 
-pub use templating::*;
+pub use lib::*;
 pub use types::*;
