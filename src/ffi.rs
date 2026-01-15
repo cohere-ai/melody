@@ -23,10 +23,10 @@
 
 use crate::filter::{Filter, FilterImpl};
 use crate::options::{FilterOptions, new_filter};
-use crate::templating::templating::{
+use crate::templating::{
     RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4,
 };
-use crate::templating::types::{
+use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };

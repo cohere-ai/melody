@@ -1,3 +1,6 @@
-pub mod templating;
-pub(crate) mod types;
+mod types;
+mod templating;
 mod util;
+
+pub use templating::*;
+pub use types::*;
