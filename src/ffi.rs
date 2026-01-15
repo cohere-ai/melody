@@ -1348,8 +1348,10 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
 // ============================================================================
 
 /// Renders CMD3 template and returns a newly allocated C string.
-/// Caller must free with `melody_string_free`.
+/// # Safety
+/// Caller must free return value with `melody_string_free`.
 #[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
 pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> *mut c_char {
     if opts.is_null() {
         return std::ptr::null_mut();
@@ -1362,8 +1364,10 @@ pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> 
 }
 
 /// Renders CMD4 template and returns a newly allocated C string.
-/// Caller must free with `melody_string_free`.
+/// # Safety
+/// Caller must free return value with `melody_string_free`.
 #[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
 pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> *mut c_char {
     if opts.is_null() {
         return std::ptr::null_mut();

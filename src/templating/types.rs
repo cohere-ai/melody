@@ -205,6 +205,7 @@ pub struct Image {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Content {
+    #[allow(clippy::struct_field_names)]
     #[serde(rename = "type")]
     pub content_type: ContentType,
     pub text: Option<String>,

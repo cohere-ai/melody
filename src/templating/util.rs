@@ -177,6 +177,7 @@ pub fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, Stri
 }
 
 // Convert messages to template
+#[allow(clippy::too_many_lines)] //TODO: Refactor this function to reduce its length.
 pub fn messages_to_template(
     messages: &[Message],
     docs_present: bool,
