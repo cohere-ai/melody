@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unsafe"
 )
+import _ "github.com/ianlancetaylor/cgosymbolizer"
 
 // FilterOptions is the Go wrapper around CFilterOptions
 type FilterOptions struct {
