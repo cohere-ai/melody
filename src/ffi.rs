@@ -22,12 +22,12 @@
 //!
 
 use crate::filter::{Filter, FilterImpl};
-use crate::options::{FilterOptions, new_filter};
+use crate::options::{new_filter, FilterOptions};
+use crate::templating::{render_cmd3, render_cmd4, RenderCmd3Options, RenderCmd4Options};
 use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };
-use crate::templating::{RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4};
 use crate::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
@@ -1160,13 +1160,18 @@ unsafe fn convert_ctool_call(tc: &CToolCall) -> ToolCall {
 }
 
 unsafe fn convert_csource(source: &CSource) -> Source {
-    let tool_result_indices: Vec<usize> = if !source.tool_result_indices.is_null() && source.tool_result_indices_len > 0 {
-        unsafe {
-            Vec::from_raw_parts(source.tool_result_indices, source.tool_result_indices_len, source.tool_result_indices_len)
-        }
-    } else {
-        Vec::new()
-    };
+    let tool_result_indices: Vec<usize> =
+        if !source.tool_result_indices.is_null() && source.tool_result_indices_len > 0 {
+            unsafe {
+                Vec::from_raw_parts(
+                    source.tool_result_indices,
+                    source.tool_result_indices_len,
+                    source.tool_result_indices_len,
+                )
+            }
+        } else {
+            Vec::new()
+        };
 
     Source {
         tool_call_index: source.tool_call_index,
