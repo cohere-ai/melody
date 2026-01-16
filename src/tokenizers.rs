@@ -3,11 +3,19 @@ use std::path::PathBuf;
 use std::ptr;
 use tokenizers::tokenizer::Tokenizer;
 
+/// Configuration options for tokenizer initialization.
+///
+/// Controls how the tokenizer handles special tokens during encoding.
 #[repr(C)]
 pub struct TokenizerOptions {
     encode_special_tokens: bool,
 }
 
+/// C-compatible buffer containing tokenization results.
+///
+/// This structure holds the output from tokenization operations, including
+/// token IDs and various metadata. All pointer fields must be freed with
+/// `free_buffer` to avoid memory leaks.
 #[repr(C)]
 pub struct Buffer {
     ids: *mut u32,
@@ -19,6 +27,25 @@ pub struct Buffer {
     len: usize,
 }
 
+/// Creates a tokenizer from a byte array.
+///
+/// Loads a tokenizer from serialized bytes (typically a JSON configuration).
+///
+/// # Arguments
+///
+/// * `bytes` - Pointer to the byte array containing the tokenizer configuration
+/// * `len` - Length of the byte array
+/// * `opts` - Tokenizer options controlling special token handling
+///
+/// # Returns
+///
+/// Pointer to the created `Tokenizer` instance. Must be freed with `free_tokenizer`.
+///
+/// # Safety
+///
+/// - `bytes` must point to valid memory of at least `len` bytes
+/// - The returned pointer must be freed with `free_tokenizer`
+/// - Panics if the bytes don't contain a valid tokenizer configuration
 #[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn from_bytes(
@@ -59,6 +86,23 @@ pub unsafe extern "C" fn from_bytes_with_truncation(
     Box::into_raw(Box::new(tokenizer))
 }
 
+/// Creates a tokenizer from a file path.
+///
+/// Loads a tokenizer from a JSON configuration file.
+///
+/// # Arguments
+///
+/// * `config` - Null-terminated C string containing the file path
+///
+/// # Returns
+///
+/// Pointer to the created `Tokenizer` instance, or null if loading fails.
+/// Must be freed with `free_tokenizer`.
+///
+/// # Safety
+///
+/// - `config` must be a valid null-terminated C string
+/// - The returned pointer must be freed with `free_tokenizer`
 #[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn from_file(config: *const libc::c_char) -> *mut libc::c_void {
@@ -74,6 +118,9 @@ pub unsafe extern "C" fn from_file(config: *const libc::c_char) -> *mut libc::c_
     }
 }
 
+/// Options controlling what information is returned from encoding.
+///
+/// Determines which fields in the returned `Buffer` will be populated.
 #[repr(C)]
 pub struct EncodeOptions {
     add_special_tokens: bool,
@@ -85,6 +132,26 @@ pub struct EncodeOptions {
     return_offsets: bool,
 }
 
+/// Encodes a text string into token IDs.
+///
+/// Tokenizes the input text and returns a `Buffer` containing the results.
+/// The buffer contents depend on the `EncodeOptions` configuration.
+///
+/// # Arguments
+///
+/// * `ptr` - Pointer to a `Tokenizer` instance
+/// * `message` - Null-terminated C string to encode
+/// * `options` - Options controlling what information to return
+///
+/// # Returns
+///
+/// A `Buffer` containing the encoding results. Must be freed with `free_buffer`.
+///
+/// # Safety
+///
+/// - `ptr` must be a valid `Tokenizer` pointer
+/// - `message` must be a valid null-terminated C string
+/// - The returned `Buffer` must be freed with `free_buffer`
 #[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn encode(
@@ -183,6 +250,27 @@ pub unsafe extern "C" fn encode(
     }
 }
 
+/// Decodes token IDs back into text.
+///
+/// Converts an array of token IDs back into a human-readable string.
+///
+/// # Arguments
+///
+/// * `ptr` - Pointer to a `Tokenizer` instance
+/// * `ids` - Array of token IDs to decode
+/// * `len` - Number of token IDs in the array
+/// * `skip_special_tokens` - Whether to omit special tokens from the output
+///
+/// # Returns
+///
+/// Null-terminated C string containing the decoded text, or null if decoding fails.
+/// Must be freed with `free_string`.
+///
+/// # Safety
+///
+/// - `ptr` must be a valid `Tokenizer` pointer
+/// - `ids` must point to an array of at least `len` u32 values
+/// - The returned string must be freed with `free_string`
 #[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn decode(
@@ -209,6 +297,22 @@ pub unsafe extern "C" fn decode(
     }
 }
 
+/// Returns the vocabulary size of the tokenizer.
+///
+/// Gets the total number of tokens in the tokenizer's vocabulary,
+/// including special tokens.
+///
+/// # Arguments
+///
+/// * `ptr` - Pointer to a `Tokenizer` instance
+///
+/// # Returns
+///
+/// The vocabulary size as a u32
+///
+/// # Safety
+///
+/// - `ptr` must be a valid `Tokenizer` pointer
 #[allow(clippy::missing_panics_doc, clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vocab_size(ptr: *mut libc::c_void) -> u32 {
@@ -222,6 +326,19 @@ pub unsafe extern "C" fn vocab_size(ptr: *mut libc::c_void) -> u32 {
     u32::try_from(tokenizer.get_vocab_size(true)).unwrap()
 }
 
+/// Frees a tokenizer instance.
+///
+/// Deallocates memory for a tokenizer created by `from_bytes` or `from_file`.
+///
+/// # Arguments
+///
+/// * `ptr` - Pointer to a `Tokenizer` instance to free
+///
+/// # Safety
+///
+/// - `ptr` must be a valid pointer returned from `from_bytes` or `from_file`
+/// - `ptr` must not be used after calling this function
+/// - Calling with a null pointer is safe (no-op)
 #[unsafe(no_mangle)]
 pub extern "C" fn free_tokenizer(ptr: *mut ::libc::c_void) {
     if ptr.is_null() {
@@ -232,6 +349,20 @@ pub extern "C" fn free_tokenizer(ptr: *mut ::libc::c_void) {
     }
 }
 
+/// Frees a buffer returned from encoding.
+///
+/// Deallocates all memory associated with a `Buffer` structure,
+/// including all internal arrays.
+///
+/// # Arguments
+///
+/// * `buf` - The `Buffer` to free
+///
+/// # Safety
+///
+/// - `buf` must be a valid `Buffer` returned from `encode`
+/// - `buf` must not be used after calling this function
+/// - All pointers in the buffer must be valid or null
 #[unsafe(no_mangle)]
 pub extern "C" fn free_buffer(buf: Buffer) {
     if !buf.ids.is_null() {
@@ -269,6 +400,19 @@ pub extern "C" fn free_buffer(buf: Buffer) {
     }
 }
 
+/// Frees a C string returned from decode.
+///
+/// Deallocates memory for a string returned by `decode`.
+///
+/// # Arguments
+///
+/// * `ptr` - Pointer to a C string to free
+///
+/// # Safety
+///
+/// - `ptr` must be a valid pointer returned from `decode`
+/// - `ptr` must not be used after calling this function
+/// - Calling with a null pointer is safe (no-op)
 #[allow(clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn free_string(ptr: *mut libc::c_char) {

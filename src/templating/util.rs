@@ -1,5 +1,6 @@
-use crate::Filter;
-use crate::{FilterCitation, templating::types::*};
+use crate::{Filter, FilterCitation};
+use crate::errors::MelodyError;
+use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
 use log::warn;
 use serde_json::{Map, Value, to_string};
 use std::collections::HashMap;
@@ -27,6 +28,7 @@ pub fn json_escape_string(s: &str) -> String {
     if b.len() < 2 {
         return String::new();
     }
+    // drop the surrounding quotes since serde_json::to_string will add them.
     b[1..b.len() - 1].to_string()
 }
 
@@ -146,23 +148,22 @@ struct ToolCallTemplate {
 }
 
 // Convert ToolCall to template string
-fn tool_call_to_template(tc: &ToolCall, tc_index: usize) -> Result<String, String> {
+fn tool_call_to_template(tc: &ToolCall, tc_index: usize) -> Result<String, MelodyError> {
     let tpl = ToolCallTemplate {
         tool_call_id: tc_index.to_string(),
         tool_name: tc.name.clone(),
         parameters: RawJsonString(tc.parameters.clone()),
     };
-    let rendered = serde_json::to_string(&tpl).map_err(|e| e.to_string())?;
+    let rendered = serde_json::to_string(&tpl)?;
     Ok(add_spaces_to_json_encoding(&rendered))
 }
 
 // Convert tools to template
-pub fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, String> {
+pub fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, MelodyError> {
     let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
     for tool in tools {
-        let schema = serde_json::to_string(&tool.parameters)
-            .map(|s| add_spaces_to_json_encoding(&s))
-            .map_err(|e| e.to_string())?;
+        let schema =
+            serde_json::to_string(&tool.parameters).map(|s| add_spaces_to_json_encoding(&s))?;
         let mut def = Map::new();
         def.insert(
             "description".to_string(),
@@ -237,22 +238,22 @@ fn add_citation_insert_pair(
 }
 
 // Convert messages to template
+#[allow(clippy::too_many_lines)] //TODO: Refactor this function to reduce its length.
 pub fn messages_to_template(
     messages: &[Message],
     docs_present: bool,
     special_token_map: &BTreeMap<String, String>,
-) -> Result<Vec<Value>, String> {
+) -> Result<Vec<Value>, MelodyError> {
     let mut template_messages: Vec<TemplateMessage> = Vec::new();
-    let mut running_tool_call_idx = if docs_present { 1 } else { 0 };
+    let mut running_tool_call_idx = usize::from(docs_present);
     let mut tool_call_id_to_tool_result_idx = BTreeMap::new();
     let mut tool_call_id_to_prompt_id = BTreeMap::new();
 
     for (i, msg) in messages.iter().enumerate() {
         if msg.role == Role::Tool {
-            let tool_call_id = msg
-                .tool_call_id
-                .as_ref()
-                .ok_or_else(|| format!("tool message[{i}] missing tool_call_id"))?;
+            let tool_call_id = msg.tool_call_id.as_ref().ok_or_else(|| {
+                MelodyError::TemplateValidation(format!("tool message[{i}] missing tool_call_id"))
+            })?;
             let tool_call_template_id = *tool_call_id_to_prompt_id
                 .entry(tool_call_id.clone())
                 .or_insert_with(|| {
@@ -262,7 +263,9 @@ pub fn messages_to_template(
                 });
 
             if template_messages.is_empty()
-                || template_messages.last().unwrap().role != Role::Tool.as_str()
+                || template_messages
+                    .last()
+                    .is_none_or(|msg| msg.role != Role::Tool.as_str())
             {
                 template_messages.push(TemplateMessage {
                     role: Role::Tool.as_str().to_string(),
@@ -271,7 +274,11 @@ pub fn messages_to_template(
                     tool_results: vec![],
                 });
             }
-            let m = template_messages.last_mut().unwrap();
+            let m = template_messages.last_mut().ok_or_else(|| {
+                MelodyError::TemplateValidation(
+                    "Internal error: template_messages should not be empty".to_string(),
+                )
+            })?;
             let tool_result_idx = *tool_call_id_to_tool_result_idx
                 .entry(tool_call_id.clone())
                 .or_insert_with(|| {
@@ -285,24 +292,24 @@ pub fn messages_to_template(
             for (j, content_item) in msg.content.iter().enumerate() {
                 if content_item.content_type == ContentType::Text {
                     if let Some(ref text) = content_item.text {
-                        let mut obj : Map<String, Value> = Map::new();
+                        let mut obj: Map<String, Value> = Map::new();
                         obj.insert("content".to_string(), Value::String(text.clone()));
-                        let rendered_obj = add_spaces_to_json_encoding(&to_string(&obj).map_err(|e| e.to_string())?);
+                        let rendered_obj = add_spaces_to_json_encoding(&to_string(&obj)?);
                         m.tool_results[tool_result_idx]
                             .documents
                             .push(escape_special_tokens(&rendered_obj, special_token_map));
                     }
                 } else if content_item.content_type == ContentType::Document {
                     if let Some(ref obj) = content_item.document {
-                        let rendered_obj = add_spaces_to_json_encoding(&to_string(obj).map_err(|e| e.to_string())?);
+                        let rendered_obj = add_spaces_to_json_encoding(&to_string(obj)?);
                         m.tool_results[tool_result_idx]
                             .documents
                             .push(escape_special_tokens(&rendered_obj, special_token_map));
                     }
                 } else {
-                    return Err(format!(
+                    return Err(MelodyError::TemplateValidation(format!(
                         "tool message[{i}].content[{j}] invalid content type"
-                    ));
+                    )));
                 }
             }
 
@@ -320,11 +327,13 @@ pub fn messages_to_template(
             match content_item.content_type {
                 ContentType::Document => {
                     if msg.role != Role::Tool {
-                        return Err("content type object is not supported for non-tool messages"
-                            .to_string());
+                        return Err(MelodyError::TemplateValidation(
+                            "content type object is not supported for non-tool messages"
+                                .to_string(),
+                        ));
                     }
                     let data = if let Some(ref obj) = content_item.document {
-                        let serialized = serde_json::to_string(obj).map_err(|e| e.to_string())?;
+                        let serialized = serde_json::to_string(obj)?;
                         add_spaces_to_json_encoding(&serialized)
                     } else {
                         "{}".to_string()
@@ -350,9 +359,9 @@ pub fn messages_to_template(
                 }
                 ContentType::Thinking => {
                     if msg.role == Role::Tool {
-                        return Err(
-                            "content type thinking is not supported for tool messages".to_string()
-                        );
+                        return Err(MelodyError::TemplateValidation(
+                            "content type thinking is not supported for tool messages".to_string(),
+                        ));
                     }
                     template_msg_content.push(TemplateContent {
                         content_type: "thinking".to_string(),
@@ -364,9 +373,9 @@ pub fn messages_to_template(
                 }
                 ContentType::Image => {
                     if msg.role == Role::Tool {
-                        return Err(
-                            "content type image is not supported for tool messages".to_string()
-                        );
+                        return Err(MelodyError::TemplateValidation(
+                            "content type image is not supported for tool messages".to_string(),
+                        ));
                     }
                     template_msg_content.push(TemplateContent {
                         content_type: "image".to_string(),
@@ -384,18 +393,20 @@ pub fn messages_to_template(
         let mut rendered_tool_calls = Vec::new();
         for tc in &msg.tool_calls {
             if msg.role != Role::Chatbot {
-                return Err(
+                return Err(MelodyError::TemplateValidation(
                     "tool calls are only supported for chatbot/assistant messages".to_string(),
-                );
+                ));
             }
             if tc.id.is_empty() {
-                return Err(format!("message[{i}] has tool call with empty id"));
+                return Err(MelodyError::TemplateValidation(format!(
+                    "message[{i}] has tool call with empty id"
+                )));
             }
             if tool_call_id_to_prompt_id.contains_key(&tc.id) {
-                return Err(format!(
+                return Err(MelodyError::TemplateValidation(format!(
                     "message[{i}] has duplicate tool call id: {}",
                     tc.id
-                ));
+                )));
             }
             tool_call_id_to_prompt_id.insert(tc.id.clone(), running_tool_call_idx);
             let rendered_tool_call = tool_call_to_template(tc, running_tool_call_idx)?;

@@ -1,0 +1,86 @@
+{
+  "grounding": "enabled",
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "I will use the GetReminders tool to check if the user has any reminders."
+        }
+      ],
+      "tool_calls": [
+        {
+          "id": "2",
+          "name": "GetReminders",
+          "parameters": "{}"
+        }
+      ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "2",
+      "content": [
+        {
+          "type": "document",
+          "document": {"reminder_id": "59-80bc", "task": "Buy groceries", "due_date": "2023-09-11 23:59:59", "status": "pending"}
+        },
+        {
+          "type": "document",
+          "document": {"reminder_id": "14-579a", "task": "Call Amy", "due_date": "2023-09-11 23:59:59", "status": "pending"}
+        },
+        {
+          "type": "document",
+          "document": {"reminder_id": "5b-dd80", "task": "finish your report", "due_date": "2023-09-15 23:59:59", "status": "pending"}
+        },
+        {
+          "type": "document",
+          "document": {"reminder_id": "20-d9ca", "task": "call your mom", "due_date": "2023-09-17 23:59:59", "status": "pending"}
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "content": "pdf chunk 1"
+    },
+    {
+      "content": "pdf chunk 2"
+    }
+  ],
+  "available_tools": [
+    {
+      "name": "GetReminders",
+      "description": "Get a list of reminders.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "DeleteReminder",
+      "description": "Delete a reminder.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reminder_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reminder_id"
+        ]
+      }
+    }
+  ]
+}

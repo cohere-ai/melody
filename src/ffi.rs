@@ -1,14 +1,33 @@
-//! FFI bindings for the melody parsing library for Go
+//! C Foreign Function Interface (FFI) bindings
+//!
+//! This module provides C-compatible bindings for the Melody parsing library,
+//! primarily intended for use from Go but compatible with any language that can
+//! call C functions.
+//!
+//! # Memory Management
+//!
+//! **Critical**: All pointers returned by this API must be freed using the
+//! corresponding `_free` functions. Failure to do so will result in memory leaks.
+//!
+//! # Ownership Rules
+//!
+//! - Pointers returned by `_new` functions: **Caller owns**, must call `_free`
+//! - Pointers returned by `write_decoded` and `flush_partials`: **Caller owns**, must call `melody_filter_output_array_free`
+//! - Pointers passed as arguments: **Caller retains ownership**, must remain valid for call duration
+//!
+//! # Thread Safety
+//!
+//! Filter instances are NOT thread-safe. Each filter must be used by only one
+//! thread at a time, or protected by external synchronization.
+//!
 
 use crate::filter::{Filter, FilterImpl};
 use crate::options::{FilterOptions, new_filter};
-use crate::templating::templating::{
-    RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4,
-};
-use crate::templating::types::{
+use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };
+use crate::templating::{RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4};
 use crate::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
@@ -18,66 +37,97 @@ use std::slice;
 /// Opaque pointer to a Filter instance
 #[repr(C)]
 pub struct CFilter {
+    /// Internal marker for opaque pointer
     _private: [u8; 0],
 }
 
 /// Opaque pointer to `FilterOptions`
 #[repr(C)]
 pub struct CFilterOptions {
+    /// Internal marker for opaque pointer
     _private: [u8; 0],
 }
 
 /// C-compatible representation of `FilterOutput`
 #[repr(C)]
 pub struct CFilterOutput {
+    /// Null-terminated C string containing the output text
     pub text: *mut c_char,
+    /// Length of the text in bytes (excluding null terminator)
     pub text_len: usize,
 
+    /// Array of token IDs
     pub token_ids: *mut u32,
+    /// Number of token IDs
     pub token_ids_len: usize,
+    /// Array of log probabilities (parallel to `token_ids`)
     pub logprobs: *mut f32,
+    /// Number of log probabilities
     pub logprobs_len: usize,
 
-    pub search_query_index: i32, // -1 if None
+    /// Index of the search query (-1 if None)
+    pub search_query_index: i32,
+    /// Null-terminated C string containing the search query text
     pub search_query_text: *mut c_char,
 
+    /// Array of citations
     pub citations: *mut CFilterCitation,
+    /// Number of citations
     pub citations_len: usize,
 
-    pub tool_call_index: i32, // -1 if None
+    /// Index of the tool call (-1 if None)
+    pub tool_call_index: i32,
+    /// Null-terminated C string containing the tool call ID
     pub tool_call_id: *mut c_char,
+    /// Null-terminated C string containing the tool call name
     pub tool_call_name: *mut c_char,
+    /// Null-terminated C string containing the parameter name
     pub tool_call_param_name: *mut c_char,
+    /// Null-terminated C string containing the parameter value delta
     pub tool_call_param_value_delta: *mut c_char,
+    /// Null-terminated C string containing the raw parameter delta
     pub tool_call_raw_param_delta: *mut c_char,
 
+    /// Whether this is post-answer content
     pub is_post_answer: bool,
+    /// Whether this is reasoning/thinking content
     pub is_reasoning: bool,
 }
 
 /// C-compatible representation of `FilterCitation`
 #[repr(C)]
 pub struct CFilterCitation {
+    /// Character index where the citation starts
     pub start_index: usize,
+    /// Character index where the citation ends (exclusive)
     pub end_index: usize,
+    /// Null-terminated C string containing the cited text
     pub text: *mut c_char,
+    /// Array of sources for this citation
     pub sources: *mut CSource,
+    /// Number of sources
     pub sources_len: usize,
+    /// Whether this citation appears in a thinking block
     pub is_thinking: bool,
 }
 
 /// C-compatible representation of Source
 #[repr(C)]
 pub struct CSource {
+    /// Index of the tool call that produced these results
     pub tool_call_index: usize,
+    /// Array of tool result indices
     pub tool_result_indices: *mut usize,
+    /// Number of tool result indices
     pub tool_result_indices_len: usize,
 }
 
 /// C-compatible representation of an array of `FilterOutput`
 #[repr(C)]
 pub struct CFilterOutputArray {
+    /// Array of filter outputs
     pub outputs: *mut CFilterOutput,
+    /// Number of outputs in the array
     pub len: usize,
 }
 
@@ -437,6 +487,9 @@ pub unsafe extern "C" fn melody_filter_flush_partials(
 }
 
 /// Helper function to convert Rust `FilterOutput` to C representation
+///
+/// # Safety
+/// The returned pointer must be freed appropriately.
 unsafe fn convert_outputs_to_c(outputs: Vec<FilterOutput>) -> *mut CFilterOutputArray {
     unsafe {
         let c_outputs: Vec<CFilterOutput> = outputs
@@ -456,6 +509,10 @@ unsafe fn convert_outputs_to_c(outputs: Vec<FilterOutput>) -> *mut CFilterOutput
     }
 }
 
+/// Converts a single `FilterOutput` to its C representation.
+///
+/// # Safety
+/// The returned struct contains heap-allocated pointers that must be freed.
 #[allow(clippy::too_many_lines)]
 unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
     unsafe {
@@ -570,6 +627,10 @@ unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
     }
 }
 
+/// Converts a single `FilterCitation` to its C representation.
+///
+/// # Safety
+/// The returned struct contains heap-allocated pointers that must be freed.
 unsafe fn convert_citation_to_c(citation: FilterCitation) -> CFilterCitation {
     let text = CString::new(citation.text).unwrap().into_raw();
 
@@ -708,143 +769,242 @@ pub unsafe extern "C" fn melody_filter_output_array_free(arr: *mut CFilterOutput
 // Templating FFI types (C-compatible equivalents)
 // ============================================================================
 
+/// C-compatible enum for role types.
+///
+/// Represents the role of a message in the conversation.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CRole {
+    /// Unknown or unspecified role.
     Unknown = 0,
+    /// System message role.
     System = 1,
+    /// User message role.
     User = 2,
+    /// Chatbot message role.
     Chatbot = 3,
+    /// Tool message role.
     Tool = 4,
 }
 
+/// C-compatible enum for content types.
+///
+/// Represents the type of content in a message.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CContentType {
+    /// Unknown or unspecified content type.
     Unknown = 0,
+    /// Text content.
     Text = 1,
+    /// Thinking/reasoning content.
     Thinking = 2,
+    /// Image content.
     Image = 3,
+    /// Document content.
     Document = 4,
 }
 
+/// C-compatible enum for citation quality.
+///
+/// Indicates the quality or presence of citations.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CCitationQuality {
+    /// Unknown or unspecified citation quality.
     Unknown = 0,
+    /// Citations are off.
     Off = 1,
+    /// Citations are on.
     On = 2,
 }
 
+/// C-compatible enum for grounding options.
+///
+/// Specifies whether grounding is enabled or disabled.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CGrounding {
+    /// Unknown or unspecified grounding.
     Unknown = 0,
+    /// Grounding is enabled.
     Enabled = 1,
+    /// Grounding is disabled.
     Disabled = 2,
 }
 
+/// C-compatible enum for safety modes.
+///
+/// Represents the safety mode for rendering.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CSafetyMode {
+    /// Unknown or unspecified safety mode.
     Unknown = 0,
+    /// No safety mode.
     None = 1,
+    /// Strict safety mode.
     Strict = 2,
+    /// Contextual safety mode.
     Contextual = 3,
 }
 
+/// C-compatible enum for reasoning types.
+///
+/// Indicates whether reasoning is enabled or disabled.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum CReasoningType {
+    /// Unknown or unspecified reasoning type.
     Unknown = 0,
+    /// Reasoning is enabled.
     Enabled = 1,
+    /// Reasoning is disabled.
     Disabled = 2,
 }
 
+/// C-compatible struct for tool definitions.
 #[repr(C)]
 pub struct CTool {
+    /// Tool name as a null-terminated C string
     pub name: *const c_char,
+    /// Tool description as a null-terminated C string
     pub description: *const c_char,
-    // JSON string representing Map<String, Value>
+    /// JSON string representing parameters (Map<String, Value>)
     pub parameters_json: *const c_char,
 }
 
+/// C-compatible struct for image placeholders.
 #[repr(C)]
 pub struct CImage {
+    /// Image template placeholder as a null-terminated C string
     pub template_placeholder: *const c_char,
 }
 
+/// C-compatible struct for content.
 #[repr(C)]
 pub struct CContent {
+    /// Content type enum
     pub content_type: CContentType,
+    /// Text content as a null-terminated C string
     pub text: *const c_char,
+    /// Thinking content as a null-terminated C string
     pub thinking: *const c_char,
-    pub image: *const CImage,         // null if None
-    pub document_json: *const c_char, // null if None; JSON Map<String, Value>
+    /// Pointer to image struct (null if None)
+    pub image: *const CImage,
+    /// Document as a JSON string (null if None)
+    pub document_json: *const c_char,
 }
 
+/// C-compatible struct for tool calls.
 #[repr(C)]
 pub struct CToolCall {
+    /// Tool call ID as a null-terminated C string
     pub id: *const c_char,
+    /// Tool call name as a null-terminated C string
     pub name: *const c_char,
+    /// Parameters as a JSON string
     pub parameters_json: *const c_char,
 }
 
+/// C-compatible struct for messages.
 #[repr(C)]
 pub struct CMessage {
+    /// Message role enum
     pub role: CRole,
+    /// Pointer to array of content structs
     pub content: *const CContent,
+    /// Number of content items
     pub content_len: usize,
+    /// Pointer to array of tool calls
     pub tool_calls: *const CToolCall,
+    /// Number of tool calls
     pub tool_calls_len: usize,
-    pub tool_call_id: *const c_char, // null if None
+    /// Tool call ID as a null-terminated C string (null if None)
+    pub tool_call_id: *const c_char,
     pub citations: *const CFilterCitation,
     pub citations_len: usize,
 }
 
+/// C-compatible struct for CMD3 render options.
 #[repr(C)]
 pub struct CRenderCmd3Options {
+    /// Pointer to array of messages
     pub messages: *const CMessage,
+    /// Number of messages
     pub messages_len: usize,
+    /// Template as a null-terminated C string
     pub template: *const c_char,
+    /// Developer instruction as a null-terminated C string
     pub dev_instruction: *const c_char,
+    /// Pointer to array of document JSON strings
     pub documents_json: *const *const c_char,
+    /// Number of documents
     pub documents_len: usize,
+    /// Pointer to array of available tools
     pub available_tools: *const CTool,
+    /// Number of available tools
     pub available_tools_len: usize,
+    /// Safety mode enum
     pub safety_mode: CSafetyMode,
+    /// Whether safety mode is set
     pub has_safety_mode: bool,
+    /// Citation quality enum
     pub citation_quality: CCitationQuality,
+    /// Whether citation quality is set
     pub has_citation_quality: bool,
+    /// Reasoning type enum
     pub reasoning_type: CReasoningType,
+    /// Whether reasoning type is set
     pub has_reasoning_type: bool,
+    /// Whether to skip preamble
     pub skip_preamble: bool,
+    /// Response prefix as a null-terminated C string
     pub response_prefix: *const c_char,
+    /// JSON schema as a null-terminated C string
     pub json_schema: *const c_char,
+    /// Whether JSON mode is enabled
     pub json_mode: bool,
-    // JSON string representing BTreeMap<String, Value>
+    /// Additional template fields as a JSON string
     pub additional_template_fields_json: *const c_char,
-    // JSON string representing BTreeMap<String, String>
+    /// Escaped special tokens as a JSON string
     pub escaped_special_tokens_json: *const c_char,
 }
 
+/// C-compatible struct for CMD4 render options.
 #[repr(C)]
 pub struct CRenderCmd4Options {
+    /// Pointer to array of messages
     pub messages: *const CMessage,
+    /// Number of messages
     pub messages_len: usize,
+    /// Template as a null-terminated C string
     pub template: *const c_char,
+    /// Developer instruction as a null-terminated C string
     pub dev_instruction: *const c_char,
+    /// Platform instruction as a null-terminated C string
     pub platform_instruction: *const c_char,
+    /// Pointer to array of document JSON strings
     pub documents_json: *const *const c_char,
+    /// Number of documents
     pub documents_len: usize,
+    /// Pointer to array of available tools
     pub available_tools: *const CTool,
+    /// Number of available tools
     pub available_tools_len: usize,
+    /// Grounding enum
     pub grounding: CGrounding,
+    /// Whether grounding is set
     pub has_grounding: bool,
+    /// Response prefix as a null-terminated C string
     pub response_prefix: *const c_char,
+    /// JSON schema as a null-terminated C string
     pub json_schema: *const c_char,
+    /// Whether JSON mode is enabled
     pub json_mode: bool,
+    /// Additional template fields as a JSON string
     pub additional_template_fields_json: *const c_char,
+    /// Escaped special tokens as a JSON string
     pub escaped_special_tokens_json: *const c_char,
 }
 
@@ -852,6 +1012,7 @@ pub struct CRenderCmd4Options {
 // Templating FFI conversion helpers
 // ============================================================================
 
+/// Maps a `CRole` to a Rust Role.
 fn map_role(r: CRole) -> Role {
     match r {
         CRole::Unknown => Role::Unknown,
@@ -862,6 +1023,7 @@ fn map_role(r: CRole) -> Role {
     }
 }
 
+/// Maps a `CContentType` to a Rust `ContentType`.
 fn map_content_type(t: CContentType) -> ContentType {
     match t {
         CContentType::Unknown => ContentType::Unknown,
@@ -872,6 +1034,7 @@ fn map_content_type(t: CContentType) -> ContentType {
     }
 }
 
+/// Maps a `CCitationQuality` to a Rust `CitationQuality`.
 fn map_citation_quality(c: CCitationQuality) -> CitationQuality {
     match c {
         CCitationQuality::Unknown => CitationQuality::Unknown,
@@ -880,6 +1043,7 @@ fn map_citation_quality(c: CCitationQuality) -> CitationQuality {
     }
 }
 
+/// Maps a `CGrounding` to a Rust Grounding.
 fn map_grounding(g: CGrounding) -> Grounding {
     match g {
         CGrounding::Unknown => Grounding::Unknown,
@@ -888,6 +1052,7 @@ fn map_grounding(g: CGrounding) -> Grounding {
     }
 }
 
+/// Maps a `CSafetyMode` to a Rust `SafetyMode`.
 fn map_safety_mode(s: CSafetyMode) -> SafetyMode {
     match s {
         CSafetyMode::Unknown => SafetyMode::Unknown,
@@ -897,6 +1062,7 @@ fn map_safety_mode(s: CSafetyMode) -> SafetyMode {
     }
 }
 
+/// Maps a `CReasoningType` to a Rust `ReasoningType`.
 fn map_reasoning_type(r: CReasoningType) -> ReasoningType {
     match r {
         CReasoningType::Unknown => ReasoningType::Unknown,
@@ -905,6 +1071,7 @@ fn map_reasoning_type(r: CReasoningType) -> ReasoningType {
     }
 }
 
+/// Converts a nullable C string pointer to an Option<String>.
 unsafe fn cstr_opt(ptr: *const c_char) -> Option<String> {
     if ptr.is_null() {
         None
@@ -913,6 +1080,7 @@ unsafe fn cstr_opt(ptr: *const c_char) -> Option<String> {
     }
 }
 
+/// Parses a C string pointer as a JSON object.
 unsafe fn parse_json_object(ptr: *const c_char) -> Map<String, Value> {
     if ptr.is_null() {
         Map::new()
@@ -1137,7 +1305,7 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
     };
 
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
-    if template == "" {
+    if template.is_empty() {
         rs_opts
     } else {
         RenderCmd3Options {
@@ -1194,7 +1362,6 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
 
     let rs_opts = RenderCmd4Options {
         messages,
-        template: unsafe { CStr::from_ptr(opts.template).to_str().unwrap() },
         dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
         platform_instruction: unsafe { cstr_opt(opts.platform_instruction) },
         documents,
@@ -1209,9 +1376,10 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
+        ..Default::default()
     };
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
-    if template == "" {
+    if template.is_empty() {
         rs_opts
     } else {
         RenderCmd4Options {
@@ -1226,8 +1394,10 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
 // ============================================================================
 
 /// Renders CMD3 template and returns a newly allocated C string.
-/// Caller must free with `melody_string_free`.
+/// # Safety
+/// Caller must free return value with `melody_string_free`.
 #[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
 pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> *mut c_char {
     if opts.is_null() {
         return std::ptr::null_mut();
@@ -1240,8 +1410,10 @@ pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> 
 }
 
 /// Renders CMD4 template and returns a newly allocated C string.
-/// Caller must free with `melody_string_free`.
+/// # Safety
+/// Caller must free return value with `melody_string_free`.
 #[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
 pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> *mut c_char {
     if opts.is_null() {
         return std::ptr::null_mut();
@@ -1254,6 +1426,9 @@ pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> 
 }
 
 /// Frees a C string returned by render functions.
+///
+/// # Safety
+/// `s` must be a valid pointer returned from a melody render function.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_string_free(s: *mut c_char) {
     unsafe {

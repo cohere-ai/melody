@@ -22,7 +22,9 @@ impl TryFrom<String> for Role {
             "user" => Ok(Role::User),
             "chatbot" => Ok(Role::Chatbot),
             "tool" => Ok(Role::Tool),
-            other => Err(format!("invalid Role '{}', expected one of: unknown, system, user, chatbot, tool", other)),
+            other => Err(format!(
+                "invalid Role '{other}', expected one of: unknown, system, user, chatbot, tool"
+            )),
         }
     }
 }
@@ -58,7 +60,9 @@ impl TryFrom<String> for ContentType {
             "thinking" => Ok(ContentType::Thinking),
             "image" => Ok(ContentType::Image),
             "document" => Ok(ContentType::Document),
-            other => Err(format!("invalid ContentType '{}', expected one of: unknown, text, thinking, image, document", other)),
+            other => Err(format!(
+                "invalid ContentType '{other}', expected one of: unknown, text, thinking, image, document"
+            )),
         }
     }
 }
@@ -78,7 +82,9 @@ impl TryFrom<String> for CitationQuality {
             "unknown" => Ok(CitationQuality::Unknown),
             "off" => Ok(CitationQuality::Off),
             "on" => Ok(CitationQuality::On),
-            other => Err(format!("invalid CitationQuality '{}', expected one of: unknown, off, on", other)),
+            other => Err(format!(
+                "invalid CitationQuality '{other}', expected one of: unknown, off, on"
+            )),
         }
     }
 }
@@ -108,7 +114,9 @@ impl TryFrom<String> for Grounding {
             "unknown" => Ok(Grounding::Unknown),
             "enabled" => Ok(Grounding::Enabled),
             "disabled" => Ok(Grounding::Disabled),
-            other => Err(format!("invalid Grounding '{}', expected one of: unknown, enabled, disabled", other)),
+            other => Err(format!(
+                "invalid Grounding '{other}', expected one of: unknown, enabled, disabled"
+            )),
         }
     }
 }
@@ -140,7 +148,9 @@ impl TryFrom<String> for SafetyMode {
             "none" => Ok(SafetyMode::None),
             "strict" => Ok(SafetyMode::Strict),
             "contextual" => Ok(SafetyMode::Contextual),
-            other => Err(format!("invalid SafetyMode '{}', expected one of: unknown, none, strict, contextual", other)),
+            other => Err(format!(
+                "invalid SafetyMode '{other}', expected one of: unknown, none, strict, contextual"
+            )),
         }
     }
 }
@@ -171,7 +181,9 @@ impl TryFrom<String> for ReasoningType {
             "unknown" => Ok(ReasoningType::Unknown),
             "enabled" => Ok(ReasoningType::Enabled),
             "disabled" => Ok(ReasoningType::Disabled),
-            other => Err(format!("invalid ReasoningType '{}', expected one of: unknown, enabled, disabled", other)),
+            other => Err(format!(
+                "invalid ReasoningType '{other}', expected one of: unknown, enabled, disabled"
+            )),
         }
     }
 }
@@ -195,13 +207,13 @@ pub struct Image {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Content {
+    #[allow(clippy::struct_field_names)]
     #[serde(rename = "type")]
     pub content_type: ContentType,
     pub text: Option<String>,
     pub thinking: Option<String>,
     pub image: Option<Image>,
-    pub document: Option<Map<String, Value>>
-
+    pub document: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

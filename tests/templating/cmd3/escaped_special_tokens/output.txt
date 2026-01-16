@@ -1,0 +1,1 @@
+<BOS_TOKEN><|START_OF_TURN_TOKEN|><|USER_TOKEN|>Here is an unescaped token: <|token|>. This should be escaped: \<\|something\|\>.<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>

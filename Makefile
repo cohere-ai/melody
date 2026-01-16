@@ -11,7 +11,7 @@ check-build-with-tokenizers:
 	fi;
 
 golang-bindings-test: check-build-with-tokenizers
-	go test -v ./gobindings/...
+	go test -v -count=1 ./gobindings/...
 
 # we kind of assume that you're running this on a macOS machine - it just builds locally
 release-darwin-%:

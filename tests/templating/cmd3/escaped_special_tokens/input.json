@@ -1,0 +1,17 @@
+{
+  "skip_preamble": true,
+  "escaped_special_tokens":{
+    "<|something|>": "\\<\\|something\\|\\>"
+  },
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Here is an unescaped token: <|token|>. This should be escaped: <|something|>."
+        }
+      ]
+    }
+  ]
+}

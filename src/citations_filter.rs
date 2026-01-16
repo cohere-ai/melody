@@ -1,12 +1,37 @@
+//! Citation parsing functionality
+//!
+//! This module handles parsing of inline citations from grounded model outputs.
+//! Citations are used to attribute generated text to specific source documents or
+//! tool results.
+//!
+
 use crate::filter::{FilterImpl, find_partial};
 use crate::types::{FilterCitation, FilterMode, FilterOutput, Source, TokenIDsWithLogProb};
 
+// Citation marker constants
 const START_FIRST_CIT: &str = "<co: ";
 const START_LAST_CIT: &str = "</co: ";
 const END_OF_CIT: &str = ">";
 const START_FIRST_CIT_CMD3: &str = "<co";
 
 impl FilterImpl {
+    /// Process text response, extracting citations.
+    ///
+    /// This method is called when in `GroundedAnswer` or `ToolReason` mode. It parses
+    /// the text stream looking for citation markers and extracts both the text
+    /// and source attribution.
+    ///
+    /// # Arguments
+    ///
+    /// * `bstr` - Byte string to process
+    /// * `after_last_token` - Whether this is the final flush (affects buffering)
+    /// * `mode` - Current filter mode (`GroundedAnswer` or `ToolReason`)
+    /// * `token_log_probs` - Optional log probabilities for these tokens
+    ///
+    /// # Returns
+    ///
+    /// A tuple of (outputs, `bytes_consumed`) where `bytes_consumed` indicates how
+    /// many bytes from bstr were processed and can be removed from the buffer.
     pub(crate) fn process_grounded_text(
         &mut self,
         bstr: &[u8],
@@ -22,7 +47,7 @@ impl FilterImpl {
         let (send, rem_right) = self.trim_space(&send);
         let remove = bstr.len() - send.len() - rem_right;
 
-        let (res_out, remove_cit) = self.parse_citations(&send, mode);
+        let (mut res_out, remove_cit) = self.parse_citations(&send, mode);
 
         if res_out.is_none()
             || (res_out.as_ref().unwrap().text.is_empty()
@@ -31,23 +56,18 @@ impl FilterImpl {
             if send.is_empty() || !after_last_token {
                 return (Vec::new(), remove + remove_cit);
             }
-            return (
-                vec![FilterOutput {
-                    text: send,
-                    ..Default::default()
-                }],
-                remove + remove_cit,
-            );
+            res_out = Some(FilterOutput {
+                text: send.clone(),
+                ..Default::default()
+            });
         }
 
         let mut res_out = res_out.unwrap();
         res_out.is_post_answer = self.stream_non_grounded_answer && mode != FilterMode::ToolReason;
         res_out.is_reasoning = mode == FilterMode::ToolReason;
 
-        // Don't send logprobs for citations if there's no corresponding text.
-        if let Some(probs) = token_log_probs
-            && (res_out.citations.is_empty() || !res_out.text.is_empty())
-        {
+        // TODO revisit how to handle empty citations https://linear.app/cohereai/issue/PTS-8688/melody-align-log-probs-behavior
+        if let Some(probs) = token_log_probs {
             res_out.logprobs = probs.clone();
         }
 

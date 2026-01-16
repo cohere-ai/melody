@@ -1,9 +1,13 @@
-use crate::templating::types::*;
-use crate::templating::util::*;
+use crate::errors::MelodyError;
+use crate::templating::types::{
+    CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
+};
+use crate::templating::util::{
+    add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template,
+};
 use serde::Deserialize;
 use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
-use std::error::Error;
 
 /// Options for cmd3 rendering.
 #[derive(Debug, Clone, Deserialize)]
@@ -88,7 +92,7 @@ impl Default for RenderCmd4Options<'_> {
     }
 }
 
-pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
+pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(
         &opts.messages,
@@ -98,21 +102,20 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
     let docs: Vec<String> = opts
         .documents
         .iter()
-        .map(|d| {
-            add_spaces_to_json_encoding(&escape_special_tokens(
-                &to_string(d).unwrap_or_default(),
+        .map(|d| -> Result<String, MelodyError> {
+            Ok(add_spaces_to_json_encoding(&escape_special_tokens(
+                &to_string(d)?,
                 &opts.escaped_special_tokens,
-            ))
+            )))
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut substitutions = opts.additional_template_fields.clone();
     substitutions.insert(
         "preamble".to_string(),
         opts.dev_instruction
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert("messages".to_string(), Value::Array(messages));
     substitutions.insert(
@@ -127,15 +130,13 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
         "citation_mode".to_string(),
         opts.citation_quality
             .as_ref()
-            .map(|c| Value::String(c.as_str().to_string()))
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, |c| Value::String(c.as_str().to_string())),
     );
     substitutions.insert(
         "safety_mode".to_string(),
         opts.safety_mode
             .as_ref()
-            .map(|s| Value::String(s.as_str().to_string()))
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, |s| Value::String(s.as_str().to_string())),
     );
     substitutions.insert(
         "reasoning_options".to_string(),
@@ -157,28 +158,21 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
         "response_prefix".to_string(),
         opts.response_prefix
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert(
         "json_schema".to_string(),
-        opts.json_schema
-            .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+        opts.json_schema.clone().map_or(Value::Null, Value::String),
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    let template = liquid::ParserBuilder::with_stdlib()
-        .build()
-        .unwrap()
-        .parse(&opts.template)
-        .unwrap();
+    let parser = liquid::ParserBuilder::with_stdlib().build()?;
+    let template = parser.parse(opts.template)?;
 
-    Ok(template.render(&liquid::object!(&substitutions)).unwrap())
+    Ok(template.render(&liquid::object!(&substitutions))?)
 }
 
-pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
+pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(
         &opts.messages,
@@ -188,28 +182,26 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
     let docs: Vec<String> = opts
         .documents
         .iter()
-        .map(|d| {
-            add_spaces_to_json_encoding(&escape_special_tokens(
-                &to_string(d).unwrap_or_default(),
+        .map(|d| -> Result<String, MelodyError> {
+            Ok(add_spaces_to_json_encoding(&escape_special_tokens(
+                &to_string(d)?,
                 &opts.escaped_special_tokens,
-            ))
+            )))
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut substitutions = opts.additional_template_fields.clone();
     substitutions.insert(
         "developer_instruction".to_string(),
         opts.dev_instruction
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert(
         "platform_instruction_override".to_string(),
         opts.platform_instruction
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert("messages".to_string(), Value::Array(messages));
     substitutions.insert(
@@ -224,32 +216,24 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
         "grounding".to_string(),
         opts.grounding
             .as_ref()
-            .map(|g| Value::String(g.as_str().to_string()))
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, |g| Value::String(g.as_str().to_string())),
     );
     substitutions.insert(
         "response_prefix".to_string(),
         opts.response_prefix
             .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+            .map_or(Value::Null, Value::String),
     );
     substitutions.insert(
         "json_schema".to_string(),
-        opts.json_schema
-            .clone()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+        opts.json_schema.clone().map_or(Value::Null, Value::String),
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    let template = liquid::ParserBuilder::with_stdlib()
-        .build()
-        .unwrap()
-        .parse(&opts.template)
-        .unwrap();
+    let parser = liquid::ParserBuilder::with_stdlib().build()?;
+    let template = parser.parse(opts.template)?;
 
-    Ok(template.render(&liquid::object!(&substitutions)).unwrap())
+    Ok(template.render(&liquid::object!(&substitutions))?)
 }
 
 #[cfg(test)]
@@ -257,14 +241,20 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
     use serde_json::Value;
+    use serde_path_to_error::deserialize;
     use std::fs;
     use std::path::Path;
-    use serde_path_to_error::deserialize;
 
     fn read_test_cases(version: &str) -> Vec<(String, Value, String)> {
         let mut cases = vec![];
         let cur_file = file!();
-        let cur_dir = Path::new(cur_file).parent().unwrap().parent().unwrap().parent().unwrap();
+        let cur_dir = Path::new(cur_file)
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
         let test_dir = cur_dir.join("tests/templating").join(version);
         if !test_dir.exists() {
             panic!("Test directory {:?} does not exist.", test_dir);
@@ -293,12 +283,7 @@ mod tests {
             println!("Running cmd3 test case: {}", test_name);
             let opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             let rendered = render_cmd3(&opts).unwrap();
-            assert_eq!(
-                rendered.trim(),
-                expected.trim(),
-                "Failed test: {}",
-                test_name
-            );
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
     }
 
@@ -308,12 +293,7 @@ mod tests {
             println!("Running cmd4 test case: {}", test_name);
             let opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             let rendered = render_cmd4(&opts).unwrap();
-            assert_eq!(
-                rendered.trim(),
-                expected.trim(),
-                "Failed test: {}",
-                test_name
-            );
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
     }
 }
