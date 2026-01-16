@@ -9,7 +9,7 @@ use crate::templating::types::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };
-use crate::types::{FilterCitation, FilterOutput, TokenIDsWithLogProb};
+use crate::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -798,6 +798,8 @@ pub struct CMessage {
     pub tool_calls: *const CToolCall,
     pub tool_calls_len: usize,
     pub tool_call_id: *const c_char, // null if None
+    pub citations: *const CFilterCitation,
+    pub citations_len: usize,
 }
 
 #[repr(C)]
@@ -989,6 +991,40 @@ unsafe fn convert_ctool_call(tc: &CToolCall) -> ToolCall {
     }
 }
 
+unsafe fn convert_csource(source: &CSource) -> Source {
+    let tool_result_indices: Vec<usize> = if !source.tool_result_indices.is_null() && source.tool_result_indices_len > 0 {
+        unsafe {
+            Vec::from_raw_parts(source.tool_result_indices, source.tool_result_indices_len, source.tool_result_indices_len)
+        }
+    } else {
+        Vec::new()
+    };
+
+    Source {
+        tool_call_index: source.tool_call_index,
+        tool_result_indices: tool_result_indices,
+    }
+}
+
+unsafe fn convert_ccitation(cit: &CFilterCitation) -> FilterCitation {
+    let sources = if !cit.sources.is_null() && cit.sources_len > 0 {
+        unsafe { slice::from_raw_parts(cit.sources, cit.sources_len) }
+            .iter()
+            .map(|x| unsafe { convert_csource(x) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    FilterCitation {
+        start_index: cit.start_index,
+        end_index: cit.end_index,
+        text: unsafe { cstr_opt(cit.text).unwrap_or_default() },
+        sources: sources,
+        is_thinking: cit.is_thinking,
+    }
+}
+
 unsafe fn convert_cmessage(msg: &CMessage) -> Message {
     let contents = if !msg.content.is_null() && msg.content_len > 0 {
         unsafe { slice::from_raw_parts(msg.content, msg.content_len) }
@@ -1008,11 +1044,21 @@ unsafe fn convert_cmessage(msg: &CMessage) -> Message {
         Vec::new()
     };
 
+    let citations = if !msg.citations.is_null() && msg.citations_len > 0 {
+        unsafe { slice::from_raw_parts(msg.citations, msg.citations_len) }
+            .iter()
+            .map(|c| unsafe { convert_ccitation(c) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     Message {
         role: map_role(msg.role),
         content: contents,
         tool_calls,
         tool_call_id: unsafe { cstr_opt(msg.tool_call_id) },
+        citations:citations,
     }
 }
 

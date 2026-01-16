@@ -1,5 +1,6 @@
 #[cfg(feature = "python_ffi")]
 use pyo3::prelude::*;
+use serde::Deserialize;
 
 /// `TokenIDsWithLogProb` pairs tokens with their log probabilities.
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
@@ -65,7 +66,7 @@ pub struct FilterToolParameter {
 }
 
 /// `FilterCitation` represents a citation parsed from a model generation.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 pub struct FilterCitation {
     /// The beginning index of the citation in the larger generation.
@@ -80,7 +81,7 @@ pub struct FilterCitation {
 }
 
 /// Source indicates which tool call and which tool results from that tool are being cited.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 pub struct Source {
     pub tool_call_index: usize,

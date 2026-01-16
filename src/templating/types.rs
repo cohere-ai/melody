@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
+use crate::FilterCitation;
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(try_from = "String")]
 pub enum Role {
@@ -219,4 +221,5 @@ pub struct Message {
     #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
     pub tool_call_id: Option<String>,
+    pub citations: Vec<FilterCitation>,
 }

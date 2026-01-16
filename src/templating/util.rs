@@ -1,6 +1,10 @@
-use crate::templating::types::*;
+use crate::Filter;
+use crate::{FilterCitation, templating::types::*};
+use log::warn;
 use serde_json::{Map, Value, to_string};
+use std::collections::HashMap;
 use std::collections::BTreeMap;
+use std::hash::Hash;
 
 pub fn add_spaces_to_json_encoding(input: &str) -> String {
     let mut b = String::with_capacity(input.len());
@@ -176,6 +180,62 @@ pub fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, Stri
     Ok(template_tools)
 }
 
+fn build_text_with_citation(text: &String, citation_inserts: &mut Vec<CitationInsertInfo>) -> String {
+	if citation_inserts.len() == 0 {
+		return text.clone()
+	}
+	// ascending sort
+    citation_inserts.sort_by_key(|x| x.idx);
+	fn get_cit_text(citation_insert: &CitationInsertInfo) -> String {
+		if citation_insert.end {
+			return format!("</co: {}>", citation_insert.id)
+		}
+		return "<co>".to_string()
+	}
+	let mut insert_cur_idx = 0;
+	let mut new_text_builder = String::with_capacity(text.capacity());
+	for (idx, char) in text.chars().enumerate() {
+		let citation_insert = &citation_inserts[insert_cur_idx];
+		if idx == citation_insert.idx {
+			new_text_builder.push_str(&get_cit_text(citation_insert));
+			while insert_cur_idx+1 < citation_inserts.len() && citation_inserts[insert_cur_idx].idx == idx {
+				insert_cur_idx += 1;
+			}
+		}
+		new_text_builder.push(char)
+	}
+	let citation_insert = &citation_inserts[insert_cur_idx]; if citation_insert.idx == text.len() {
+		new_text_builder.push_str(&get_cit_text(citation_insert))
+	}
+	return new_text_builder
+}
+
+struct CitationInsertInfo {
+	idx: usize,
+	end: bool,
+	id: String,
+	citation: FilterCitation,
+}
+
+fn add_citation_insert_pair(
+    citation: &FilterCitation,
+	citation_inserts: &mut Vec<CitationInsertInfo>,
+) {
+    let insrt_start = CitationInsertInfo{citation: citation.clone(), idx: citation.start_index, end: false, id: String::new()};
+	let mut citation_id_map: HashMap<usize, Vec<usize>> = HashMap::new();
+	for source in &citation.sources {
+		citation_id_map.entry(source.tool_call_index).or_insert(Vec::new()).extend_from_slice(&source.tool_result_indices)
+	}
+	let mut citation_ids = Vec::new();
+	for (tool_call_idx, result_ids) in citation_id_map {
+		let citation_id = format!("{tool_call_idx}:[{}]", result_ids.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","));
+		citation_ids.push(citation_id)
+	}
+	let insrt_end = CitationInsertInfo{citation: citation.clone(), idx: citation.end_index, end: true, id: citation_ids.join(",")};
+
+    citation_inserts.extend([insrt_start, insrt_end]);
+}
+
 // Convert messages to template
 pub fn messages_to_template(
     messages: &[Message],
@@ -250,7 +310,13 @@ pub fn messages_to_template(
         }
 
         let mut template_msg_content = Vec::new();
-        for content_item in &msg.content {
+        for (j, content_item) in msg.content.iter().enumerate() {
+            let mut citation_inserts = Vec::<CitationInsertInfo>::new();
+            for citation in &msg.citations {
+                if citation.is_thinking == true && j == 0 {
+                    add_citation_insert_pair(citation, &mut citation_inserts);
+                }
+            }
             match content_item.content_type {
                 ContentType::Document => {
                     if msg.role != Role::Tool {
@@ -272,10 +338,10 @@ pub fn messages_to_template(
                     let data = if msg.role == Role::System {
                         content_item.text.clone().unwrap_or_default()
                     } else {
-                        escape_special_tokens(
+                        build_text_with_citation(&escape_special_tokens(
                             content_item.text.as_deref().unwrap_or_default(),
                             special_token_map,
-                        )
+                        ), &mut citation_inserts)
                     };
                     template_msg_content.push(TemplateContent {
                         content_type: "text".to_string(),
@@ -290,10 +356,10 @@ pub fn messages_to_template(
                     }
                     template_msg_content.push(TemplateContent {
                         content_type: "thinking".to_string(),
-                        data: escape_special_tokens(
+                        data: build_text_with_citation(&escape_special_tokens(
                             content_item.thinking.as_deref().unwrap_or_default(),
                             special_token_map,
-                        ),
+                        ), &mut citation_inserts),
                     });
                 }
                 ContentType::Image => {
