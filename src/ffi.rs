@@ -1170,7 +1170,7 @@ unsafe fn convert_csource(source: &CSource) -> Source {
 
     Source {
         tool_call_index: source.tool_call_index,
-        tool_result_indices: tool_result_indices,
+        tool_result_indices,
     }
 }
 
@@ -1188,7 +1188,7 @@ unsafe fn convert_ccitation(cit: &CFilterCitation) -> FilterCitation {
         start_index: cit.start_index,
         end_index: cit.end_index,
         text: unsafe { cstr_opt(cit.text).unwrap_or_default() },
-        sources: sources,
+        sources,
         is_thinking: cit.is_thinking,
     }
 }
@@ -1226,7 +1226,7 @@ unsafe fn convert_cmessage(msg: &CMessage) -> Message {
         content: contents,
         tool_calls,
         tool_call_id: unsafe { cstr_opt(msg.tool_call_id) },
-        citations:citations,
+        citations,
     }
 }
 
