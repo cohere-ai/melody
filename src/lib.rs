@@ -98,6 +98,7 @@
 //! unsafe code for cross-language interoperability. See their respective module
 //! documentation for safety requirements.
 
+pub mod errors;
 pub mod filter;
 pub mod options;
 pub mod types;

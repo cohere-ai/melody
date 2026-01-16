@@ -1,3 +1,4 @@
+use crate::errors::MelodyError;
 use crate::templating::types::{
     CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
 };
@@ -7,7 +8,6 @@ use crate::templating::util::{
 use serde::Deserialize;
 use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
-use std::error::Error;
 
 /// Options for cmd3 rendering.
 #[derive(Debug, Clone, Deserialize)]
@@ -92,7 +92,7 @@ impl Default for RenderCmd4Options<'_> {
     }
 }
 
-pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
+pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(
         &opts.messages,
@@ -102,13 +102,13 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
     let docs: Vec<String> = opts
         .documents
         .iter()
-        .map(|d| {
-            add_spaces_to_json_encoding(&escape_special_tokens(
-                &to_string(d).unwrap_or_default(),
+        .map(|d| -> Result<String, MelodyError> {
+            Ok(add_spaces_to_json_encoding(&escape_special_tokens(
+                &to_string(d)?,
                 &opts.escaped_special_tokens,
-            ))
+            )))
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut substitutions = opts.additional_template_fields.clone();
     substitutions.insert(
@@ -166,16 +166,14 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, Box<dyn Error>> {
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    let template = liquid::ParserBuilder::with_stdlib()
-        .build()
-        .unwrap()
-        .parse(opts.template)
-        .unwrap();
+    let parser = liquid::ParserBuilder::with_stdlib()
+        .build()?;
+    let template = parser.parse(opts.template)?;
 
-    Ok(template.render(&liquid::object!(&substitutions)).unwrap())
+    Ok(template.render(&liquid::object!(&substitutions))?)
 }
 
-pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
+pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(
         &opts.messages,
@@ -185,13 +183,13 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
     let docs: Vec<String> = opts
         .documents
         .iter()
-        .map(|d| {
-            add_spaces_to_json_encoding(&escape_special_tokens(
-                &to_string(d).unwrap_or_default(),
+        .map(|d| -> Result<String, MelodyError> {
+            Ok(add_spaces_to_json_encoding(&escape_special_tokens(
+                &to_string(d)?,
                 &opts.escaped_special_tokens,
-            ))
+            )))
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut substitutions = opts.additional_template_fields.clone();
     substitutions.insert(
@@ -233,13 +231,11 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, Box<dyn Error>> {
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    let template = liquid::ParserBuilder::with_stdlib()
-        .build()
-        .unwrap()
-        .parse(opts.template)
-        .unwrap();
+    let parser = liquid::ParserBuilder::with_stdlib()
+        .build()?;
+    let template = parser.parse(opts.template)?;
 
-    Ok(template.render(&liquid::object!(&substitutions)).unwrap())
+    Ok(template.render(&liquid::object!(&substitutions))?)
 }
 
 #[cfg(test)]
