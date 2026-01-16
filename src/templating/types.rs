@@ -233,5 +233,6 @@ pub struct Message {
     #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
     pub tool_call_id: Option<String>,
+    #[serde(default)]
     pub citations: Vec<FilterCitation>,
 }
