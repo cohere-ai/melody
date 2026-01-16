@@ -1,3 +1,8 @@
+//! Melody Errors
+//!
+//! This module documents the errors that can occur in the Melody library.
+//!
+
 use thiserror::Error;
 
 /// Errors that can occur in the Melody library

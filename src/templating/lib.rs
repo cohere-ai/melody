@@ -166,8 +166,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    let parser = liquid::ParserBuilder::with_stdlib()
-        .build()?;
+    let parser = liquid::ParserBuilder::with_stdlib().build()?;
     let template = parser.parse(opts.template)?;
 
     Ok(template.render(&liquid::object!(&substitutions))?)
@@ -231,8 +230,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    let parser = liquid::ParserBuilder::with_stdlib()
-        .build()?;
+    let parser = liquid::ParserBuilder::with_stdlib().build()?;
     let template = parser.parse(opts.template)?;
 
     Ok(template.render(&liquid::object!(&substitutions))?)
