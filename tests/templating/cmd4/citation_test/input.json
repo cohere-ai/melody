@@ -1,6 +1,5 @@
 {
-  "skip_preamble": true,
-  "citation_quality": "on",
+  "grounding": "enabled",
   "messages": [
     {
       "role": "User",
