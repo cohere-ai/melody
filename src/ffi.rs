@@ -22,12 +22,12 @@
 //!
 
 use crate::filter::{Filter, FilterImpl};
-use crate::options::{new_filter, FilterOptions};
-use crate::templating::{render_cmd3, render_cmd4, RenderCmd3Options, RenderCmd4Options};
+use crate::options::{FilterOptions, new_filter};
 use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };
+use crate::templating::{RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4};
 use crate::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};

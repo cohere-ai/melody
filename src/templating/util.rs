@@ -1,7 +1,7 @@
+use crate::FilterCitation;
 use crate::errors::MelodyError;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
-use crate::FilterCitation;
-use serde_json::{to_string, Map, Value};
+use serde_json::{Map, Value, to_string};
 use std::collections::{BTreeMap, HashMap};
 
 pub fn add_spaces_to_json_encoding(input: &str) -> String {
