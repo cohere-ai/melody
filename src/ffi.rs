@@ -21,6 +21,7 @@
 //! thread at a time, or protected by external synchronization.
 //!
 
+#![allow(missing_docs)]
 use crate::filter::{Filter, FilterImpl};
 use crate::options::{FilterOptions, new_filter};
 use crate::templating::{
