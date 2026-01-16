@@ -63,6 +63,18 @@
       ],
       "citations": [
         {
+          "start_index": 69,
+          "end_index": 79,
+          "sources": [
+            {
+              "tool_call_index": 0,
+              "tool_result_indices": [0,1]
+            }
+          ],
+          "text": "pdf chunks",
+          "is_thinking": false
+        },
+        {
           "start_index": 31,
           "end_index": 46,
           "sources": [
@@ -96,18 +108,6 @@
             }
           ],
           "text": "'Call your mom'",
-          "is_thinking": false
-        },
-        {
-          "start_index": 69,
-          "end_index": 79,
-          "sources": [
-            {
-              "tool_call_index": 0,
-              "tool_result_indices": [0,1]
-            }
-          ],
-          "text": "pdf chunks",
           "is_thinking": false
         }
       ]
