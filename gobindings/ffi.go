@@ -292,7 +292,7 @@ func convertCOutput(cOutput *C.CFilterOutput) FilterOutput {
 	// Convert search query
 	if cOutput.search_query_index >= 0 {
 		output.SearchQuery = &FilterSearchQueryDelta{
-			Index: int(cOutput.search_query_index),
+			Index: uint(cOutput.search_query_index),
 			Text:  C.GoString(cOutput.search_query_text),
 		}
 	}
@@ -309,7 +309,7 @@ func convertCOutput(cOutput *C.CFilterOutput) FilterOutput {
 	// Convert tool calls
 	if cOutput.tool_call_index >= 0 {
 		tc := &FilterToolCallDelta{
-			Index:         int(cOutput.tool_call_index),
+			Index:         uint(cOutput.tool_call_index),
 			ID:            C.GoString(cOutput.tool_call_id),
 			Name:          C.GoString(cOutput.tool_call_name),
 			RawParamDelta: C.GoString(cOutput.tool_call_raw_param_delta),
@@ -334,8 +334,8 @@ func convertCOutput(cOutput *C.CFilterOutput) FilterOutput {
 // convertCCitation converts a C citation to Go FilterCitation
 func convertCCitation(cCitation *C.CFilterCitation) FilterCitation {
 	citation := FilterCitation{
-		StartIndex: int(cCitation.start_index),
-		EndIndex:   int(cCitation.end_index),
+		StartIndex: uint(cCitation.start_index),
+		EndIndex:   uint(cCitation.end_index),
 		Text:       C.GoString(cCitation.text),
 		IsThinking: bool(cCitation.is_thinking),
 	}
@@ -354,14 +354,14 @@ func convertCCitation(cCitation *C.CFilterCitation) FilterCitation {
 // convertCSource converts a C source to Go Source
 func convertCSource(cSource *C.CSource) Source {
 	source := Source{
-		ToolCallIndex: int(cSource.tool_call_index),
+		ToolCallIndex: uint(cSource.tool_call_index),
 	}
 
 	if cSource.tool_result_indices != nil && cSource.tool_result_indices_len > 0 {
 		indices := unsafe.Slice(cSource.tool_result_indices, int(cSource.tool_result_indices_len))
-		source.ToolResultIndices = make([]int, len(indices))
+		source.ToolResultIndices = make([]uint, len(indices))
 		for i, idx := range indices {
-			source.ToolResultIndices[i] = int(idx)
+			source.ToolResultIndices[i] = uint(idx)
 		}
 	}
 
@@ -598,10 +598,11 @@ type ToolCall struct {
 }
 
 type Message struct {
-	Role       Role       `json:"role"`
-	Content    []Content  `json:"content"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"` // optional: empty means omitted
+	Role       Role             `json:"role"`
+	Content    []Content        `json:"content"`
+	ToolCalls  []ToolCall       `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"` // optional: empty means omitted
+	Citations  []FilterCitation `json:"citations,omitempty"`
 }
 
 type RenderCmd3Options struct {
@@ -766,6 +767,58 @@ func buildCToolCalls(a *cAllocator, calls []ToolCall) (*C.CToolCall, C.size_t) {
 	return base, C.size_t(n)
 }
 
+func buildCSources(a *cAllocator, sources []Source) (*C.CSource, C.size_t) {
+	if len(sources) == 0 {
+		return nil, 0
+	}
+	n := len(sources)
+	var sample C.CSource
+	size := uintptr(n) * unsafe.Sizeof(sample)
+	base := (*C.CSource)(a.Malloc(size))
+	var arr []C.CSource = unsafe.Slice(base, n)
+	for i := 0; i < n; i++ {
+		source := sources[i]
+		arr[i].tool_call_index = C.size_t(source.ToolCallIndex)
+
+		lenResIdxs := len(source.ToolResultIndices)
+		if lenResIdxs > 0 {
+			// Can't use a.Malloc here for some reason, got this line from North
+			baseResIdxs := (*C.size_t)(C.malloc(C.size_t(lenResIdxs) * C.size_t(unsafe.Sizeof(C.size_t(0)))))
+			var cResIdxs []C.size_t = unsafe.Slice(baseResIdxs, lenResIdxs)
+			// Copy tool res indicies array data
+			for i, v := range source.ToolResultIndices {
+				cResIdxs[i] = C.size_t(v)
+			}
+			arr[i].tool_result_indices = baseResIdxs
+			arr[i].tool_result_indices_len = C.size_t(lenResIdxs)
+		} else {
+			arr[i].tool_result_indices = nil
+			arr[i].tool_result_indices_len = 0
+		}
+	}
+	return base, C.size_t(n)
+}
+
+func buildCCitations(a *cAllocator, citations []FilterCitation) (*C.CFilterCitation, C.size_t) {
+	if len(citations) == 0 {
+		return nil, 0
+	}
+	n := len(citations)
+	var sample C.CFilterCitation
+	size := uintptr(n) * unsafe.Sizeof(sample)
+	base := (*C.CFilterCitation)(a.Malloc(size))
+	var arr []C.CFilterCitation = unsafe.Slice(base, n)
+	for i := 0; i < n; i++ {
+		cit := citations[i]
+		arr[i].start_index = C.size_t(cit.StartIndex)
+		arr[i].end_index = C.size_t(cit.EndIndex)
+		arr[i].text = a.CString(cit.Text)
+		arr[i].sources, arr[i].sources_len = buildCSources(a, cit.Sources)
+		arr[i].is_thinking = C.bool(cit.IsThinking)
+	}
+	return base, C.size_t(n)
+}
+
 func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 	if len(msgs) == 0 {
 		return nil, 0
@@ -793,6 +846,10 @@ func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 		if m.ToolCallID != "" {
 			arr[i].tool_call_id = a.CString(m.ToolCallID)
 		}
+
+		cCitations, cCitationsLen := buildCCitations(a, m.Citations)
+		arr[i].citations = cCitations
+		arr[i].citations_len = cCitationsLen
 	}
 	return base, C.size_t(n)
 }

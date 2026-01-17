@@ -21,14 +21,13 @@
 //! thread at a time, or protected by external synchronization.
 //!
 
-#![allow(missing_docs)]
 use crate::filter::{Filter, FilterImpl};
-use crate::options::{FilterOptions, new_filter};
+use crate::options::{new_filter, FilterOptions};
+use crate::templating::{render_cmd3, render_cmd4, RenderCmd3Options, RenderCmd4Options};
 use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };
-use crate::templating::{RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4};
 use crate::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
@@ -909,8 +908,7 @@ pub struct CToolCall {
 }
 
 /// C-compatible struct for messages.
-#[repr(C)]
-pub struct CMessage {
+#[repr(C)]pub struct CMessage {
     /// Message role enum
     pub role: CRole,
     /// Pointer to array of content structs
@@ -923,7 +921,9 @@ pub struct CMessage {
     pub tool_calls_len: usize,
     /// Tool call ID as a null-terminated C string (null if None)
     pub tool_call_id: *const c_char,
+    /// Citations
     pub citations: *const CFilterCitation,
+    /// Number of citations
     pub citations_len: usize,
 }
 

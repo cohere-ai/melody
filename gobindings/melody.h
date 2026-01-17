@@ -71,12 +71,29 @@ typedef struct {
 } CToolCall;
 
 typedef struct {
+    size_t tool_call_index;
+    size_t* tool_result_indices;
+    size_t tool_result_indices_len;
+} CSource;
+
+typedef struct {
+    size_t start_index;
+    size_t end_index;
+    char* text;
+    CSource* sources;
+    size_t sources_len;
+    bool is_thinking;
+} CFilterCitation;
+
+typedef struct {
     CRole role;
     const CContent* content;
     size_t content_len;
     const CToolCall* tool_calls;
     size_t tool_calls_len;
     const char* tool_call_id; // null if None
+    const CFilterCitation* citations;
+    size_t citations_len;
 } CMessage;
 
 typedef struct {
@@ -131,21 +148,6 @@ extern void melody_string_free(char* s);
 
 typedef struct CFilter CFilter;
 typedef struct CFilterOptions CFilterOptions;
-
-typedef struct {
-    size_t tool_call_index;
-    size_t* tool_result_indices;
-    size_t tool_result_indices_len;
-} CSource;
-
-typedef struct {
-    size_t start_index;
-    size_t end_index;
-    char* text;
-    CSource* sources;
-    size_t sources_len;
-    bool is_thinking;
-} CFilterCitation;
 
 typedef struct {
     char* text;
