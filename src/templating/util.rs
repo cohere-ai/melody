@@ -3,7 +3,7 @@ use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
 use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
 
-pub fn add_spaces_to_json_encoding(input: &str) -> String {
+pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
     let mut b = String::with_capacity(input.len());
     let mut in_string_literal = false;
     let mut last_char_is_backslash = false;
@@ -19,7 +19,7 @@ pub fn add_spaces_to_json_encoding(input: &str) -> String {
     }
     b
 }
-pub fn json_escape_string(s: &str) -> String {
+pub(crate) fn json_escape_string(s: &str) -> String {
     let b = serde_json::to_string(s).unwrap_or_default();
     if b.len() < 2 {
         return String::new();
@@ -28,7 +28,10 @@ pub fn json_escape_string(s: &str) -> String {
     b[1..b.len() - 1].to_string()
 }
 
-pub fn escape_special_tokens(text: &str, special_token_map: &BTreeMap<String, String>) -> String {
+pub(crate) fn escape_special_tokens(
+    text: &str,
+    special_token_map: &BTreeMap<String, String>,
+) -> String {
     let mut result = text.to_string();
     for (special_token, replacement) in special_token_map {
         result = result.replace(special_token, replacement);
@@ -37,19 +40,19 @@ pub fn escape_special_tokens(text: &str, special_token_map: &BTreeMap<String, St
 }
 
 #[derive(Debug, Clone)]
-pub struct TemplateContent {
+pub(crate) struct TemplateContent {
     pub content_type: String,
     pub data: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct TemplateToolResult {
+pub(crate) struct TemplateToolResult {
     pub tool_call_id: usize,
     pub documents: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
-pub struct TemplateMessage {
+pub(crate) struct TemplateMessage {
     pub role: String,
     pub tool_calls: Vec<String>,
     pub content: Vec<TemplateContent>,
@@ -155,7 +158,7 @@ fn tool_call_to_template(tc: &ToolCall, tc_index: usize) -> Result<String, Melod
 }
 
 // Convert tools to template
-pub fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, MelodyError> {
+pub(crate) fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, MelodyError> {
     let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
     for tool in tools {
         let schema =
@@ -179,7 +182,7 @@ pub fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, Melo
 
 // Convert messages to template
 #[allow(clippy::too_many_lines)] //TODO: Refactor this function to reduce its length.
-pub fn messages_to_template(
+pub(crate) fn messages_to_template(
     messages: &[Message],
     docs_present: bool,
     special_token_map: &BTreeMap<String, String>,
