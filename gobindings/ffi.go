@@ -726,6 +726,12 @@ func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
 	for i := 0; i < n; i++ {
 		c := contents[i]
 		arr[i].content_type = contentTypeToC(c.Type)
+		// Explicitly nil pointer fields
+		arr[i].text = nil
+		arr[i].thinking = nil
+		arr[i].image = nil
+		arr[i].document_json = nil
+
 		if c.Text != "" {
 			arr[i].text = a.CString(c.Text)
 		}
@@ -759,6 +765,11 @@ func buildCToolCalls(a *cAllocator, calls []ToolCall) (*C.CToolCall, C.size_t) {
 	var arr []C.CToolCall = unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		tc := calls[i]
+		// Explicitly nil pointer fields
+		arr[i].id = nil
+		arr[i].name = nil
+		arr[i].parameters = nil
+
 		arr[i].id = a.CString(tc.ID)
 		arr[i].name = a.CString(tc.Name)
 		arr[i].parameters = a.CString(tc.Parameters)
@@ -778,6 +789,11 @@ func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 	for i := 0; i < n; i++ {
 		m := msgs[i]
 		arr[i].role = roleToC(m.Role)
+
+		// Explicitly nil pointer fields
+		arr[i].content = nil
+		arr[i].tool_calls = nil
+		arr[i].tool_call_id = nil
 
 		// contents
 		cContent, cContentLen := buildCContents(a, m.Content)
