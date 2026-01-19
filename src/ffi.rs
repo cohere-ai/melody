@@ -131,6 +131,15 @@ pub struct CFilterOutputArray {
     pub len: usize,
 }
 
+/// Struct for returning either a result or an error (mutually exclusive, one is always null)
+#[repr(C)]
+pub struct CRenderResult {
+    /// Null-terminated C string containing the result (null if error)
+    pub result: *mut c_char,
+    /// Null-terminated C string containing the error (null if success)
+    pub error: *mut c_char,
+}
+
 // ============================================================================
 // FilterOptions FFI functions
 // ============================================================================
@@ -1347,47 +1356,74 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
 // Templating FFI functions
 // ============================================================================
 
-/// Renders CMD3 template and returns a newly allocated C string.
+/// Renders CMD3 template and returns a struct with result or error.
 /// # Safety
-/// Caller must free return value with `melody_string_free`.
+/// Caller must free return value with `melody_render_result_free`.
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
-pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> *mut c_char {
+pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> *mut CRenderResult {
     if opts.is_null() {
-        return std::ptr::null_mut();
+        let err = CString::new("null options pointer").unwrap().into_raw();
+        return Box::into_raw(Box::new(CRenderResult {
+            result: std::ptr::null_mut(),
+            error: err,
+        }));
     }
     let rust_opts = unsafe { convert_cmd3_options(&*opts) };
     match render_cmd3(&rust_opts) {
-        Ok(s) => CString::new(s).unwrap().into_raw(),
-        Err(_) => std::ptr::null_mut(),
+        Ok(s) => Box::into_raw(Box::new(CRenderResult {
+            result: CString::new(s).unwrap().into_raw(),
+            error: std::ptr::null_mut(),
+        })),
+        Err(e) => Box::into_raw(Box::new(CRenderResult {
+            result: std::ptr::null_mut(),
+            error: CString::new(e.to_string()).unwrap().into_raw(),
+        })),
     }
 }
 
-/// Renders CMD4 template and returns a newly allocated C string.
+/// Renders CMD4 template and returns a struct with result or error.
 /// # Safety
-/// Caller must free return value with `melody_string_free`.
+/// Caller must free return value with `melody_render_result_free`.
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
-pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> *mut c_char {
+pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> *mut CRenderResult {
     if opts.is_null() {
-        return std::ptr::null_mut();
+        let err = CString::new("null options pointer").unwrap().into_raw();
+        return Box::into_raw(Box::new(CRenderResult {
+            result: std::ptr::null_mut(),
+            error: err,
+        }));
     }
     let rust_opts = unsafe { convert_cmd4_options(&*opts) };
     match render_cmd4(&rust_opts) {
-        Ok(s) => CString::new(s).unwrap().into_raw(),
-        Err(_) => std::ptr::null_mut(),
+        Ok(s) => Box::into_raw(Box::new(CRenderResult {
+            result: CString::new(s).unwrap().into_raw(),
+            error: std::ptr::null_mut(),
+        })),
+        Err(e) => Box::into_raw(Box::new(CRenderResult {
+            result: std::ptr::null_mut(),
+            error: CString::new(e.to_string()).unwrap().into_raw(),
+        })),
     }
 }
 
-/// Frees a C string returned by render functions.
+/// Frees a CRenderResult struct and its strings.
 ///
 /// # Safety
-/// `s` must be a valid pointer returned from a melody render function.
+/// `res` must be a valid pointer returned from a melody render function.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_string_free(s: *mut c_char) {
+pub unsafe extern "C" fn melody_render_result_free(res: *mut CRenderResult) {
+    if res.is_null() {
+        return;
+    }
     unsafe {
-        if !s.is_null() {
-            let _ = CString::from_raw(s);
+        let res_box = Box::from_raw(res);
+        if !res_box.result.is_null() {
+            let _ = CString::from_raw(res_box.result);
+        }
+        if !res_box.error.is_null() {
+            let _ = CString::from_raw(res_box.error);
         }
     }
 }

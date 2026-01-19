@@ -881,14 +881,19 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 	}
 
 	// Call into Rust
-	cs := C.melody_render_cmd3(&cOpts)
-	if cs == nil {
-		return "", errors.New("melody_render_cmd3 returned null")
+	res := C.melody_render_cmd3(&cOpts)
+	if res == nil {
+		return "", errors.New("melody_render_cmd3 returned null result struct")
 	}
-	defer C.melody_string_free(cs)
+	defer C.melody_render_result_free(res)
 
-	result := C.GoString(cs)
-	return result, nil
+	if res.result != nil {
+		return C.GoString(res.result), nil
+	}
+	if res.error != nil {
+		return "", errors.New(C.GoString(res.error))
+	}
+	return "", errors.New("melody_render_cmd3 returned neither result nor error")
 }
 
 // RenderCMD4 renders CMD4 using the Rust templating engine via FFI.
@@ -938,12 +943,17 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		cOpts.json_schema = a.CString(*opts.JSONSchema)
 	}
 
-	cs := C.melody_render_cmd4(&cOpts)
-	if cs == nil {
-		return "", errors.New("melody_render_cmd4 returned null")
+	res := C.melody_render_cmd4(&cOpts)
+	if res == nil {
+		return "", errors.New("melody_render_cmd4 returned null result struct")
 	}
-	defer C.melody_string_free(cs)
+	defer C.melody_render_result_free(res)
 
-	result := C.GoString(cs)
-	return result, nil
+	if res.result != nil {
+		return C.GoString(res.result), nil
+	}
+	if res.error != nil {
+		return "", errors.New(C.GoString(res.error))
+	}
+	return "", errors.New("melody_render_cmd4 returned neither result nor error")
 }
