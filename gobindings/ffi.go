@@ -727,6 +727,12 @@ func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
 	for i := 0; i < n; i++ {
 		c := contents[i]
 		arr[i].content_type = contentTypeToC(c.Type)
+		// Explicitly nil pointer fields
+		arr[i].text = nil
+		arr[i].thinking = nil
+		arr[i].image = nil
+		arr[i].document_json = nil
+
 		if c.Text != "" {
 			arr[i].text = a.CString(c.Text)
 		}
@@ -760,6 +766,11 @@ func buildCToolCalls(a *cAllocator, calls []ToolCall) (*C.CToolCall, C.size_t) {
 	var arr []C.CToolCall = unsafe.Slice(base, n)
 	for i := 0; i < n; i++ {
 		tc := calls[i]
+		// Explicitly nil pointer fields
+		arr[i].id = nil
+		arr[i].name = nil
+		arr[i].parameters = nil
+
 		arr[i].id = a.CString(tc.ID)
 		arr[i].name = a.CString(tc.Name)
 		arr[i].parameters = a.CString(tc.Parameters)
@@ -831,6 +842,11 @@ func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 	for i := 0; i < n; i++ {
 		m := msgs[i]
 		arr[i].role = roleToC(m.Role)
+
+		// Explicitly nil pointer fields
+		arr[i].content = nil
+		arr[i].tool_calls = nil
+		arr[i].tool_call_id = nil
 
 		// contents
 		cContent, cContentLen := buildCContents(a, m.Content)
@@ -922,14 +938,19 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 	}
 
 	// Call into Rust
-	cs := C.melody_render_cmd3(&cOpts)
-	if cs == nil {
-		return "", errors.New("melody_render_cmd3 returned null")
+	res := C.melody_render_cmd3(&cOpts)
+	if res == nil {
+		return "", errors.New("melody_render_cmd3 returned null result struct")
 	}
-	defer C.melody_string_free(cs)
+	defer C.melody_render_result_free(res)
 
-	result := C.GoString(cs)
-	return result, nil
+	if res.result != nil {
+		return C.GoString(res.result), nil
+	}
+	if res.error != nil {
+		return "", errors.New(C.GoString(res.error))
+	}
+	return "", errors.New("melody_render_cmd3 returned neither result nor error")
 }
 
 // RenderCMD4 renders CMD4 using the Rust templating engine via FFI.
@@ -979,12 +1000,17 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		cOpts.json_schema = a.CString(*opts.JSONSchema)
 	}
 
-	cs := C.melody_render_cmd4(&cOpts)
-	if cs == nil {
-		return "", errors.New("melody_render_cmd4 returned null")
+	res := C.melody_render_cmd4(&cOpts)
+	if res == nil {
+		return "", errors.New("melody_render_cmd4 returned null result struct")
 	}
-	defer C.melody_string_free(cs)
+	defer C.melody_render_result_free(res)
 
-	result := C.GoString(cs)
-	return result, nil
+	if res.result != nil {
+		return C.GoString(res.result), nil
+	}
+	if res.error != nil {
+		return "", errors.New(C.GoString(res.error))
+	}
+	return "", errors.New("melody_render_cmd4 returned neither result nor error")
 }

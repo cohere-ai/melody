@@ -142,8 +142,15 @@ typedef struct {
 // Templating FFI functions
 // ============================================================================
 
-extern char* melody_render_cmd3(const CRenderCmd3Options* opts);
-extern char* melody_render_cmd4(const CRenderCmd4Options* opts);
+typedef struct {
+    char* result; // null if error
+    char* error;  // null if success
+} CRenderResult;
+
+extern CRenderResult* melody_render_cmd3(const CRenderCmd3Options* opts);
+extern CRenderResult* melody_render_cmd4(const CRenderCmd4Options* opts);
+extern void melody_render_result_free(CRenderResult* res);
+
 extern void melody_string_free(char* s);
 
 typedef struct CFilter CFilter;

@@ -1,0 +1,4 @@
+Here is the dev instruction:
+talk like a pirate.
+Here are the messages:
+USER: Can you check if I have any reminders for the week?

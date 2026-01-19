@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,10 +20,11 @@ func readTemplatingTestCases(t *testing.T, version string) []templateTest {
 	t.Helper()
 	var cases []templateTest
 	// Find the root directory (project root)
-	root, err := os.Getwd()
-	require.NoError(t, err)
+	_, filename, _, ok := runtime.Caller(1)
+	require.True(t, ok)
+	curDir := filepath.Dir(filename)
 	// Find the tests/templating/<version> directory
-	testDir := filepath.Join(root, "..", "tests", "templating", version)
+	testDir := filepath.Join(curDir, "..", "tests", "templating", version)
 	entries, err := os.ReadDir(testDir)
 	require.NoError(t, err)
 	for _, entry := range entries {
