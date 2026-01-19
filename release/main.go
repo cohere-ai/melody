@@ -15,6 +15,23 @@ func main() {
 	// **********
 	// TEMPLATING
 	// **********
+	opts := melody.RenderCmd3Options{
+		SkipPreamble: true,
+		Messages: []melody.Message{
+			{
+				Role: melody.RoleUser,
+				Content: []melody.Content{{
+					Type: melody.ContentText,
+					Text: "Tell me a joke about cats.",
+				}},
+			},
+		},
+	}
+	result, err := melody.RenderCMD3(opts)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("render cmd3 result: ", result)
 
 	// *******
 	// PARSING
