@@ -1,0 +1,15 @@
+{
+  "template": "Here is the dev instruction:\n{{ developer_instruction }}.\nHere are the messages:{% for message in messages %}\n{{ message.role }}: {% for content in message.content %}{{content.data}}{% endfor %}{% endfor %}",
+  "dev_instruction": "talk like a pirate",
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    }
+  ]
+}
