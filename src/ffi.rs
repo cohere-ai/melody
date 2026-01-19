@@ -1408,7 +1408,7 @@ pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> 
     }
 }
 
-/// Frees a CRenderResult struct and its strings.
+/// Frees a `CRenderResult` struct and its strings.
 ///
 /// # Safety
 /// `res` must be a valid pointer returned from a melody render function.
