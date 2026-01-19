@@ -18,7 +18,6 @@ from vllm.reasoning import ReasoningParser, ReasoningParserManager
 from vllm.entrypoints.openai.tool_parsers import ToolParser, ToolParserManager
 from vllm.transformers_utils.tokenizer import AnyTokenizer
 
-
 try:
     from cohere_melody import PyFilter, PyFilterOptions  # type: ignore
 
