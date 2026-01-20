@@ -78,7 +78,7 @@ You may run into issues calling the Rust static library from other languages (e.
 [profile.release]
 debug = true
 ```
-and then building the lirbary normally: `make rust-build-with-tokenizers`.
+and then building the library normally: `make rust-build-with-tokenizers`.
 2. Create a binary to debug. In Golang, I create a binary from a test:
 ```bash
 go test -count=1 ./gobindings/... -c
