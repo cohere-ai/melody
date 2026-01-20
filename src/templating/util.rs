@@ -1,7 +1,8 @@
+use crate::FilterCitation;
 use crate::errors::MelodyError;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
 use serde_json::{Map, Value, to_string};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
     let mut b = String::with_capacity(input.len());
@@ -180,6 +181,82 @@ pub(crate) fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>
     Ok(template_tools)
 }
 
+fn build_text_with_citation(text: &String, citation_inserts: &mut [CitationInsertInfo]) -> String {
+    fn get_cit_text(citation_insert: &CitationInsertInfo) -> String {
+        if citation_insert.end {
+            return format!("</co: {}>", citation_insert.id);
+        }
+        "<co>".to_string()
+    }
+    if citation_inserts.is_empty() {
+        return text.clone();
+    }
+    // ascending sort
+    citation_inserts.sort_by_key(|x| x.idx);
+    let mut insert_cur_idx = 0;
+    let mut new_text_builder = String::with_capacity(text.capacity());
+    for (idx, char) in text.chars().enumerate() {
+        let citation_insert = &citation_inserts[insert_cur_idx];
+        if idx == citation_insert.idx {
+            new_text_builder.push_str(&get_cit_text(citation_insert));
+            while insert_cur_idx + 1 < citation_inserts.len()
+                && citation_inserts[insert_cur_idx].idx == idx
+            {
+                insert_cur_idx += 1;
+            }
+        }
+        new_text_builder.push(char);
+    }
+    let citation_insert = &citation_inserts[insert_cur_idx];
+    if citation_insert.idx == text.len() {
+        new_text_builder.push_str(&get_cit_text(citation_insert));
+    }
+    new_text_builder
+}
+
+struct CitationInsertInfo {
+    idx: usize,
+    end: bool,
+    id: String,
+}
+
+fn add_citation_insert_pair(
+    citation: &FilterCitation,
+    citation_inserts: &mut Vec<CitationInsertInfo>,
+) {
+    let insrt_start = CitationInsertInfo {
+        idx: citation.start_index,
+        end: false,
+        id: String::new(),
+    };
+    let mut citation_id_map: HashMap<usize, Vec<usize>> = HashMap::new();
+    for source in &citation.sources {
+        citation_id_map
+            .entry(source.tool_call_index)
+            .or_default()
+            .extend_from_slice(&source.tool_result_indices);
+    }
+    let mut citation_ids = Vec::new();
+    for (tool_call_idx, result_ids) in citation_id_map {
+        let citation_id = format!(
+            "{tool_call_idx}:[{}]",
+            result_ids
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>()
+                .join(",")
+        );
+        citation_ids.push(citation_id);
+    }
+    let insrt_end = CitationInsertInfo {
+        idx: citation.end_index,
+        end: true,
+        id: citation_ids.join(","),
+    };
+
+    citation_inserts.extend([insrt_start, insrt_end]);
+}
+
 // Convert messages to template
 #[allow(clippy::too_many_lines)] //TODO: Refactor this function to reduce its length.
 pub(crate) fn messages_to_template(
@@ -260,7 +337,17 @@ pub(crate) fn messages_to_template(
         }
 
         let mut template_msg_content = Vec::new();
-        for content_item in &msg.content {
+        for (j, content_item) in msg.content.iter().enumerate() {
+            let mut citation_inserts = Vec::<CitationInsertInfo>::new();
+            for citation in &msg.citations {
+                // TODO Fix citation to use content index instead of is_thinking then can simplify this
+                if msg.content.len() == 1
+                    || citation.is_thinking && j == 0
+                    || !citation.is_thinking && j == 1
+                {
+                    add_citation_insert_pair(citation, &mut citation_inserts);
+                }
+            }
             match content_item.content_type {
                 ContentType::Document => {
                     if msg.role != Role::Tool {
@@ -284,9 +371,12 @@ pub(crate) fn messages_to_template(
                     let data = if msg.role == Role::System {
                         content_item.text.clone().unwrap_or_default()
                     } else {
-                        escape_special_tokens(
-                            content_item.text.as_deref().unwrap_or_default(),
-                            special_token_map,
+                        build_text_with_citation(
+                            &escape_special_tokens(
+                                content_item.text.as_deref().unwrap_or_default(),
+                                special_token_map,
+                            ),
+                            &mut citation_inserts,
                         )
                     };
                     template_msg_content.push(TemplateContent {
@@ -302,9 +392,12 @@ pub(crate) fn messages_to_template(
                     }
                     template_msg_content.push(TemplateContent {
                         content_type: "thinking".to_string(),
-                        data: escape_special_tokens(
-                            content_item.thinking.as_deref().unwrap_or_default(),
-                            special_token_map,
+                        data: build_text_with_citation(
+                            &escape_special_tokens(
+                                content_item.thinking.as_deref().unwrap_or_default(),
+                                special_token_map,
+                            ),
+                            &mut citation_inserts,
                         ),
                     });
                 }

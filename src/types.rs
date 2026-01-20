@@ -5,6 +5,7 @@
 
 #[cfg(feature = "python_ffi")]
 use pyo3::prelude::*;
+use serde::Deserialize;
 
 /// Token IDs paired with their log probabilities.
 ///
@@ -217,7 +218,7 @@ pub struct FilterToolParameter {
 /// };
 /// assert_eq!(citation.text, "world");
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 pub struct FilterCitation {
     /// Character index where the citation starts in the overall text output.
@@ -250,7 +251,7 @@ pub struct FilterCitation {
 /// };
 /// // This means the citation references results 0, 1, and 2 from tool call 0
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 pub struct Source {
     /// Index of the tool call that produced these results

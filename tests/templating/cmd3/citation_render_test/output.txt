@@ -1,0 +1,25 @@
+<BOS_TOKEN><|START_OF_TURN_TOKEN|><|USER_TOKEN|>Can you check if I have any reminders for the week?<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>I will look through the document to address the users needs.<|END_THINKING|><|START_ACTION|>[
+    {"tool_call_id": "0", "tool_name": "direct-injected-document", "parameters": {}}
+]<|END_ACTION|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
+    {
+        "tool_call_id": "0",
+        "results": {
+            "0": {"content": "pdf chunk 1"},
+            "1": {"content": "pdf chunk 2"}
+        },
+        "is_error": null
+    }
+]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>I will use the GetReminders tool to check if the user has any reminders.<|END_THINKING|><|START_ACTION|>[
+    {"tool_call_id": "1", "tool_name": "GetReminders", "parameters": {}}
+]<|END_ACTION|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
+    {
+        "tool_call_id": "1",
+        "results": {
+            "0": {"reminder_id": "59-80bc", "task": "Buy groceries", "due_date": "2023-09-11 23:59:59", "status": "pending"},
+            "1": {"reminder_id": "14-579a", "task": "Call Amy", "due_date": "2023-09-11 23:59:59", "status": "pending"},
+            "2": {"reminder_id": "5b-dd80", "task": "finish your report", "due_date": "2023-09-15 23:59:59", "status": "pending"},
+            "3": {"reminder_id": "20-d9ca", "task": "call your mom", "due_date": "2023-09-17 23:59:59", "status": "pending"}
+        },
+        "is_error": null
+    }
+]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>I will use the results such as <co>'Call your mom'</co: 1:[0,1,2,3]> in my response<|END_THINKING|><|START_RESPONSE|>Some reminders include <co>'Call Amy'</co: 1:[1]> and <co>'Call your mom'</co: 1:[3]>, also you have <co>pdf chunks</co: 0:[0,1]><|END_RESPONSE|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_RESPONSE|><co>Testing</co: 0:[0]> without thinking works<|END_RESPONSE|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>
