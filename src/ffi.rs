@@ -1175,9 +1175,7 @@ unsafe fn convert_csource(source: &CSource) -> Source {
         && source.tool_result_indices_len > 0
     {
         unsafe { slice::from_raw_parts(source.tool_result_indices, source.tool_result_indices_len) }
-            .iter()
-            .cloned()
-            .collect::<Vec<usize>>()
+            .to_vec()
     } else {
         Vec::new()
     };
