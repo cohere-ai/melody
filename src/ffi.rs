@@ -1171,18 +1171,16 @@ unsafe fn convert_ctool_call(tc: &CToolCall) -> ToolCall {
 }
 
 unsafe fn convert_csource(source: &CSource) -> Source {
-    let tool_result_indices: Vec<usize> =
-        if !source.tool_result_indices.is_null() && source.tool_result_indices_len > 0 {
-            unsafe {
-                Vec::from_raw_parts(
-                    source.tool_result_indices,
-                    source.tool_result_indices_len,
-                    source.tool_result_indices_len,
-                )
-            }
-        } else {
-            Vec::new()
-        };
+    let tool_result_indices: Vec<usize> = if !source.tool_result_indices.is_null()
+        && source.tool_result_indices_len > 0
+    {
+        unsafe { slice::from_raw_parts(source.tool_result_indices, source.tool_result_indices_len) }
+            .iter()
+            .map(|x| *x)
+            .collect::<Vec<usize>>()
+    } else {
+        Vec::new()
+    };
 
     Source {
         tool_call_index: source.tool_call_index,

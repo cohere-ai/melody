@@ -794,7 +794,8 @@ func buildCSources(a *cAllocator, sources []Source) (*C.CSource, C.size_t) {
 		lenResIdxs := len(source.ToolResultIndices)
 		if lenResIdxs > 0 {
 			// Can't use a.Malloc here for some reason, got this line from North
-			baseResIdxs := (*C.size_t)(C.malloc(C.size_t(lenResIdxs) * C.size_t(unsafe.Sizeof(C.size_t(0)))))
+			ssize := uintptr(lenResIdxs) * unsafe.Sizeof(C.size_t(0))
+			baseResIdxs := (*C.size_t)(a.Malloc(ssize))
 			var cResIdxs []C.size_t = unsafe.Slice(baseResIdxs, lenResIdxs)
 			// Copy tool res indicies array data
 			for i, v := range source.ToolResultIndices {
