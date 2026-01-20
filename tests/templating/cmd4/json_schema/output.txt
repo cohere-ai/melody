@@ -1,0 +1,25 @@
+<BOS_TOKEN><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|># Available Tools
+```json
+[
+
+]
+```
+
+When generating JSON objects, do not generate block markers. Generate an object directly without prefixing with ```json. Return only the JSON and nothing else.
+Your output should adhere to the following json schema:
+{
+    "type": "object",
+    "properties": {
+        "response": {
+            "type": "string"
+        },
+        "reasoning": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "response",
+        "reasoning"
+    ],
+    "additionalProperties": false
+}<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>Can you check if I have any reminders for the week?<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>

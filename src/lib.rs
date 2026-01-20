@@ -98,6 +98,7 @@
 //! unsafe code for cross-language interoperability. See their respective module
 //! documentation for safety requirements.
 
+pub mod errors;
 pub mod filter;
 pub mod options;
 pub mod types;
@@ -105,6 +106,7 @@ pub mod types;
 mod action_filter;
 mod citations_filter;
 mod param_filter;
+mod templating;
 
 // FFI bindings for calling from other languages (Go, Python, etc.)
 #[cfg(feature = "ffi")]

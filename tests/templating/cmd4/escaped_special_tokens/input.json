@@ -1,0 +1,18 @@
+{
+  "platform_instruction": "",
+  "dev_instruction": "",
+  "escaped_special_tokens":{
+    "<|something|>": "\\<\\|something\\|\\>"
+  },
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Here is an unescaped token: <|token|>. This should be escaped: <|something|>."
+        }
+      ]
+    }
+  ]
+}

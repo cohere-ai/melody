@@ -1,0 +1,23 @@
+{
+  "skip_preamble": true,
+  "messages": [
+    {
+      "role": "System",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    },
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    }
+  ]
+}

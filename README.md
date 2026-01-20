@@ -70,3 +70,24 @@ let final_outputs = filter.flush_partials();
    cd rust
    uv run python -c "import cohere_melody;"
    ```
+
+## DEBUGGING
+You may run into issues calling the Rust static library from other languages (e.g. Golang via CGO). One effective way to debug these issues is to:
+1. Build the library in debug mode. You can do this by adding these lines to the `Cargo.toml` file:
+```toml
+[profile.release]
+debug = true
+```
+and then building the library normally: `make rust-build-with-tokenizers`.
+
+2. Create a binary to debug. In Golang, I create a binary from a test:
+```bash
+go test -count=1 ./gobindings/... -c
+```
+3. Use `gdb` (`brew install gdb` on macOS).
+```bash
+gdb ./gobindings.test
+break melody_render_cmd3
+run
+```
+4. When it hits the breakpoint, you can step through the Rust code to see where things might be going wrong.

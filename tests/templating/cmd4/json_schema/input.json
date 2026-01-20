@@ -1,0 +1,15 @@
+{
+  "json_mode": true,
+  "json_schema": "{\n    \"type\": \"object\",\n    \"properties\": {\n        \"response\": {\n            \"type\": \"string\"\n        },\n        \"reasoning\": {\n            \"type\": \"string\"\n        }\n    },\n    \"required\": [\n        \"response\",\n        \"reasoning\"\n    ],\n    \"additionalProperties\": false\n}",
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    }
+  ]
+}

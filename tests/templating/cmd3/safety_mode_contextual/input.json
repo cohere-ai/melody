@@ -1,0 +1,14 @@
+{
+  "safety_mode": "CONTEXTUAL",
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    }
+  ]
+}

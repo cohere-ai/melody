@@ -5,7 +5,10 @@ package gobindings
 // #include "melody.h"
 import "C"
 import (
+	"encoding/json"
+	"errors"
 	"runtime"
+	"strings"
 	"unsafe"
 )
 
@@ -289,7 +292,7 @@ func convertCOutput(cOutput *C.CFilterOutput) FilterOutput {
 	// Convert search query
 	if cOutput.search_query_index >= 0 {
 		output.SearchQuery = &FilterSearchQueryDelta{
-			Index: int(cOutput.search_query_index),
+			Index: uint(cOutput.search_query_index),
 			Text:  C.GoString(cOutput.search_query_text),
 		}
 	}
@@ -306,7 +309,7 @@ func convertCOutput(cOutput *C.CFilterOutput) FilterOutput {
 	// Convert tool calls
 	if cOutput.tool_call_index >= 0 {
 		tc := &FilterToolCallDelta{
-			Index:         int(cOutput.tool_call_index),
+			Index:         uint(cOutput.tool_call_index),
 			ID:            C.GoString(cOutput.tool_call_id),
 			Name:          C.GoString(cOutput.tool_call_name),
 			RawParamDelta: C.GoString(cOutput.tool_call_raw_param_delta),
@@ -331,8 +334,8 @@ func convertCOutput(cOutput *C.CFilterOutput) FilterOutput {
 // convertCCitation converts a C citation to Go FilterCitation
 func convertCCitation(cCitation *C.CFilterCitation) FilterCitation {
 	citation := FilterCitation{
-		StartIndex: int(cCitation.start_index),
-		EndIndex:   int(cCitation.end_index),
+		StartIndex: uint(cCitation.start_index),
+		EndIndex:   uint(cCitation.end_index),
 		Text:       C.GoString(cCitation.text),
 		IsThinking: bool(cCitation.is_thinking),
 	}
@@ -351,16 +354,664 @@ func convertCCitation(cCitation *C.CFilterCitation) FilterCitation {
 // convertCSource converts a C source to Go Source
 func convertCSource(cSource *C.CSource) Source {
 	source := Source{
-		ToolCallIndex: int(cSource.tool_call_index),
+		ToolCallIndex: uint(cSource.tool_call_index),
 	}
 
 	if cSource.tool_result_indices != nil && cSource.tool_result_indices_len > 0 {
 		indices := unsafe.Slice(cSource.tool_result_indices, int(cSource.tool_result_indices_len))
-		source.ToolResultIndices = make([]int, len(indices))
+		source.ToolResultIndices = make([]uint, len(indices))
 		for i, idx := range indices {
-			source.ToolResultIndices[i] = int(idx)
+			source.ToolResultIndices[i] = uint(idx)
 		}
 	}
 
 	return source
+}
+
+// Templating enums (mirror ffi.rs C enums)
+type Role int32
+
+const (
+	RoleUnknown Role = 0
+	RoleSystem  Role = 1
+	RoleUser    Role = 2
+	RoleChatbot Role = 3
+	RoleTool    Role = 4
+)
+
+type ContentType int32
+
+const (
+	ContentUnknown  ContentType = 0
+	ContentText     ContentType = 1
+	ContentThinking ContentType = 2
+	ContentImage    ContentType = 3
+	ContentDocument ContentType = 4
+)
+
+type CitationQuality int32
+
+const (
+	CitationQualityUnknown CitationQuality = 0
+	CitationQualityOff     CitationQuality = 1
+	CitationQualityOn      CitationQuality = 2
+)
+
+type Grounding int32
+
+const (
+	GroundingUnknown  Grounding = 0
+	GroundingEnabled  Grounding = 1
+	GroundingDisabled Grounding = 2
+)
+
+type SafetyMode int32
+
+const (
+	SafetyModeUnknown    SafetyMode = 0
+	SafetyModeNone       SafetyMode = 1
+	SafetyModeStrict     SafetyMode = 2
+	SafetyModeContextual SafetyMode = 3
+)
+
+type ReasoningType int32
+
+const (
+	ReasoningTypeUnknown  ReasoningType = 0
+	ReasoningTypeEnabled  ReasoningType = 1
+	ReasoningTypeDisabled ReasoningType = 2
+)
+
+// Unmarshalers for enums (case-insensitive string support; numbers map directly)
+
+func (r *Role) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*r = RoleUnknown
+		case "system":
+			*r = RoleSystem
+		case "user":
+			*r = RoleUser
+		case "chatbot", "assistant":
+			*r = RoleChatbot
+		case "tool":
+			*r = RoleTool
+		default:
+			return errors.New("invalid Role: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*r = Role(n)
+		return nil
+	}
+	return errors.New("Role must be a string or number")
+}
+
+func (t *ContentType) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*t = ContentUnknown
+		case "text":
+			*t = ContentText
+		case "thinking":
+			*t = ContentThinking
+		case "image":
+			*t = ContentImage
+		case "document":
+			*t = ContentDocument
+		default:
+			return errors.New("invalid ContentType: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*t = ContentType(n)
+		return nil
+	}
+	return errors.New("ContentType must be a string or number")
+}
+
+func (q *CitationQuality) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*q = CitationQualityUnknown
+		case "off", "disabled", "false", "0":
+			*q = CitationQualityOff
+		case "on", "enabled", "true", "1":
+			*q = CitationQualityOn
+		default:
+			return errors.New("invalid CitationQuality: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*q = CitationQuality(n)
+		return nil
+	}
+	return errors.New("CitationQuality must be a string or number")
+}
+
+func (g *Grounding) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*g = GroundingUnknown
+		case "enabled", "on", "true", "1":
+			*g = GroundingEnabled
+		case "disabled", "off", "false", "0":
+			*g = GroundingDisabled
+		default:
+			return errors.New("invalid Grounding: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*g = Grounding(n)
+		return nil
+	}
+	return errors.New("Grounding must be a string or number")
+}
+
+func (s *SafetyMode) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		switch strings.ToLower(strings.TrimSpace(str)) {
+		case "unknown":
+			*s = SafetyModeUnknown
+		case "none":
+			*s = SafetyModeNone
+		case "strict":
+			*s = SafetyModeStrict
+		case "contextual":
+			*s = SafetyModeContextual
+		default:
+			return errors.New("invalid SafetyMode: " + str)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*s = SafetyMode(n)
+		return nil
+	}
+	return errors.New("SafetyMode must be a string or number")
+}
+
+func (rt *ReasoningType) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "unknown":
+			*rt = ReasoningTypeUnknown
+		case "enabled", "on", "true", "1":
+			*rt = ReasoningTypeEnabled
+		case "disabled", "off", "false", "0":
+			*rt = ReasoningTypeDisabled
+		default:
+			return errors.New("invalid ReasoningType: " + s)
+		}
+		return nil
+	}
+	var n int32
+	if err := json.Unmarshal(data, &n); err == nil {
+		*rt = ReasoningType(n)
+		return nil
+	}
+	return errors.New("ReasoningType must be a string or number")
+}
+
+// Templating Go-side types
+type Tool struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Parameters  Object `json:"parameters,omitempty"`
+}
+
+type Image struct {
+	TemplatePlaceholder string `json:"template_placeholder"`
+}
+
+type Content struct {
+	Type     ContentType `json:"type"`
+	Text     string      `json:"text,omitempty"`     // optional: empty means omitted
+	Thinking string      `json:"thinking,omitempty"` // optional: empty means omitted
+	Image    *Image      `json:"image,omitempty"`    // optional
+	Document Object      `json:"document,omitempty"`
+}
+
+type ToolCall struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Parameters string `json:"parameters,omitempty"`
+}
+
+type Message struct {
+	Role       Role             `json:"role"`
+	Content    []Content        `json:"content"`
+	ToolCalls  []ToolCall       `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"` // optional: empty means omitted
+	Citations  []FilterCitation `json:"citations,omitempty"`
+}
+
+type RenderCmd3Options struct {
+	Messages                 []Message         `json:"messages"`
+	Template                 string            `json:"template"`
+	DevInstruction           *string           `json:"dev_instruction,omitempty"`
+	Documents                []Object          `json:"documents,omitempty"` // JSON objects
+	AvailableTools           []Tool            `json:"available_tools,omitempty"`
+	SafetyMode               *SafetyMode       `json:"safety_mode,omitempty"`      // optional
+	CitationQuality          *CitationQuality  `json:"citation_quality,omitempty"` // optional
+	ReasoningType            *ReasoningType    `json:"reasoning_type,omitempty"`   // optional
+	SkipPreamble             bool              `json:"skip_preamble,omitempty"`
+	ResponsePrefix           *string           `json:"response_prefix,omitempty"`
+	JSONSchema               *string           `json:"json_schema,omitempty"`
+	JSONMode                 bool              `json:"json_mode,omitempty"`
+	AdditionalTemplateFields map[string]any    `json:"additional_template_fields,omitempty"` // optional: JSON-encoded
+	EscapedSpecialTokens     map[string]string `json:"escaped_special_tokens,omitempty"`     // optional: JSON-encoded
+}
+
+type RenderCmd4Options struct {
+	Messages                 []Message         `json:"messages"`
+	Template                 string            `json:"template"`
+	DevInstruction           *string           `json:"dev_instruction,omitempty"`
+	PlatformInstruction      *string           `json:"platform_instruction,omitempty"`
+	Documents                []Object          `json:"documents,omitempty"`
+	AvailableTools           []Tool            `json:"available_tools,omitempty"`
+	Grounding                *Grounding        `json:"grounding,omitempty"` // optional
+	ResponsePrefix           *string           `json:"response_prefix,omitempty"`
+	JSONSchema               *string           `json:"json_schema,omitempty"`
+	JSONMode                 bool              `json:"json_mode,omitempty"`
+	AdditionalTemplateFields map[string]any    `json:"additional_template_fields,omitempty"` // optional
+	EscapedSpecialTokens     map[string]string `json:"escaped_special_tokens,omitempty"`     // optional
+}
+
+// Internal C allocator helper to track and free C allocations
+type cAllocator struct {
+	ptrs []unsafe.Pointer
+}
+
+func (a *cAllocator) CString(s string) *C.char {
+	p := C.CString(s)
+	a.ptrs = append(a.ptrs, unsafe.Pointer(p))
+	return p
+}
+
+func (a *cAllocator) Malloc(size uintptr) unsafe.Pointer {
+	if size == 0 {
+		return nil
+	}
+	p := C.malloc(C.size_t(size))
+	a.ptrs = append(a.ptrs, p)
+	return p
+}
+
+func (a *cAllocator) FreeAll() {
+	for i := len(a.ptrs) - 1; i >= 0; i-- {
+		C.free(a.ptrs[i])
+	}
+	a.ptrs = nil
+}
+
+// Helpers to map Go enums to C enums
+func roleToC(r Role) C.CRole                                  { return C.CRole(r) }
+func contentTypeToC(t ContentType) C.CContentType             { return C.CContentType(t) }
+func citationQualityToC(q CitationQuality) C.CCitationQuality { return C.CCitationQuality(q) }
+func groundingToC(g Grounding) C.CGrounding                   { return C.CGrounding(g) }
+func safetyModeToC(s SafetyMode) C.CSafetyMode                { return C.CSafetyMode(s) }
+func reasoningTypeToC(rt ReasoningType) C.CReasoningType      { return C.CReasoningType(rt) }
+
+func jsonCString(a *cAllocator, v any) *C.char {
+	if v == nil {
+		return nil
+	}
+	b, err := json.Marshal(v)
+	if err != nil || len(b) == 0 {
+		return nil
+	}
+	return a.CString(string(b))
+}
+
+func buildCDocuments(a *cAllocator, docs []Object) (**C.char, C.size_t) {
+	if len(docs) == 0 {
+		return nil, 0
+	}
+	n := len(docs)
+	// allocate array of *char in C memory
+	size := uintptr(n) * unsafe.Sizeof((*C.char)(nil))
+	base := (**C.char)(a.Malloc(size))
+	arr := unsafe.Slice(base, n)
+	for i := 0; i < n; i++ {
+		arr[i] = jsonCString(a, docs[i])
+	}
+	return base, C.size_t(n)
+}
+
+func buildCTools(a *cAllocator, tools []Tool) (*C.CTool, C.size_t) {
+	if len(tools) == 0 {
+		return nil, 0
+	}
+	n := len(tools)
+	var sample C.CTool
+	size := uintptr(n) * unsafe.Sizeof(sample)
+	base := (*C.CTool)(a.Malloc(size))
+	var arr []C.CTool = unsafe.Slice(base, n)
+	for i := 0; i < n; i++ {
+		arr[i].name = a.CString(tools[i].Name)
+		arr[i].description = a.CString(tools[i].Description)
+		arr[i].parameters_json = jsonCString(a, tools[i].Parameters)
+	}
+	return base, C.size_t(n)
+}
+
+func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
+	if len(contents) == 0 {
+		return nil, 0
+	}
+	n := len(contents)
+	var sample C.CContent
+	size := uintptr(n) * unsafe.Sizeof(sample)
+	base := (*C.CContent)(a.Malloc(size))
+	var arr []C.CContent = unsafe.Slice(base, n)
+	for i := 0; i < n; i++ {
+		c := contents[i]
+		arr[i].content_type = contentTypeToC(c.Type)
+		// Explicitly nil pointer fields
+		arr[i].text = nil
+		arr[i].thinking = nil
+		arr[i].image = nil
+		arr[i].document_json = nil
+
+		if c.Text != "" {
+			arr[i].text = a.CString(c.Text)
+		}
+		if c.Thinking != "" {
+			arr[i].thinking = a.CString(c.Thinking)
+		}
+		// image (optional)
+		if c.Image != nil {
+			var imgSample C.CImage
+			imgPtr := a.Malloc(unsafe.Sizeof(imgSample))
+			img := (*C.CImage)(imgPtr)
+			img.template_placeholder = a.CString(c.Image.TemplatePlaceholder)
+			arr[i].image = img
+		}
+		// document_json (optional)
+		if c.Document.Len() > 0 {
+			arr[i].document_json = jsonCString(a, c.Document)
+		}
+	}
+	return base, C.size_t(n)
+}
+
+func buildCToolCalls(a *cAllocator, calls []ToolCall) (*C.CToolCall, C.size_t) {
+	if len(calls) == 0 {
+		return nil, 0
+	}
+	n := len(calls)
+	var sample C.CToolCall
+	size := uintptr(n) * unsafe.Sizeof(sample)
+	base := (*C.CToolCall)(a.Malloc(size))
+	var arr []C.CToolCall = unsafe.Slice(base, n)
+	for i := 0; i < n; i++ {
+		tc := calls[i]
+		// Explicitly nil pointer fields
+		arr[i].id = nil
+		arr[i].name = nil
+		arr[i].parameters = nil
+
+		arr[i].id = a.CString(tc.ID)
+		arr[i].name = a.CString(tc.Name)
+		arr[i].parameters = a.CString(tc.Parameters)
+	}
+	return base, C.size_t(n)
+}
+
+func buildCSources(a *cAllocator, sources []Source) (*C.CSource, C.size_t) {
+	if len(sources) == 0 {
+		return nil, 0
+	}
+	n := len(sources)
+	var sample C.CSource
+	size := uintptr(n) * unsafe.Sizeof(sample)
+	base := (*C.CSource)(a.Malloc(size))
+	var arr []C.CSource = unsafe.Slice(base, n)
+	for i := 0; i < n; i++ {
+		source := sources[i]
+		arr[i].tool_call_index = C.size_t(source.ToolCallIndex)
+
+		lenResIdxs := len(source.ToolResultIndices)
+		if lenResIdxs > 0 {
+			// Can't use a.Malloc here for some reason, got this line from North
+			ssize := uintptr(lenResIdxs) * unsafe.Sizeof(C.size_t(0))
+			baseResIdxs := (*C.size_t)(a.Malloc(ssize))
+			var cResIdxs []C.size_t = unsafe.Slice(baseResIdxs, lenResIdxs)
+			// Copy tool res indicies array data
+			for i, v := range source.ToolResultIndices {
+				cResIdxs[i] = C.size_t(v)
+			}
+			arr[i].tool_result_indices = baseResIdxs
+			arr[i].tool_result_indices_len = C.size_t(lenResIdxs)
+		} else {
+			arr[i].tool_result_indices = nil
+			arr[i].tool_result_indices_len = 0
+		}
+	}
+	return base, C.size_t(n)
+}
+
+func buildCCitations(a *cAllocator, citations []FilterCitation) (*C.CFilterCitation, C.size_t) {
+	if len(citations) == 0 {
+		return nil, 0
+	}
+	n := len(citations)
+	var sample C.CFilterCitation
+	size := uintptr(n) * unsafe.Sizeof(sample)
+	base := (*C.CFilterCitation)(a.Malloc(size))
+	var arr []C.CFilterCitation = unsafe.Slice(base, n)
+	for i := 0; i < n; i++ {
+		cit := citations[i]
+		arr[i].start_index = C.size_t(cit.StartIndex)
+		arr[i].end_index = C.size_t(cit.EndIndex)
+		arr[i].text = a.CString(cit.Text)
+		arr[i].sources, arr[i].sources_len = buildCSources(a, cit.Sources)
+		arr[i].is_thinking = C.bool(cit.IsThinking)
+	}
+	return base, C.size_t(n)
+}
+
+func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
+	if len(msgs) == 0 {
+		return nil, 0
+	}
+	n := len(msgs)
+	var sample C.CMessage
+	size := uintptr(n) * unsafe.Sizeof(sample)
+	base := (*C.CMessage)(a.Malloc(size))
+	var arr []C.CMessage = unsafe.Slice(base, n)
+	for i := 0; i < n; i++ {
+		m := msgs[i]
+		arr[i].role = roleToC(m.Role)
+
+		// Explicitly nil pointer fields
+		arr[i].content = nil
+		arr[i].tool_calls = nil
+		arr[i].tool_call_id = nil
+
+		// contents
+		cContent, cContentLen := buildCContents(a, m.Content)
+		arr[i].content = cContent
+		arr[i].content_len = cContentLen
+
+		// tool calls
+		cCalls, cCallsLen := buildCToolCalls(a, m.ToolCalls)
+		arr[i].tool_calls = cCalls
+		arr[i].tool_calls_len = cCallsLen
+
+		// optional tool_call_id
+		if m.ToolCallID != "" {
+			arr[i].tool_call_id = a.CString(m.ToolCallID)
+		}
+
+		cCitations, cCitationsLen := buildCCitations(a, m.Citations)
+		arr[i].citations = cCitations
+		arr[i].citations_len = cCitationsLen
+	}
+	return base, C.size_t(n)
+}
+
+// RenderCMD3 renders CMD3 using the Rust templating engine via FFI.
+func RenderCMD3(opts RenderCmd3Options) (string, error) {
+	var a cAllocator
+	defer a.FreeAll()
+
+	// Build nested arrays
+	cMsgs, cMsgsLen := buildCMessages(&a, opts.Messages)
+	cDocs, cDocsLen := buildCDocuments(&a, opts.Documents)
+	cTools, cToolsLen := buildCTools(&a, opts.AvailableTools)
+
+	// Optional enums with presence flags
+	var cSafety C.CSafetyMode
+	var hasSafety C.bool
+	if opts.SafetyMode != nil {
+		cSafety = safetyModeToC(*opts.SafetyMode)
+		hasSafety = C.bool(true)
+	}
+
+	var cCitation C.CCitationQuality
+	var hasCitation C.bool
+	if opts.CitationQuality != nil {
+		cCitation = citationQualityToC(*opts.CitationQuality)
+		hasCitation = C.bool(true)
+	}
+
+	var cReason C.CReasoningType
+	var hasReason C.bool
+	if opts.ReasoningType != nil {
+		cReason = reasoningTypeToC(*opts.ReasoningType)
+		hasReason = C.bool(true)
+	}
+
+	// Optional strings
+	additionalFields := jsonCString(&a, opts.AdditionalTemplateFields)
+	escapedTokens := jsonCString(&a, opts.EscapedSpecialTokens)
+
+	// Build options struct (lives on Go stack; nested buffers are C-allocated)
+	cOpts := C.CRenderCmd3Options{
+		messages:                        cMsgs,
+		messages_len:                    cMsgsLen,
+		template:                        a.CString(opts.Template),
+		documents_json:                  cDocs,
+		documents_len:                   cDocsLen,
+		available_tools:                 cTools,
+		available_tools_len:             cToolsLen,
+		safety_mode:                     cSafety,
+		has_safety_mode:                 hasSafety,
+		citation_quality:                cCitation,
+		has_citation_quality:            hasCitation,
+		reasoning_type:                  cReason,
+		has_reasoning_type:              hasReason,
+		skip_preamble:                   C.bool(opts.SkipPreamble),
+		json_mode:                       C.bool(opts.JSONMode),
+		additional_template_fields_json: additionalFields,
+		escaped_special_tokens_json:     escapedTokens,
+	}
+
+	if opts.DevInstruction != nil {
+		cOpts.dev_instruction = a.CString(*opts.DevInstruction)
+	}
+	if opts.ResponsePrefix != nil {
+		cOpts.response_prefix = a.CString(*opts.ResponsePrefix)
+	}
+	if opts.JSONSchema != nil {
+		cOpts.json_schema = a.CString(*opts.JSONSchema)
+	}
+
+	// Call into Rust
+	res := C.melody_render_cmd3(&cOpts)
+	if res == nil {
+		return "", errors.New("melody_render_cmd3 returned null result struct")
+	}
+	defer C.melody_render_result_free(res)
+
+	if res.result != nil {
+		return C.GoString(res.result), nil
+	}
+	if res.error != nil {
+		return "", errors.New(C.GoString(res.error))
+	}
+	return "", errors.New("melody_render_cmd3 returned neither result nor error")
+}
+
+// RenderCMD4 renders CMD4 using the Rust templating engine via FFI.
+func RenderCMD4(opts RenderCmd4Options) (string, error) {
+	var a cAllocator
+	defer a.FreeAll()
+
+	cMsgs, cMsgsLen := buildCMessages(&a, opts.Messages)
+	cDocs, cDocsLen := buildCDocuments(&a, opts.Documents)
+	cTools, cToolsLen := buildCTools(&a, opts.AvailableTools)
+
+	var cGround C.CGrounding
+	var hasGround C.bool
+	if opts.Grounding != nil {
+		cGround = groundingToC(*opts.Grounding)
+		hasGround = C.bool(true)
+	}
+
+	additionalFields := jsonCString(&a, opts.AdditionalTemplateFields)
+	escapedTokens := jsonCString(&a, opts.EscapedSpecialTokens)
+
+	cOpts := C.CRenderCmd4Options{
+		messages:                        cMsgs,
+		messages_len:                    cMsgsLen,
+		template:                        a.CString(opts.Template),
+		documents_json:                  cDocs,
+		documents_len:                   cDocsLen,
+		available_tools:                 cTools,
+		available_tools_len:             cToolsLen,
+		grounding:                       cGround,
+		has_grounding:                   hasGround,
+		json_mode:                       C.bool(opts.JSONMode),
+		additional_template_fields_json: additionalFields,
+		escaped_special_tokens_json:     escapedTokens,
+	}
+
+	if opts.DevInstruction != nil {
+		cOpts.dev_instruction = a.CString(*opts.DevInstruction)
+	}
+	if opts.PlatformInstruction != nil {
+		cOpts.platform_instruction = a.CString(*opts.PlatformInstruction)
+	}
+	if opts.ResponsePrefix != nil {
+		cOpts.response_prefix = a.CString(*opts.ResponsePrefix)
+	}
+	if opts.JSONSchema != nil {
+		cOpts.json_schema = a.CString(*opts.JSONSchema)
+	}
+
+	res := C.melody_render_cmd4(&cOpts)
+	if res == nil {
+		return "", errors.New("melody_render_cmd4 returned null result struct")
+	}
+	defer C.melody_render_result_free(res)
+
+	if res.result != nil {
+		return C.GoString(res.result), nil
+	}
+	if res.error != nil {
+		return "", errors.New(C.GoString(res.error))
+	}
+	return "", errors.New("melody_render_cmd4 returned neither result nor error")
 }

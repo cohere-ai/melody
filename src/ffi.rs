@@ -21,23 +21,30 @@
 //! thread at a time, or protected by external synchronization.
 //!
 
+use crate::filter::{Filter, FilterImpl};
+use crate::options::{FilterOptions, new_filter};
+use crate::templating::{
+    CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
+    Role, SafetyMode, Tool, ToolCall,
+};
+use crate::templating::{RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4};
+use crate::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
+use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::slice;
 
-use crate::filter::{Filter, FilterImpl};
-use crate::options::{FilterOptions, new_filter};
-use crate::types::{FilterCitation, FilterOutput, TokenIDsWithLogProb};
-
 /// Opaque pointer to a Filter instance
 #[repr(C)]
 pub struct CFilter {
+    /// Internal marker for opaque pointer
     _private: [u8; 0],
 }
 
 /// Opaque pointer to `FilterOptions`
 #[repr(C)]
 pub struct CFilterOptions {
+    /// Internal marker for opaque pointer
     _private: [u8; 0],
 }
 
@@ -59,7 +66,7 @@ pub struct CFilterOutput {
     pub logprobs_len: usize,
 
     /// Index of the search query (-1 if None)
-    pub search_query_index: i32, // -1 if None
+    pub search_query_index: i32,
     /// Null-terminated C string containing the search query text
     pub search_query_text: *mut c_char,
 
@@ -69,7 +76,7 @@ pub struct CFilterOutput {
     pub citations_len: usize,
 
     /// Index of the tool call (-1 if None)
-    pub tool_call_index: i32, // -1 if None
+    pub tool_call_index: i32,
     /// Null-terminated C string containing the tool call ID
     pub tool_call_id: *mut c_char,
     /// Null-terminated C string containing the tool call name
@@ -122,6 +129,15 @@ pub struct CFilterOutputArray {
     pub outputs: *mut CFilterOutput,
     /// Number of outputs in the array
     pub len: usize,
+}
+
+/// Struct for returning either a result or an error (mutually exclusive, one is always null)
+#[repr(C)]
+pub struct CRenderResult {
+    /// Null-terminated C string containing the result (null if error)
+    pub result: *mut c_char,
+    /// Null-terminated C string containing the error (null if success)
+    pub error: *mut c_char,
 }
 
 // ============================================================================
@@ -480,6 +496,9 @@ pub unsafe extern "C" fn melody_filter_flush_partials(
 }
 
 /// Helper function to convert Rust `FilterOutput` to C representation
+///
+/// # Safety
+/// The returned pointer must be freed appropriately.
 unsafe fn convert_outputs_to_c(outputs: Vec<FilterOutput>) -> *mut CFilterOutputArray {
     unsafe {
         let c_outputs: Vec<CFilterOutput> = outputs
@@ -499,6 +518,10 @@ unsafe fn convert_outputs_to_c(outputs: Vec<FilterOutput>) -> *mut CFilterOutput
     }
 }
 
+/// Converts a single `FilterOutput` to its C representation.
+///
+/// # Safety
+/// The returned struct contains heap-allocated pointers that must be freed.
 #[allow(clippy::too_many_lines)]
 unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
     unsafe {
@@ -613,6 +636,10 @@ unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
     }
 }
 
+/// Converts a single `FilterCitation` to its C representation.
+///
+/// # Safety
+/// The returned struct contains heap-allocated pointers that must be freed.
 unsafe fn convert_citation_to_c(citation: FilterCitation) -> CFilterCitation {
     let text = CString::new(citation.text).unwrap().into_raw();
 
@@ -743,6 +770,709 @@ pub unsafe extern "C" fn melody_filter_output_array_free(arr: *mut CFilterOutput
                     }
                 }
             }
+        }
+    }
+}
+
+// ============================================================================
+// Templating FFI types (C-compatible equivalents)
+// ============================================================================
+
+/// C-compatible enum for role types.
+///
+/// Represents the role of a message in the conversation.
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum CRole {
+    /// Unknown or unspecified role.
+    Unknown = 0,
+    /// System message role.
+    System = 1,
+    /// User message role.
+    User = 2,
+    /// Chatbot message role.
+    Chatbot = 3,
+    /// Tool message role.
+    Tool = 4,
+}
+
+/// C-compatible enum for content types.
+///
+/// Represents the type of content in a message.
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum CContentType {
+    /// Unknown or unspecified content type.
+    Unknown = 0,
+    /// Text content.
+    Text = 1,
+    /// Thinking/reasoning content.
+    Thinking = 2,
+    /// Image content.
+    Image = 3,
+    /// Document content.
+    Document = 4,
+}
+
+/// C-compatible enum for citation quality.
+///
+/// Indicates the quality or presence of citations.
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum CCitationQuality {
+    /// Unknown or unspecified citation quality.
+    Unknown = 0,
+    /// Citations are off.
+    Off = 1,
+    /// Citations are on.
+    On = 2,
+}
+
+/// C-compatible enum for grounding options.
+///
+/// Specifies whether grounding is enabled or disabled.
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum CGrounding {
+    /// Unknown or unspecified grounding.
+    Unknown = 0,
+    /// Grounding is enabled.
+    Enabled = 1,
+    /// Grounding is disabled.
+    Disabled = 2,
+}
+
+/// C-compatible enum for safety modes.
+///
+/// Represents the safety mode for rendering.
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum CSafetyMode {
+    /// Unknown or unspecified safety mode.
+    Unknown = 0,
+    /// No safety mode.
+    None = 1,
+    /// Strict safety mode.
+    Strict = 2,
+    /// Contextual safety mode.
+    Contextual = 3,
+}
+
+/// C-compatible enum for reasoning types.
+///
+/// Indicates whether reasoning is enabled or disabled.
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum CReasoningType {
+    /// Unknown or unspecified reasoning type.
+    Unknown = 0,
+    /// Reasoning is enabled.
+    Enabled = 1,
+    /// Reasoning is disabled.
+    Disabled = 2,
+}
+
+/// C-compatible struct for tool definitions.
+#[repr(C)]
+pub struct CTool {
+    /// Tool name as a null-terminated C string
+    pub name: *const c_char,
+    /// Tool description as a null-terminated C string
+    pub description: *const c_char,
+    /// JSON string representing parameters (Map<String, Value>)
+    pub parameters_json: *const c_char,
+}
+
+/// C-compatible struct for image placeholders.
+#[repr(C)]
+pub struct CImage {
+    /// Image template placeholder as a null-terminated C string
+    pub template_placeholder: *const c_char,
+}
+
+/// C-compatible struct for content.
+#[repr(C)]
+pub struct CContent {
+    /// Content type enum
+    pub content_type: CContentType,
+    /// Text content as a null-terminated C string
+    pub text: *const c_char,
+    /// Thinking content as a null-terminated C string
+    pub thinking: *const c_char,
+    /// Pointer to image struct (null if None)
+    pub image: *const CImage,
+    /// Document as a JSON string (null if None)
+    pub document_json: *const c_char,
+}
+
+/// C-compatible struct for tool calls.
+#[repr(C)]
+pub struct CToolCall {
+    /// Tool call ID as a null-terminated C string
+    pub id: *const c_char,
+    /// Tool call name as a null-terminated C string
+    pub name: *const c_char,
+    /// Parameters as a JSON string
+    pub parameters_json: *const c_char,
+}
+
+/// C-compatible struct for messages.
+#[repr(C)]
+pub struct CMessage {
+    /// Message role enum
+    pub role: CRole,
+    /// Pointer to array of content structs
+    pub content: *const CContent,
+    /// Number of content items
+    pub content_len: usize,
+    /// Pointer to array of tool calls
+    pub tool_calls: *const CToolCall,
+    /// Number of tool calls
+    pub tool_calls_len: usize,
+    /// Tool call ID as a null-terminated C string (null if None)
+    pub tool_call_id: *const c_char,
+    /// Citations
+    pub citations: *const CFilterCitation,
+    /// Number of citations
+    pub citations_len: usize,
+}
+
+/// C-compatible struct for CMD3 render options.
+#[repr(C)]
+pub struct CRenderCmd3Options {
+    /// Pointer to array of messages
+    pub messages: *const CMessage,
+    /// Number of messages
+    pub messages_len: usize,
+    /// Template as a null-terminated C string
+    pub template: *const c_char,
+    /// Developer instruction as a null-terminated C string
+    pub dev_instruction: *const c_char,
+    /// Pointer to array of document JSON strings
+    pub documents_json: *const *const c_char,
+    /// Number of documents
+    pub documents_len: usize,
+    /// Pointer to array of available tools
+    pub available_tools: *const CTool,
+    /// Number of available tools
+    pub available_tools_len: usize,
+    /// Safety mode enum
+    pub safety_mode: CSafetyMode,
+    /// Whether safety mode is set
+    pub has_safety_mode: bool,
+    /// Citation quality enum
+    pub citation_quality: CCitationQuality,
+    /// Whether citation quality is set
+    pub has_citation_quality: bool,
+    /// Reasoning type enum
+    pub reasoning_type: CReasoningType,
+    /// Whether reasoning type is set
+    pub has_reasoning_type: bool,
+    /// Whether to skip preamble
+    pub skip_preamble: bool,
+    /// Response prefix as a null-terminated C string
+    pub response_prefix: *const c_char,
+    /// JSON schema as a null-terminated C string
+    pub json_schema: *const c_char,
+    /// Whether JSON mode is enabled
+    pub json_mode: bool,
+    /// Additional template fields as a JSON string
+    pub additional_template_fields_json: *const c_char,
+    /// Escaped special tokens as a JSON string
+    pub escaped_special_tokens_json: *const c_char,
+}
+
+/// C-compatible struct for CMD4 render options.
+#[repr(C)]
+pub struct CRenderCmd4Options {
+    /// Pointer to array of messages
+    pub messages: *const CMessage,
+    /// Number of messages
+    pub messages_len: usize,
+    /// Template as a null-terminated C string
+    pub template: *const c_char,
+    /// Developer instruction as a null-terminated C string
+    pub dev_instruction: *const c_char,
+    /// Platform instruction as a null-terminated C string
+    pub platform_instruction: *const c_char,
+    /// Pointer to array of document JSON strings
+    pub documents_json: *const *const c_char,
+    /// Number of documents
+    pub documents_len: usize,
+    /// Pointer to array of available tools
+    pub available_tools: *const CTool,
+    /// Number of available tools
+    pub available_tools_len: usize,
+    /// Grounding enum
+    pub grounding: CGrounding,
+    /// Whether grounding is set
+    pub has_grounding: bool,
+    /// Response prefix as a null-terminated C string
+    pub response_prefix: *const c_char,
+    /// JSON schema as a null-terminated C string
+    pub json_schema: *const c_char,
+    /// Whether JSON mode is enabled
+    pub json_mode: bool,
+    /// Additional template fields as a JSON string
+    pub additional_template_fields_json: *const c_char,
+    /// Escaped special tokens as a JSON string
+    pub escaped_special_tokens_json: *const c_char,
+}
+
+// ============================================================================
+// Templating FFI conversion helpers
+// ============================================================================
+
+/// Maps a `CRole` to a Rust Role.
+fn map_role(r: CRole) -> Role {
+    match r {
+        CRole::Unknown => Role::Unknown,
+        CRole::System => Role::System,
+        CRole::User => Role::User,
+        CRole::Chatbot => Role::Chatbot,
+        CRole::Tool => Role::Tool,
+    }
+}
+
+/// Maps a `CContentType` to a Rust `ContentType`.
+fn map_content_type(t: CContentType) -> ContentType {
+    match t {
+        CContentType::Unknown => ContentType::Unknown,
+        CContentType::Text => ContentType::Text,
+        CContentType::Thinking => ContentType::Thinking,
+        CContentType::Image => ContentType::Image,
+        CContentType::Document => ContentType::Document,
+    }
+}
+
+/// Maps a `CCitationQuality` to a Rust `CitationQuality`.
+fn map_citation_quality(c: CCitationQuality) -> CitationQuality {
+    match c {
+        CCitationQuality::Unknown => CitationQuality::Unknown,
+        CCitationQuality::Off => CitationQuality::Off,
+        CCitationQuality::On => CitationQuality::On,
+    }
+}
+
+/// Maps a `CGrounding` to a Rust Grounding.
+fn map_grounding(g: CGrounding) -> Grounding {
+    match g {
+        CGrounding::Unknown => Grounding::Unknown,
+        CGrounding::Enabled => Grounding::Enabled,
+        CGrounding::Disabled => Grounding::Disabled,
+    }
+}
+
+/// Maps a `CSafetyMode` to a Rust `SafetyMode`.
+fn map_safety_mode(s: CSafetyMode) -> SafetyMode {
+    match s {
+        CSafetyMode::Unknown => SafetyMode::Unknown,
+        CSafetyMode::None => SafetyMode::None,
+        CSafetyMode::Strict => SafetyMode::Strict,
+        CSafetyMode::Contextual => SafetyMode::Contextual,
+    }
+}
+
+/// Maps a `CReasoningType` to a Rust `ReasoningType`.
+fn map_reasoning_type(r: CReasoningType) -> ReasoningType {
+    match r {
+        CReasoningType::Unknown => ReasoningType::Unknown,
+        CReasoningType::Enabled => ReasoningType::Enabled,
+        CReasoningType::Disabled => ReasoningType::Disabled,
+    }
+}
+
+/// Converts a nullable C string pointer to an Option<String>.
+unsafe fn cstr_opt(ptr: *const c_char) -> Option<String> {
+    if ptr.is_null() {
+        None
+    } else {
+        unsafe { Some(CStr::from_ptr(ptr).to_string_lossy().into_owned()) }
+    }
+}
+
+/// Parses a C string pointer as a JSON object.
+unsafe fn parse_json_object(ptr: *const c_char) -> Map<String, Value> {
+    if ptr.is_null() {
+        Map::new()
+    } else {
+        unsafe {
+            let s = CStr::from_ptr(ptr).to_string_lossy();
+            serde_json::from_str::<Map<String, Value>>(&s).unwrap_or_else(|_| Map::new())
+        }
+    }
+}
+unsafe fn parse_json_value(ptr: *const c_char) -> Value {
+    if ptr.is_null() {
+        Value::Null
+    } else {
+        unsafe {
+            let s = CStr::from_ptr(ptr).to_string_lossy();
+            serde_json::from_str::<Value>(&s).unwrap_or(Value::Null)
+        }
+    }
+}
+
+unsafe fn convert_ctool(tool: &CTool) -> Tool {
+    Tool {
+        name: unsafe { CStr::from_ptr(tool.name).to_string_lossy().into_owned() },
+        description: unsafe {
+            CStr::from_ptr(tool.description)
+                .to_string_lossy()
+                .into_owned()
+        },
+        parameters: unsafe { parse_json_object(tool.parameters_json) },
+    }
+}
+
+unsafe fn convert_cimage(image: &CImage) -> Image {
+    Image {
+        template_placeholder: unsafe {
+            CStr::from_ptr(image.template_placeholder)
+                .to_string_lossy()
+                .into_owned()
+        },
+    }
+}
+
+unsafe fn convert_ccontent(content: &CContent) -> Content {
+    let image = if content.image.is_null() {
+        None
+    } else {
+        Some(unsafe { convert_cimage(&*content.image) })
+    };
+    let document = if content.document_json.is_null() {
+        None
+    } else {
+        match unsafe { parse_json_value(content.document_json) } {
+            Value::Object(m) => Some(m),
+            _ => None,
+        }
+    };
+    Content {
+        content_type: map_content_type(content.content_type),
+        text: unsafe { cstr_opt(content.text) },
+        thinking: unsafe { cstr_opt(content.thinking) },
+        image,
+        document,
+    }
+}
+
+unsafe fn convert_ctool_call(tc: &CToolCall) -> ToolCall {
+    ToolCall {
+        id: unsafe { CStr::from_ptr(tc.id).to_string_lossy().into_owned() },
+        name: unsafe { CStr::from_ptr(tc.name).to_string_lossy().into_owned() },
+        parameters: unsafe {
+            CStr::from_ptr(tc.parameters_json)
+                .to_string_lossy()
+                .into_owned()
+        },
+    }
+}
+
+unsafe fn convert_csource(source: &CSource) -> Source {
+    let tool_result_indices: Vec<usize> = if !source.tool_result_indices.is_null()
+        && source.tool_result_indices_len > 0
+    {
+        unsafe { slice::from_raw_parts(source.tool_result_indices, source.tool_result_indices_len) }
+            .to_vec()
+    } else {
+        Vec::new()
+    };
+
+    Source {
+        tool_call_index: source.tool_call_index,
+        tool_result_indices,
+    }
+}
+
+unsafe fn convert_ccitation(cit: &CFilterCitation) -> FilterCitation {
+    let sources = if !cit.sources.is_null() && cit.sources_len > 0 {
+        unsafe { slice::from_raw_parts(cit.sources, cit.sources_len) }
+            .iter()
+            .map(|x| unsafe { convert_csource(x) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    FilterCitation {
+        start_index: cit.start_index,
+        end_index: cit.end_index,
+        text: unsafe { cstr_opt(cit.text).unwrap_or_default() },
+        sources,
+        is_thinking: cit.is_thinking,
+    }
+}
+
+unsafe fn convert_cmessage(msg: &CMessage) -> Message {
+    let contents = if !msg.content.is_null() && msg.content_len > 0 {
+        unsafe { slice::from_raw_parts(msg.content, msg.content_len) }
+            .iter()
+            .map(|c| unsafe { convert_ccontent(c) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let tool_calls = if !msg.tool_calls.is_null() && msg.tool_calls_len > 0 {
+        unsafe { slice::from_raw_parts(msg.tool_calls, msg.tool_calls_len) }
+            .iter()
+            .map(|c| unsafe { convert_ctool_call(c) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let citations = if !msg.citations.is_null() && msg.citations_len > 0 {
+        unsafe { slice::from_raw_parts(msg.citations, msg.citations_len) }
+            .iter()
+            .map(|c| unsafe { convert_ccitation(c) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    Message {
+        role: map_role(msg.role),
+        content: contents,
+        tool_calls,
+        tool_call_id: unsafe { cstr_opt(msg.tool_call_id) },
+        citations,
+    }
+}
+
+unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Options<'a> {
+    let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
+        unsafe { slice::from_raw_parts(opts.messages, opts.messages_len) }
+            .iter()
+            .map(|m| unsafe { convert_cmessage(m) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let documents: Vec<Document> = if !opts.documents_json.is_null() && opts.documents_len > 0 {
+        unsafe { slice::from_raw_parts(opts.documents_json, opts.documents_len) }
+            .iter()
+            .map(|&ptr| {
+                if ptr.is_null() {
+                    Map::new()
+                } else {
+                    match unsafe { parse_json_value(ptr) } {
+                        Value::Object(m) => m,
+                        _ => Map::new(),
+                    }
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let tools = if !opts.available_tools.is_null() && opts.available_tools_len > 0 {
+        unsafe { slice::from_raw_parts(opts.available_tools, opts.available_tools_len) }
+            .iter()
+            .map(|t| unsafe { convert_ctool(t) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let additional_template_fields =
+        unsafe { parse_json_object(opts.additional_template_fields_json) };
+    let escaped_special_tokens_raw = unsafe { parse_json_object(opts.escaped_special_tokens_json) };
+    let escaped_special_tokens = escaped_special_tokens_raw
+        .into_iter()
+        .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
+        .collect();
+
+    let rs_opts = RenderCmd3Options {
+        messages,
+        dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
+        documents,
+        available_tools: tools,
+        safety_mode: if opts.has_safety_mode {
+            Some(map_safety_mode(opts.safety_mode))
+        } else {
+            None
+        },
+        citation_quality: if opts.has_citation_quality {
+            Some(map_citation_quality(opts.citation_quality))
+        } else {
+            None
+        },
+        reasoning_type: if opts.has_reasoning_type {
+            Some(map_reasoning_type(opts.reasoning_type))
+        } else {
+            None
+        },
+        skip_preamble: opts.skip_preamble,
+        response_prefix: unsafe { cstr_opt(opts.response_prefix) },
+        json_schema: unsafe { cstr_opt(opts.json_schema) },
+        json_mode: opts.json_mode,
+        additional_template_fields,
+        escaped_special_tokens,
+        ..Default::default()
+    };
+
+    let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
+    if template.is_empty() {
+        rs_opts
+    } else {
+        RenderCmd3Options {
+            template,
+            ..rs_opts
+        }
+    }
+}
+
+unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Options<'a> {
+    let messages = if !opts.messages.is_null() && opts.messages_len > 0 {
+        unsafe { slice::from_raw_parts(opts.messages, opts.messages_len) }
+            .iter()
+            .map(|m| unsafe { convert_cmessage(m) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let documents: Vec<Document> = if !opts.documents_json.is_null() && opts.documents_len > 0 {
+        unsafe { slice::from_raw_parts(opts.documents_json, opts.documents_len) }
+            .iter()
+            .map(|&ptr| {
+                if ptr.is_null() {
+                    Map::new()
+                } else {
+                    match unsafe { parse_json_value(ptr) } {
+                        Value::Object(m) => m,
+                        _ => Map::new(),
+                    }
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let tools = if !opts.available_tools.is_null() && opts.available_tools_len > 0 {
+        unsafe { slice::from_raw_parts(opts.available_tools, opts.available_tools_len) }
+            .iter()
+            .map(|t| unsafe { convert_ctool(t) })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let additional_template_fields =
+        unsafe { parse_json_object(opts.additional_template_fields_json) };
+    let escaped_special_tokens_raw = unsafe { parse_json_object(opts.escaped_special_tokens_json) };
+    let escaped_special_tokens = escaped_special_tokens_raw
+        .into_iter()
+        .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
+        .collect();
+
+    let rs_opts = RenderCmd4Options {
+        messages,
+        dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
+        platform_instruction: unsafe { cstr_opt(opts.platform_instruction) },
+        documents,
+        available_tools: tools,
+        grounding: if opts.has_grounding {
+            Some(map_grounding(opts.grounding))
+        } else {
+            None
+        },
+        response_prefix: unsafe { cstr_opt(opts.response_prefix) },
+        json_schema: unsafe { cstr_opt(opts.json_schema) },
+        json_mode: opts.json_mode,
+        additional_template_fields,
+        escaped_special_tokens,
+        ..Default::default()
+    };
+    let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
+    if template.is_empty() {
+        rs_opts
+    } else {
+        RenderCmd4Options {
+            template,
+            ..rs_opts
+        }
+    }
+}
+
+// ============================================================================
+// Templating FFI functions
+// ============================================================================
+
+/// Renders CMD3 template and returns a struct with result or error.
+/// # Safety
+/// Caller must free return value with `melody_render_result_free`.
+#[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
+pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> *mut CRenderResult {
+    if opts.is_null() {
+        let err = CString::new("null options pointer").unwrap().into_raw();
+        return Box::into_raw(Box::new(CRenderResult {
+            result: std::ptr::null_mut(),
+            error: err,
+        }));
+    }
+    let rust_opts = unsafe { convert_cmd3_options(&*opts) };
+    match render_cmd3(&rust_opts) {
+        Ok(s) => Box::into_raw(Box::new(CRenderResult {
+            result: CString::new(s).unwrap().into_raw(),
+            error: std::ptr::null_mut(),
+        })),
+        Err(e) => Box::into_raw(Box::new(CRenderResult {
+            result: std::ptr::null_mut(),
+            error: CString::new(e.to_string()).unwrap().into_raw(),
+        })),
+    }
+}
+
+/// Renders CMD4 template and returns a struct with result or error.
+/// # Safety
+/// Caller must free return value with `melody_render_result_free`.
+#[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
+pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> *mut CRenderResult {
+    if opts.is_null() {
+        let err = CString::new("null options pointer").unwrap().into_raw();
+        return Box::into_raw(Box::new(CRenderResult {
+            result: std::ptr::null_mut(),
+            error: err,
+        }));
+    }
+    let rust_opts = unsafe { convert_cmd4_options(&*opts) };
+    match render_cmd4(&rust_opts) {
+        Ok(s) => Box::into_raw(Box::new(CRenderResult {
+            result: CString::new(s).unwrap().into_raw(),
+            error: std::ptr::null_mut(),
+        })),
+        Err(e) => Box::into_raw(Box::new(CRenderResult {
+            result: std::ptr::null_mut(),
+            error: CString::new(e.to_string()).unwrap().into_raw(),
+        })),
+    }
+}
+
+/// Frees a `CRenderResult` struct and its strings.
+///
+/// # Safety
+/// `res` must be a valid pointer returned from a melody render function.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_render_result_free(res: *mut CRenderResult) {
+    if res.is_null() {
+        return;
+    }
+    unsafe {
+        let res_box = Box::from_raw(res);
+        if !res_box.result.is_null() {
+            let _ = CString::from_raw(res_box.result);
+        }
+        if !res_box.error.is_null() {
+            let _ = CString::from_raw(res_box.error);
         }
     }
 }
