@@ -514,14 +514,12 @@ pub(crate) fn find_partial<'a>(
         if let Some(idx) = s.find(stop) {
             return (idx, stop.clone());
         }
-
         // Go through the substrings of the stop sequence
-        for i in 0..s.len() {
-            let suffix = if stop.len() > s.len() - i {
-                &stop[..s.len() - i]
-            } else {
-                stop
-            };
+        'inner: for i in 0..stop.len() {
+            if !stop.is_char_boundary(stop.len() - i) {
+                continue 'inner;
+            }
+            let suffix = &stop[..stop.len() - i];
 
             if s.ends_with(suffix) {
                 let idx = s.len() - suffix.len();
@@ -564,5 +562,14 @@ mod tests {
         // Test no match
         let (idx, _) = find_partial("hello world", stops.iter());
         assert_eq!(idx, usize::MAX);
+    }
+
+    #[test]
+    fn test_find_partial_utf8() {
+        // This test ensures we don't slice in the middle of a UTF-8 character (we used to panic here).
+        let stops = vec!["RÈGLES".to_string()];
+        let (idx, found) = find_partial("ÈÈÈÈÈÈÈR", stops.iter());
+        assert_eq!(idx, 14);
+        assert_eq!(found, "");
     }
 }
