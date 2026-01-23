@@ -1,3 +1,5 @@
+//go:build cgo
+
 package gobindings
 
 // #cgo LDFLAGS: ${SRCDIR}/../target/release/libcohere_melody.a -ldl -lm -lstdc++
