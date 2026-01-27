@@ -18,7 +18,10 @@ f := melody.NewFilter(melody.HandleMultiHopCmd3(), melody.StreamToolActions())
 // Process tokens synchronously
 out := []melody.FilterOutput{}
 for _, chunk := range textChunks {
-    outputs := f.WriteDecoded(chunk, nil)
+    outputs, err := f.WriteDecoded(chunk, nil)
+    if err != nil {
+        panic(err)
+    }
     out = append(out, outputs...)
 }
 

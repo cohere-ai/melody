@@ -149,7 +149,9 @@ func TestFilter_Command3(t *testing.T) {
 			require.NotNil(t, f)
 			out := []melody.FilterOutput{}
 			for i, chunk := range textChunks {
-				out = append(out, f.WriteDecoded(chunk, &likelihoodsChunks[i])...)
+				outputs, err := f.WriteDecoded(chunk, &likelihoodsChunks[i])
+				require.NoError(t, err)
+				out = append(out, outputs...)
 			}
 			require.Equal(t, tt.want, out)
 		})

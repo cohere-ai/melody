@@ -182,6 +182,11 @@ typedef struct {
     size_t len;
 } CFilterOutputArray;
 
+typedef struct {
+    CFilterOutputArray* result; // null if error
+    char* error;                // null if success
+} CFilterOutputResult;
+
 // FilterOptions functions
 extern CFilterOptions* melody_filter_options_new();
 extern void melody_filter_options_free(CFilterOptions* options);
@@ -203,6 +208,7 @@ extern void melody_filter_options_remove_token(CFilterOptions* options, const ch
 // Filter functions
 extern CFilter* melody_filter_new(const CFilterOptions* options);
 extern void melody_filter_free(CFilter* filter);
-extern CFilterOutputArray* melody_filter_write_decoded(CFilter* filter, const char* decoded_token, const uint32_t* token_ids, size_t token_ids_len, const float* logprobs, size_t logprobs_len);
+extern CFilterOutputResult* melody_filter_write_decoded(CFilter* filter, const char* decoded_token, const uint32_t* token_ids, size_t token_ids_len, const float* logprobs, size_t logprobs_len);
+extern void melody_result_free(CFilterOutputResult* res);
 extern CFilterOutputArray* melody_filter_flush_partials(CFilter* filter);
 extern void melody_filter_output_array_free(CFilterOutputArray* arr);
