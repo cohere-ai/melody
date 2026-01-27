@@ -1,4 +1,4 @@
-package gobindings
+package orderedjson
 
 import (
 	"bytes"
