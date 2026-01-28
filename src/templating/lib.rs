@@ -5,10 +5,10 @@ use crate::templating::types::{
 use crate::templating::util::{
     add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template,
 };
+use minijinja::Environment;
 use serde::Deserialize;
 use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
-use minijinja::{Environment};
 
 /// Options for cmd3 rendering.
 #[derive(Debug, Clone, Deserialize)]
@@ -34,8 +34,10 @@ pub struct RenderCmd3Options<'a> {
 }
 // for now always set the template to cmd3v1.
 static CMD3V1_TEMPLATE: &str = include_str!("templates/cmd3-v1.tmpl");
-static CMD3_JINJA_TEMPLATE_BASE: &str = include_str!("templates/jinja/cmd3/chat_merged_template.jinja");
-static CMD3V1_JINJA_TEMPLATE: &str = include_str!("templates/jinja/cmd3/chat_merged_template_v1.jinja");
+static CMD3_JINJA_TEMPLATE_BASE: &str =
+    include_str!("templates/jinja/cmd3/chat_merged_template.jinja");
+static CMD3V1_JINJA_TEMPLATE: &str =
+    include_str!("templates/jinja/cmd3/chat_merged_template_v1.jinja");
 
 impl Default for RenderCmd3Options<'_> {
     fn default() -> Self {
@@ -103,15 +105,20 @@ fn tojson(value: &minijinja::Value) -> Result<minijinja::Value, minijinja::Error
     // Based off of the minijinja version: https://github.com/mitsuhiko/minijinja/blob/64d933eaf325ba20e7af0012505571d7ae32364a/minijinja/src/filters.rs#L991
     // but we don't need indenting and we don't want the html char conversion, so using this
     serde_json::to_string(&value)
-    .map_err(|err| {
-        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "cannot serialize to JSON").with_source(err)
-    })
-    .map(|s| {
-        minijinja::Value::from_safe_string(s)
-    })
+        .map_err(|err| {
+            minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "cannot serialize to JSON",
+            )
+            .with_source(err)
+        })
+        .map(|s| minijinja::Value::from_safe_string(s))
 }
 
-fn get_minijinja_env<'a>(template_name: &'a str, template: &'a str) -> Result<minijinja::Environment<'a>, minijinja::Error> {
+fn get_minijinja_env<'a>(
+    template_name: &'a str,
+    template: &'a str,
+) -> Result<minijinja::Environment<'a>, minijinja::Error> {
     let mut env = Environment::new();
     env.set_trim_blocks(true);
     env.set_lstrip_blocks(true);
@@ -139,23 +146,33 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         .collect::<Result<Vec<_>, _>>()?;
 
     if opts.use_jinja {
-        messages = messages.iter().map(|m| -> Value {
-            let mut new_m = m.clone();
-            if let Some(mobj) = new_m.as_object_mut() {
-                let mut def_val = Value::Null;
-                let mut def_vec = Vec::<Value>::new();
-                let content = mobj.get_mut("content").unwrap_or(&mut def_val).as_array_mut().unwrap_or(&mut def_vec);
-                content.iter_mut().for_each(|c| {
-                    let mut def_map = Map::new();
-                    let content_item = c.as_object_mut().unwrap_or(&mut def_map);
-                    if let Some(content_type) = content_item.get("type") {
-                        let data = content_item.get("data").unwrap_or_default();
-                        content_item.insert(content_type.as_str().unwrap_or_default().to_string(), data.clone());
-                    }
-                });
-            }
-            new_m
-        }).collect();
+        messages = messages
+            .iter()
+            .map(|m| -> Value {
+                let mut new_m = m.clone();
+                if let Some(mobj) = new_m.as_object_mut() {
+                    let mut def_val = Value::Null;
+                    let mut def_vec = Vec::<Value>::new();
+                    let content = mobj
+                        .get_mut("content")
+                        .unwrap_or(&mut def_val)
+                        .as_array_mut()
+                        .unwrap_or(&mut def_vec);
+                    content.iter_mut().for_each(|c| {
+                        let mut def_map = Map::new();
+                        let content_item = c.as_object_mut().unwrap_or(&mut def_map);
+                        if let Some(content_type) = content_item.get("type") {
+                            let data = content_item.get("data").unwrap_or_default();
+                            content_item.insert(
+                                content_type.as_str().unwrap_or_default().to_string(),
+                                data.clone(),
+                            );
+                        }
+                    });
+                }
+                new_m
+            })
+            .collect();
         println!("modified msgs {:?}", messages);
     }
 
