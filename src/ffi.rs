@@ -117,14 +117,6 @@ where
     }
 }
 
-/// Catches panics silently for void FFI functions (like `_free` functions).
-fn catch_panic_void<F>(f: F)
-where
-    F: FnOnce() + panic::UnwindSafe,
-{
-    let _ = panic::catch_unwind(f);
-}
-
 /// Opaque pointer to a Filter instance
 #[repr(C)]
 pub struct CFilter {
@@ -796,21 +788,19 @@ unsafe fn convert_citation_to_c(citation: FilterCitation) -> CFilterCitation {
 /// `res` must be a valid pointer returned from `melody_filter_write_decoded`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_result_free(res: *mut CFilterOutputResult) {
-    catch_panic_void(AssertUnwindSafe(|| {
-        if res.is_null() {
-            return;
-        }
+    if res.is_null() {
+        return;
+    }
 
-        unsafe {
-            let res_box = Box::from_raw(res);
-            if !res_box.result.is_null() {
-                melody_filter_output_array_free(res_box.result);
-            }
-            if !res_box.error.is_null() {
-                let _ = CString::from_raw(res_box.error);
-            }
+    unsafe {
+        let res_box = Box::from_raw(res);
+        if !res_box.result.is_null() {
+            melody_filter_output_array_free(res_box.result);
         }
-    }));
+        if !res_box.error.is_null() {
+            let _ = CString::from_raw(res_box.error);
+        }
+    }
 }
 
 /// Frees a `CFilterOutputArray`
@@ -819,86 +809,84 @@ pub unsafe extern "C" fn melody_result_free(res: *mut CFilterOutputResult) {
 /// `arr` must be a valid pointer returned from `melody_filter_write_decoded` or `melody_filter_flush_partials`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_filter_output_array_free(arr: *mut CFilterOutputArray) {
-    catch_panic_void(AssertUnwindSafe(|| {
-        if arr.is_null() {
-            return;
-        }
+    if arr.is_null() {
+        return;
+    }
 
-        unsafe {
-            let arr_box = Box::from_raw(arr);
+    unsafe {
+        let arr_box = Box::from_raw(arr);
 
-            if !arr_box.outputs.is_null() && arr_box.len > 0 {
-                let outputs = Vec::from_raw_parts(arr_box.outputs, arr_box.len, arr_box.len);
+        if !arr_box.outputs.is_null() && arr_box.len > 0 {
+            let outputs = Vec::from_raw_parts(arr_box.outputs, arr_box.len, arr_box.len);
 
-                for output in outputs {
-                    // Free all strings
-                    if !output.text.is_null() {
-                        let _ = CString::from_raw(output.text);
-                    }
-                    if !output.search_query_text.is_null() {
-                        let _ = CString::from_raw(output.search_query_text);
-                    }
-                    if !output.tool_call_id.is_null() {
-                        let _ = CString::from_raw(output.tool_call_id);
-                    }
-                    if !output.tool_call_name.is_null() {
-                        let _ = CString::from_raw(output.tool_call_name);
-                    }
-                    if !output.tool_call_param_name.is_null() {
-                        let _ = CString::from_raw(output.tool_call_param_name);
-                    }
-                    if !output.tool_call_param_value_delta.is_null() {
-                        let _ = CString::from_raw(output.tool_call_param_value_delta);
-                    }
-                    if !output.tool_call_raw_param_delta.is_null() {
-                        let _ = CString::from_raw(output.tool_call_raw_param_delta);
-                    }
+            for output in outputs {
+                // Free all strings
+                if !output.text.is_null() {
+                    let _ = CString::from_raw(output.text);
+                }
+                if !output.search_query_text.is_null() {
+                    let _ = CString::from_raw(output.search_query_text);
+                }
+                if !output.tool_call_id.is_null() {
+                    let _ = CString::from_raw(output.tool_call_id);
+                }
+                if !output.tool_call_name.is_null() {
+                    let _ = CString::from_raw(output.tool_call_name);
+                }
+                if !output.tool_call_param_name.is_null() {
+                    let _ = CString::from_raw(output.tool_call_param_name);
+                }
+                if !output.tool_call_param_value_delta.is_null() {
+                    let _ = CString::from_raw(output.tool_call_param_value_delta);
+                }
+                if !output.tool_call_raw_param_delta.is_null() {
+                    let _ = CString::from_raw(output.tool_call_raw_param_delta);
+                }
 
-                    // Free token_ids and logprobs
-                    if !output.token_ids.is_null() && output.token_ids_len > 0 {
-                        let _ = Vec::from_raw_parts(
-                            output.token_ids,
-                            output.token_ids_len,
-                            output.token_ids_len,
-                        );
-                    }
-                    if !output.logprobs.is_null() && output.logprobs_len > 0 {
-                        let _ = Vec::from_raw_parts(
-                            output.logprobs,
-                            output.logprobs_len,
-                            output.logprobs_len,
-                        );
-                    }
+                // Free token_ids and logprobs
+                if !output.token_ids.is_null() && output.token_ids_len > 0 {
+                    let _ = Vec::from_raw_parts(
+                        output.token_ids,
+                        output.token_ids_len,
+                        output.token_ids_len,
+                    );
+                }
+                if !output.logprobs.is_null() && output.logprobs_len > 0 {
+                    let _ = Vec::from_raw_parts(
+                        output.logprobs,
+                        output.logprobs_len,
+                        output.logprobs_len,
+                    );
+                }
 
-                    // Free citations
-                    if !output.citations.is_null() && output.citations_len > 0 {
-                        let citations = Vec::from_raw_parts(
-                            output.citations,
-                            output.citations_len,
-                            output.citations_len,
-                        );
-                        for citation in citations {
-                            if !citation.text.is_null() {
-                                let _ = CString::from_raw(citation.text);
-                            }
+                // Free citations
+                if !output.citations.is_null() && output.citations_len > 0 {
+                    let citations = Vec::from_raw_parts(
+                        output.citations,
+                        output.citations_len,
+                        output.citations_len,
+                    );
+                    for citation in citations {
+                        if !citation.text.is_null() {
+                            let _ = CString::from_raw(citation.text);
+                        }
 
-                            // Free sources
-                            if !citation.sources.is_null() && citation.sources_len > 0 {
-                                let sources = Vec::from_raw_parts(
-                                    citation.sources,
-                                    citation.sources_len,
-                                    citation.sources_len,
-                                );
-                                for source in sources {
-                                    if !source.tool_result_indices.is_null()
-                                        && source.tool_result_indices_len > 0
-                                    {
-                                        let _ = Vec::from_raw_parts(
-                                            source.tool_result_indices,
-                                            source.tool_result_indices_len,
-                                            source.tool_result_indices_len,
-                                        );
-                                    }
+                        // Free sources
+                        if !citation.sources.is_null() && citation.sources_len > 0 {
+                            let sources = Vec::from_raw_parts(
+                                citation.sources,
+                                citation.sources_len,
+                                citation.sources_len,
+                            );
+                            for source in sources {
+                                if !source.tool_result_indices.is_null()
+                                    && source.tool_result_indices_len > 0
+                                {
+                                    let _ = Vec::from_raw_parts(
+                                        source.tool_result_indices,
+                                        source.tool_result_indices_len,
+                                        source.tool_result_indices_len,
+                                    );
                                 }
                             }
                         }
@@ -906,7 +894,7 @@ pub unsafe extern "C" fn melody_filter_output_array_free(arr: *mut CFilterOutput
                 }
             }
         }
-    }));
+    }
 }
 
 // ============================================================================
@@ -1634,20 +1622,18 @@ pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> 
 /// `res` must be a valid pointer returned from a melody render function.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_render_result_free(res: *mut CRenderResult) {
-    catch_panic_void(AssertUnwindSafe(|| {
-        if res.is_null() {
-            return;
+    if res.is_null() {
+        return;
+    }
+    unsafe {
+        let res_box = Box::from_raw(res);
+        if !res_box.result.is_null() {
+            let _ = CString::from_raw(res_box.result);
         }
-        unsafe {
-            let res_box = Box::from_raw(res);
-            if !res_box.result.is_null() {
-                let _ = CString::from_raw(res_box.result);
-            }
-            if !res_box.error.is_null() {
-                let _ = CString::from_raw(res_box.error);
-            }
+        if !res_box.error.is_null() {
+            let _ = CString::from_raw(res_box.error);
         }
-    }));
+    }
 }
 
 #[cfg(test)]
