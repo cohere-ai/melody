@@ -8,6 +8,7 @@ use crate::templating::util::{
 use serde::Deserialize;
 use serde_json::{Map, Value, to_string};
 use std::collections::BTreeMap;
+use minijinja::{Environment};
 
 /// Options for cmd3 rendering.
 #[derive(Debug, Clone, Deserialize)]
@@ -16,6 +17,8 @@ use std::collections::BTreeMap;
 pub struct RenderCmd3Options<'a> {
     pub messages: Vec<Message>,
     pub template: &'a str,
+    pub template_jinja: &'a str,
+    pub use_jinja: bool,
     pub dev_instruction: Option<String>,
     pub documents: Vec<Document>,
     pub available_tools: Vec<Tool>,
@@ -31,12 +34,16 @@ pub struct RenderCmd3Options<'a> {
 }
 // for now always set the template to cmd3v1.
 static CMD3V1_TEMPLATE: &str = include_str!("templates/cmd3-v1.tmpl");
+static CMD3_JINJA_TEMPLATE_BASE: &str = include_str!("templates/jinja/cmd3/chat_merged_template.jinja");
+static CMD3V1_JINJA_TEMPLATE: &str = include_str!("templates/jinja/cmd3/chat_merged_template_v1.jinja");
 
 impl Default for RenderCmd3Options<'_> {
     fn default() -> Self {
         Self {
             messages: Vec::new(),
             template: CMD3V1_TEMPLATE,
+            template_jinja: CMD3V1_JINJA_TEMPLATE,
+            use_jinja: false,
             dev_instruction: None,
             documents: Vec::new(),
             available_tools: Vec::new(),
@@ -92,9 +99,30 @@ impl Default for RenderCmd4Options<'_> {
     }
 }
 
+fn tojson(value: &minijinja::Value) -> Result<minijinja::Value, minijinja::Error> {
+    // Based off of the minijinja version: https://github.com/mitsuhiko/minijinja/blob/64d933eaf325ba20e7af0012505571d7ae32364a/minijinja/src/filters.rs#L991
+    // but we don't need indenting and we don't want the html char conversion, so using this
+    serde_json::to_string(&value)
+    .map_err(|err| {
+        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "cannot serialize to JSON").with_source(err)
+    })
+    .map(|s| {
+        minijinja::Value::from_safe_string(s)
+    })
+}
+
+fn get_minijinja_env<'a>(template_name: &'a str, template: &'a str) -> Result<minijinja::Environment<'a>, minijinja::Error> {
+    let mut env = Environment::new();
+    env.set_trim_blocks(true);
+    env.set_lstrip_blocks(true);
+    env.add_filter("tojson", tojson);
+    env.add_template(template_name, template)?;
+    Ok(env)
+}
+
 pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let template_tools = tools_to_template(&opts.available_tools)?;
-    let messages = messages_to_template(
+    let mut messages = messages_to_template(
         &opts.messages,
         !opts.documents.is_empty(),
         &opts.escaped_special_tokens,
@@ -109,6 +137,27 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
             )))
         })
         .collect::<Result<Vec<_>, _>>()?;
+
+    if opts.use_jinja {
+        messages = messages.iter().map(|m| -> Value {
+            let mut new_m = m.clone();
+            if let Some(mobj) = new_m.as_object_mut() {
+                let mut def_val = Value::Null;
+                let mut def_vec = Vec::<Value>::new();
+                let content = mobj.get_mut("content").unwrap_or(&mut def_val).as_array_mut().unwrap_or(&mut def_vec);
+                content.iter_mut().for_each(|c| {
+                    let mut def_map = Map::new();
+                    let content_item = c.as_object_mut().unwrap_or(&mut def_map);
+                    if let Some(content_type) = content_item.get("type") {
+                        let data = content_item.get("data").unwrap_or_default();
+                        content_item.insert(content_type.as_str().unwrap_or_default().to_string(), data.clone());
+                    }
+                });
+            }
+            new_m
+        }).collect();
+        println!("modified msgs {:?}", messages);
+    }
 
     let mut substitutions = opts.additional_template_fields.clone();
     substitutions.insert(
@@ -154,22 +203,35 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         "skip_thinking".to_string(),
         Value::Bool(matches!(opts.reasoning_type, Some(ReasoningType::Disabled))),
     );
-    substitutions.insert(
-        "response_prefix".to_string(),
-        opts.response_prefix
-            .clone()
-            .map_or(Value::Null, Value::String),
-    );
+    if opts.response_prefix.is_some() {
+        substitutions.insert(
+            "response_prefix".to_string(),
+            opts.response_prefix
+                .clone()
+                .map_or(Value::Null, Value::String),
+        );
+    }
     substitutions.insert(
         "json_schema".to_string(),
         opts.json_schema.clone().map_or(Value::Null, Value::String),
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    let parser = liquid::ParserBuilder::with_stdlib().build()?;
-    let template = parser.parse(opts.template)?;
+    if opts.use_jinja {
+        substitutions.insert("add_generation_prompt".to_string(), Value::Bool(true));
+        let template_name = "chat_template.jinja";
+        let mut env = get_minijinja_env(template_name, opts.template_jinja)?;
+        env.add_template("chat_merged_template.jinja", CMD3_JINJA_TEMPLATE_BASE)?;
+        let template = env.get_template(template_name)?;
+        let template_str = template.render(&substitutions)?;
 
-    Ok(template.render(&liquid::object!(&substitutions))?)
+        Ok(template_str)
+    } else {
+        let parser = liquid::ParserBuilder::with_stdlib().build()?;
+        let template = parser.parse(opts.template)?;
+
+        Ok(template.render(&liquid::object!(&substitutions))?)
+    }
 }
 
 pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
@@ -218,12 +280,14 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
             .as_ref()
             .map_or(Value::Null, |g| Value::String(g.as_str().to_string())),
     );
-    substitutions.insert(
-        "response_prefix".to_string(),
-        opts.response_prefix
-            .clone()
-            .map_or(Value::Null, Value::String),
-    );
+    if opts.response_prefix.is_some() {
+        substitutions.insert(
+            "response_prefix".to_string(),
+            opts.response_prefix
+                .clone()
+                .map_or(Value::Null, Value::String),
+        );
+    }
     substitutions.insert(
         "json_schema".to_string(),
         opts.json_schema.clone().map_or(Value::Null, Value::String),
@@ -282,6 +346,17 @@ mod tests {
         for (test_name, input_json, expected) in read_test_cases("cmd3") {
             println!("Running cmd3 test case: {}", test_name);
             let opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
+            let rendered = render_cmd3(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd3_jinja_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v1") {
+            println!("Running cmd3 jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
+            opts.use_jinja = true;
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
