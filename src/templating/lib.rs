@@ -173,7 +173,6 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
                 new_m
             })
             .collect();
-        println!("modified msgs {:?}", messages);
     }
 
     let mut substitutions = opts.additional_template_fields.clone();
