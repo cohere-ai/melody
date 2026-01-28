@@ -69,6 +69,7 @@ impl Default for RenderCmd3Options<'_> {
 pub struct RenderCmd4Options<'a> {
     pub messages: Vec<Message>,
     pub template: &'a str,
+    pub use_jinja: bool,
     pub dev_instruction: Option<String>,
     pub platform_instruction: Option<String>,
     pub documents: Vec<Document>,
@@ -87,6 +88,7 @@ impl Default for RenderCmd4Options<'_> {
         Self {
             messages: Vec::new(),
             template: CMD4V1_TEMPLATE,
+            use_jinja: false,
             dev_instruction: None,
             platform_instruction: None,
             documents: Vec::new(),
@@ -112,7 +114,7 @@ fn tojson(value: &minijinja::Value) -> Result<minijinja::Value, minijinja::Error
             )
             .with_source(err)
         })
-        .map(|s| minijinja::Value::from_safe_string(s))
+        .map(minijinja::Value::from_safe_string)
 }
 
 fn get_minijinja_env<'a>(
@@ -158,7 +160,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
                         .unwrap_or(&mut def_val)
                         .as_array_mut()
                         .unwrap_or(&mut def_vec);
-                    content.iter_mut().for_each(|c| {
+                    for c in content.iter_mut() {
                         let mut def_map = Map::new();
                         let content_item = c.as_object_mut().unwrap_or(&mut def_map);
                         if let Some(content_type) = content_item.get("type") {
@@ -168,7 +170,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
                                 data.clone(),
                             );
                         }
-                    });
+                    }
                 }
                 new_m
             })
@@ -219,7 +221,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         "skip_thinking".to_string(),
         Value::Bool(matches!(opts.reasoning_type, Some(ReasoningType::Disabled))),
     );
-    if opts.response_prefix.is_some() {
+    if opts.response_prefix.is_some() || !opts.use_jinja {
         substitutions.insert(
             "response_prefix".to_string(),
             opts.response_prefix
@@ -296,7 +298,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
             .as_ref()
             .map_or(Value::Null, |g| Value::String(g.as_str().to_string())),
     );
-    if opts.response_prefix.is_some() {
+    if opts.response_prefix.is_some() || !opts.use_jinja {
         substitutions.insert(
             "response_prefix".to_string(),
             opts.response_prefix
