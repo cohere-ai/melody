@@ -210,11 +210,16 @@ func (f *cFilter) writeDecoded(decodedToken string, logprobs TokenIDsWithLogProb
 
 	var cTokenIds *C.uint32_t
 	var cLogprobs *C.float
+	// Declare tokenIds in the function scope (not inside the if block) so the
+	// backing array remains reachable until runtime.KeepAlive below. Without
+	// this, the GC may collect the Go-heap-allocated array while Rust is still
+	// reading through the C-typed pointer, causing "found bad pointer in Go heap".
+	var tokenIds []uint32
 	tokenIdsLen := C.size_t(len(logprobs.TokenIDs))
 	logprobsLen := C.size_t(len(logprobs.Logprobs))
 
 	if len(logprobs.TokenIDs) > 0 {
-		tokenIds := make([]uint32, len(logprobs.TokenIDs))
+		tokenIds = make([]uint32, len(logprobs.TokenIDs))
 		for i, id := range logprobs.TokenIDs {
 			tokenIds[i] = uint32(id)
 		}
