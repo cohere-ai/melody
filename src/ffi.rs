@@ -12,7 +12,7 @@
 //! # Ownership Rules
 //!
 //! - Pointers returned by `_new` functions: **Caller owns**, must call `_free`
-//! - Pointers returned by `write_decoded` and `flush_partials`: **Caller owns**, must call `melody_filter_output_array_free`
+//! - `CFilterOutputResult` returned by `write_decoded` and `flush_partials`: **Caller owns**, must call `melody_result_free`
 //! - Pointers passed as arguments: **Caller retains ownership**, must remain valid for call duration
 //!
 //! # Thread Safety
@@ -32,7 +32,77 @@ use crate::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::panic::{self, AssertUnwindSafe};
 use std::slice;
+
+// ============================================================================
+// Panic Guard Helpers
+// ============================================================================
+//
+// These helpers catch Rust panics at the FFI boundary to prevent them from
+// unwinding into the Go runtime, which would cause undefined behavior.
+//
+// IMPORTANT: Panics that cross FFI boundaries cause undefined behavior.
+// All extern "C" functions must catch panics and convert them to error returns.
+
+/// Catches panics and returns a `CFilterOutputResult` with an error if one occurs.
+/// Use this for FFI functions that return filter results.
+fn catch_panic_filter_result<F>(f: F) -> *mut CFilterOutputResult
+where
+    F: FnOnce() -> *mut CFilterOutputResult + panic::UnwindSafe,
+{
+    match panic::catch_unwind(f) {
+        Ok(result) => result,
+        Err(e) => {
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                format!("Rust panic: {s}")
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                format!("Rust panic: {s}")
+            } else {
+                "Rust panic: unknown error".to_string()
+            };
+            let err = CString::new(msg)
+                .unwrap_or_else(|_| {
+                    CString::new("Rust panic: error message contained null bytes").unwrap()
+                })
+                .into_raw();
+            Box::into_raw(Box::new(CFilterOutputResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }))
+        }
+    }
+}
+
+/// Catches panics and returns a `CRenderResult` with an error if one occurs.
+/// Use this for FFI functions that return render results.
+fn catch_panic_render_result<F>(f: F) -> *mut CRenderResult
+where
+    F: FnOnce() -> *mut CRenderResult + panic::UnwindSafe,
+{
+    match panic::catch_unwind(f) {
+        Ok(result) => result,
+        Err(e) => {
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                format!("Rust panic: {s}")
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                format!("Rust panic: {s}")
+            } else {
+                "Rust panic: unknown error".to_string()
+            };
+            // Use unwrap_or to handle CString::new failure (if msg contains null bytes)
+            let err = CString::new(msg)
+                .unwrap_or_else(|_| {
+                    CString::new("Rust panic: error message contained null bytes").unwrap()
+                })
+                .into_raw();
+            Box::into_raw(Box::new(CRenderResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }))
+        }
+    }
+}
 
 /// Opaque pointer to a Filter instance
 #[repr(C)]
@@ -131,7 +201,16 @@ pub struct CFilterOutputArray {
     pub len: usize,
 }
 
-/// Struct for returning either a result or an error (mutually exclusive, one is always null)
+/// Struct for returning either a `CFilterOutputArray` result or an error (mutually exclusive, one is always null)
+#[repr(C)]
+pub struct CFilterOutputResult {
+    /// Pointer to the filter output array result (null if error)
+    pub result: *mut CFilterOutputArray,
+    /// Null-terminated C string containing the error (null if success)
+    pub error: *mut c_char,
+}
+
+/// Struct for returning either a render prompt result or an error (mutually exclusive, one is always null)
 #[repr(C)]
 pub struct CRenderResult {
     /// Null-terminated C string containing the result (null if error)
@@ -435,7 +514,10 @@ pub unsafe extern "C" fn melody_filter_free(filter: *mut CFilter) {
 /// # Safety
 /// - `filter` must be a valid pointer returned from `melody_filter_new`
 /// - `decoded_token` must be a valid null-terminated C string
-/// - The returned `CFilterOutputArray` must be freed with `melody_filter_output_array_free`
+/// - The returned `CFilterOutputResult` must be freed with `melody_result_free`
+///
+/// # Returns
+/// Returns null if inputs are invalid. Returns a `CFilterOutputResult` with an error if a panic occurs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_filter_write_decoded(
     filter: *mut CFilter,
@@ -444,12 +526,12 @@ pub unsafe extern "C" fn melody_filter_write_decoded(
     token_ids_len: usize,
     logprobs: *const f32,
     logprobs_len: usize,
-) -> *mut CFilterOutputArray {
+) -> *mut CFilterOutputResult {
     if filter.is_null() || decoded_token.is_null() {
         return std::ptr::null_mut();
     }
 
-    unsafe {
+    catch_panic_filter_result(AssertUnwindSafe(|| unsafe {
         let filter = &mut *(filter.cast::<FilterImpl>());
         let token_str = CStr::from_ptr(decoded_token).to_string_lossy();
 
@@ -471,28 +553,39 @@ pub unsafe extern "C" fn melody_filter_write_decoded(
         };
 
         let outputs = filter.write_decoded(&token_str, log_prob);
-        convert_outputs_to_c(outputs)
-    }
+        let result = convert_outputs_to_c(outputs);
+        Box::into_raw(Box::new(CFilterOutputResult {
+            result,
+            error: std::ptr::null_mut(),
+        }))
+    }))
 }
 
 /// Flushes any partial outputs from the filter
 ///
 /// # Safety
 /// - `filter` must be a valid pointer returned from `melody_filter_new`
-/// - The returned `CFilterOutputArray` must be freed with `melody_filter_output_array_free`
+/// - The returned `CFilterOutputResult` must be freed with `melody_result_free`
+///
+/// # Returns
+/// Returns null if filter is null. Returns a `CFilterOutputResult` with an error if a panic occurs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_filter_flush_partials(
     filter: *mut CFilter,
-) -> *mut CFilterOutputArray {
+) -> *mut CFilterOutputResult {
     if filter.is_null() {
         return std::ptr::null_mut();
     }
 
-    unsafe {
+    catch_panic_filter_result(AssertUnwindSafe(|| unsafe {
         let filter = &mut *(filter.cast::<FilterImpl>());
         let outputs = filter.flush_partials();
-        convert_outputs_to_c(outputs)
-    }
+        let result = convert_outputs_to_c(outputs);
+        Box::into_raw(Box::new(CFilterOutputResult {
+            result,
+            error: std::ptr::null_mut(),
+        }))
+    }))
 }
 
 /// Helper function to convert Rust `FilterOutput` to C representation
@@ -677,6 +770,27 @@ unsafe fn convert_citation_to_c(citation: FilterCitation) -> CFilterCitation {
         sources,
         sources_len,
         is_thinking: citation.is_thinking,
+    }
+}
+
+/// Frees a `CFilterOutputResult` struct and its contents
+///
+/// # Safety
+/// `res` must be a valid pointer returned from `melody_filter_write_decoded`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_result_free(res: *mut CFilterOutputResult) {
+    if res.is_null() {
+        return;
+    }
+
+    unsafe {
+        let res_box = Box::from_raw(res);
+        if !res_box.result.is_null() {
+            melody_filter_output_array_free(res_box.result);
+        }
+        if !res_box.error.is_null() {
+            let _ = CString::from_raw(res_box.error);
+        }
     }
 }
 
@@ -1408,53 +1522,89 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
 /// Renders CMD3 template and returns a struct with result or error.
 /// # Safety
 /// Caller must free return value with `melody_render_result_free`.
+///
+/// # Returns
+/// Returns a result struct with either the rendered output or an error message.
+/// If a panic occurs, returns a result struct with an error describing the panic.
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
 pub unsafe extern "C" fn melody_render_cmd3(opts: *const CRenderCmd3Options) -> *mut CRenderResult {
-    if opts.is_null() {
-        let err = CString::new("null options pointer").unwrap().into_raw();
-        return Box::into_raw(Box::new(CRenderResult {
-            result: std::ptr::null_mut(),
-            error: err,
-        }));
-    }
-    let rust_opts = unsafe { convert_cmd3_options(&*opts) };
-    match render_cmd3(&rust_opts) {
-        Ok(s) => Box::into_raw(Box::new(CRenderResult {
-            result: CString::new(s).unwrap().into_raw(),
-            error: std::ptr::null_mut(),
-        })),
-        Err(e) => Box::into_raw(Box::new(CRenderResult {
-            result: std::ptr::null_mut(),
-            error: CString::new(e.to_string()).unwrap().into_raw(),
-        })),
-    }
+    catch_panic_render_result(AssertUnwindSafe(|| {
+        if opts.is_null() {
+            let err = CString::new("null options pointer")
+                .unwrap_or_else(|_| CString::new("null options").unwrap())
+                .into_raw();
+            return Box::into_raw(Box::new(CRenderResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }));
+        }
+        let rust_opts = unsafe { convert_cmd3_options(&*opts) };
+        match render_cmd3(&rust_opts) {
+            Ok(s) => {
+                let result = CString::new(s)
+                    .unwrap_or_else(|_| CString::new("result contained null bytes").unwrap())
+                    .into_raw();
+                Box::into_raw(Box::new(CRenderResult {
+                    result,
+                    error: std::ptr::null_mut(),
+                }))
+            }
+            Err(e) => {
+                let error = CString::new(e.to_string())
+                    .unwrap_or_else(|_| CString::new("error message contained null bytes").unwrap())
+                    .into_raw();
+                Box::into_raw(Box::new(CRenderResult {
+                    result: std::ptr::null_mut(),
+                    error,
+                }))
+            }
+        }
+    }))
 }
 
 /// Renders CMD4 template and returns a struct with result or error.
 /// # Safety
 /// Caller must free return value with `melody_render_result_free`.
+///
+/// # Returns
+/// Returns a result struct with either the rendered output or an error message.
+/// If a panic occurs, returns a result struct with an error describing the panic.
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
 pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> *mut CRenderResult {
-    if opts.is_null() {
-        let err = CString::new("null options pointer").unwrap().into_raw();
-        return Box::into_raw(Box::new(CRenderResult {
-            result: std::ptr::null_mut(),
-            error: err,
-        }));
-    }
-    let rust_opts = unsafe { convert_cmd4_options(&*opts) };
-    match render_cmd4(&rust_opts) {
-        Ok(s) => Box::into_raw(Box::new(CRenderResult {
-            result: CString::new(s).unwrap().into_raw(),
-            error: std::ptr::null_mut(),
-        })),
-        Err(e) => Box::into_raw(Box::new(CRenderResult {
-            result: std::ptr::null_mut(),
-            error: CString::new(e.to_string()).unwrap().into_raw(),
-        })),
-    }
+    catch_panic_render_result(AssertUnwindSafe(|| {
+        if opts.is_null() {
+            let err = CString::new("null options pointer")
+                .unwrap_or_else(|_| CString::new("null options").unwrap())
+                .into_raw();
+            return Box::into_raw(Box::new(CRenderResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }));
+        }
+        let rust_opts = unsafe { convert_cmd4_options(&*opts) };
+        match render_cmd4(&rust_opts) {
+            Ok(s) => {
+                let result = CString::new(s)
+                    .unwrap_or_else(|_| CString::new("result contained null bytes").unwrap())
+                    .into_raw();
+                Box::into_raw(Box::new(CRenderResult {
+                    result,
+                    error: std::ptr::null_mut(),
+                }))
+            }
+            Err(e) => {
+                let error = CString::new(e.to_string())
+                    .unwrap_or_else(|_| CString::new("error message contained null bytes").unwrap())
+                    .into_raw();
+                Box::into_raw(Box::new(CRenderResult {
+                    result: std::ptr::null_mut(),
+                    error,
+                }))
+            }
+        }
+    }))
 }
 
 /// Frees a `CRenderResult` struct and its strings.
@@ -1473,6 +1623,52 @@ pub unsafe extern "C" fn melody_render_result_free(res: *mut CRenderResult) {
         }
         if !res_box.error.is_null() {
             let _ = CString::from_raw(res_box.error);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_catch_panic_filter_result_catches_panic() {
+        let result_ptr = catch_panic_filter_result(|| {
+            panic!("test panic message");
+        });
+
+        assert!(!result_ptr.is_null());
+
+        unsafe {
+            let result = &*result_ptr;
+            assert!(result.result.is_null());
+            assert!(!result.error.is_null());
+
+            let error_str = CStr::from_ptr(result.error).to_str().unwrap();
+            assert!(error_str.contains("test panic message"));
+
+            melody_result_free(result_ptr);
+        }
+    }
+
+    #[test]
+    fn test_catch_panic_filter_result_success() {
+        let result_ptr = catch_panic_filter_result(|| {
+            let outputs = unsafe { convert_outputs_to_c(vec![]) };
+            Box::into_raw(Box::new(CFilterOutputResult {
+                result: outputs,
+                error: std::ptr::null_mut(),
+            }))
+        });
+
+        assert!(!result_ptr.is_null());
+
+        unsafe {
+            let result = &*result_ptr;
+            assert!(!result.result.is_null());
+            assert!(result.error.is_null());
+
+            melody_result_free(result_ptr);
         }
     }
 }

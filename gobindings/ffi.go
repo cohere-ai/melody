@@ -200,9 +200,9 @@ func (f *cFilter) free() {
 }
 
 // writeDecoded writes a decoded token to the filter
-func (f *cFilter) writeDecoded(decodedToken string, logprobs TokenIDsWithLogProb) []FilterOutput {
+func (f *cFilter) writeDecoded(decodedToken string, logprobs TokenIDsWithLogProb) ([]FilterOutput, error) {
 	if f.ptr == nil {
-		return nil
+		return nil, nil
 	}
 
 	cToken := C.CString(decodedToken)
@@ -225,28 +225,36 @@ func (f *cFilter) writeDecoded(decodedToken string, logprobs TokenIDsWithLogProb
 		cLogprobs = (*C.float)(unsafe.Pointer(&logprobs.Logprobs[0]))
 	}
 
-	cArr := C.melody_filter_write_decoded(f.ptr, cToken, cTokenIds, tokenIdsLen, cLogprobs, logprobsLen)
-	if cArr == nil {
-		return nil
+	res := C.melody_filter_write_decoded(f.ptr, cToken, cTokenIds, tokenIdsLen, cLogprobs, logprobsLen)
+	if res == nil {
+		return nil, nil
 	}
-	defer C.melody_filter_output_array_free(cArr)
+	defer C.melody_result_free(res)
 
-	return convertCOutputArray(cArr)
+	if res.error != nil {
+		return nil, errors.New(C.GoString(res.error))
+	}
+
+	return convertCOutputArray(res.result), nil
 }
 
 // flushPartials flushes any partial outputs from the filter
-func (f *cFilter) flushPartials() []FilterOutput {
+func (f *cFilter) flushPartials() ([]FilterOutput, error) {
 	if f.ptr == nil {
-		return nil
+		return nil, nil
 	}
 
-	cArr := C.melody_filter_flush_partials(f.ptr)
-	if cArr == nil {
-		return nil
+	res := C.melody_filter_flush_partials(f.ptr)
+	if res == nil {
+		return nil, nil
 	}
-	defer C.melody_filter_output_array_free(cArr)
+	defer C.melody_result_free(res)
 
-	return convertCOutputArray(cArr)
+	if res.error != nil {
+		return nil, errors.New(C.GoString(res.error))
+	}
+
+	return convertCOutputArray(res.result), nil
 }
 
 // convertCOutputArray converts a C output array to Go FilterOutput slice

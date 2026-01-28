@@ -4,10 +4,10 @@ package gobindings
 type Filter interface {
 	// WriteDecoded writes a decoded token string to the filter
 	// For raw text processing
-	WriteDecoded(decodedToken string, logprob *TokenIDsWithLogProb) []FilterOutput
+	WriteDecoded(decodedToken string, logprob *TokenIDsWithLogProb) ([]FilterOutput, error)
 
 	// FlushPartials flushes any partial outputs
-	FlushPartials() []FilterOutput
+	FlushPartials() ([]FilterOutput, error)
 }
 
 // SyncFilter is a synchronous filter implementation
@@ -43,9 +43,9 @@ func NewFilter(options ...FilterOption) Filter {
 }
 
 // WriteDecoded writes a decoded token string to the filter
-func (f *SyncFilter) WriteDecoded(decodedToken string, logprob *TokenIDsWithLogProb) []FilterOutput {
+func (f *SyncFilter) WriteDecoded(decodedToken string, logprob *TokenIDsWithLogProb) ([]FilterOutput, error) {
 	if f.cfilter == nil {
-		return nil
+		return nil, nil
 	}
 
 	var lp TokenIDsWithLogProb
@@ -57,9 +57,9 @@ func (f *SyncFilter) WriteDecoded(decodedToken string, logprob *TokenIDsWithLogP
 }
 
 // FlushPartials flushes any partial outputs
-func (f *SyncFilter) FlushPartials() []FilterOutput {
+func (f *SyncFilter) FlushPartials() ([]FilterOutput, error) {
 	if f.cfilter == nil {
-		return nil
+		return nil, nil
 	}
 
 	return f.cfilter.flushPartials()
