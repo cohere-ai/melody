@@ -7,7 +7,7 @@ type Filter interface {
 	WriteDecoded(decodedToken string, logprob *TokenIDsWithLogProb) ([]FilterOutput, error)
 
 	// FlushPartials flushes any partial outputs
-	FlushPartials() []FilterOutput
+	FlushPartials() ([]FilterOutput, error)
 }
 
 // SyncFilter is a synchronous filter implementation
@@ -57,9 +57,9 @@ func (f *SyncFilter) WriteDecoded(decodedToken string, logprob *TokenIDsWithLogP
 }
 
 // FlushPartials flushes any partial outputs
-func (f *SyncFilter) FlushPartials() []FilterOutput {
+func (f *SyncFilter) FlushPartials() ([]FilterOutput, error) {
 	if f.cfilter == nil {
-		return nil
+		return nil, nil
 	}
 
 	return f.cfilter.flushPartials()

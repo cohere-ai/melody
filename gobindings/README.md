@@ -26,7 +26,11 @@ for _, chunk := range textChunks {
 }
 
 // Flush any remaining partial outputs
-out = append(out, f.FlushPartials()...)
+remaining, err := f.FlushPartials()
+if err != nil {
+    panic(err)
+}
+out = append(out, remaining...)
 
 /*
 Expected output:

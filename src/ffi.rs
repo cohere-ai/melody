@@ -12,8 +12,7 @@
 //! # Ownership Rules
 //!
 //! - Pointers returned by `_new` functions: **Caller owns**, must call `_free`
-//! - `CFilterOutputResult` returned by `write_decoded`: **Caller owns**, must call `melody_result_free`
-//! - Pointers returned by `flush_partials`: **Caller owns**, must call `melody_filter_output_array_free`
+//! - `CFilterOutputResult` returned by `write_decoded` and `flush_partials`: **Caller owns**, must call `melody_result_free`
 //! - Pointers passed as arguments: **Caller retains ownership**, must remain valid for call duration
 //!
 //! # Thread Safety
@@ -45,18 +44,6 @@ use std::slice;
 //
 // IMPORTANT: Panics that cross FFI boundaries cause undefined behavior.
 // All extern "C" functions must catch panics and convert them to error returns.
-
-/// Catches panics and returns a null pointer if one occurs.
-/// Use this for FFI functions that return pointers.
-fn catch_panic_ptr<F, T>(f: F) -> *mut T
-where
-    F: FnOnce() -> *mut T + panic::UnwindSafe,
-{
-    match panic::catch_unwind(f) {
-        Ok(ptr) => ptr,
-        Err(_) => std::ptr::null_mut(),
-    }
-}
 
 /// Catches panics and returns a `CFilterOutputResult` with an error if one occurs.
 /// Use this for FFI functions that return filter results.
@@ -578,22 +565,26 @@ pub unsafe extern "C" fn melody_filter_write_decoded(
 ///
 /// # Safety
 /// - `filter` must be a valid pointer returned from `melody_filter_new`
-/// - The returned `CFilterOutputArray` must be freed with `melody_filter_output_array_free`
+/// - The returned `CFilterOutputResult` must be freed with `melody_result_free`
 ///
 /// # Returns
-/// Returns null if filter is null or if a panic occurs.
+/// Returns null if filter is null. Returns a `CFilterOutputResult` with an error if a panic occurs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_filter_flush_partials(
     filter: *mut CFilter,
-) -> *mut CFilterOutputArray {
+) -> *mut CFilterOutputResult {
     if filter.is_null() {
         return std::ptr::null_mut();
     }
 
-    catch_panic_ptr(AssertUnwindSafe(|| unsafe {
+    catch_panic_filter_result(AssertUnwindSafe(|| unsafe {
         let filter = &mut *(filter.cast::<FilterImpl>());
         let outputs = filter.flush_partials();
-        convert_outputs_to_c(outputs)
+        let result = convert_outputs_to_c(outputs);
+        Box::into_raw(Box::new(CFilterOutputResult {
+            result,
+            error: std::ptr::null_mut(),
+        }))
     }))
 }
 

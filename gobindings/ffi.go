@@ -239,18 +239,22 @@ func (f *cFilter) writeDecoded(decodedToken string, logprobs TokenIDsWithLogProb
 }
 
 // flushPartials flushes any partial outputs from the filter
-func (f *cFilter) flushPartials() []FilterOutput {
+func (f *cFilter) flushPartials() ([]FilterOutput, error) {
 	if f.ptr == nil {
-		return nil
+		return nil, nil
 	}
 
-	cArr := C.melody_filter_flush_partials(f.ptr)
-	if cArr == nil {
-		return nil
+	res := C.melody_filter_flush_partials(f.ptr)
+	if res == nil {
+		return nil, nil
 	}
-	defer C.melody_filter_output_array_free(cArr)
+	defer C.melody_result_free(res)
 
-	return convertCOutputArray(cArr)
+	if res.error != nil {
+		return nil, errors.New(C.GoString(res.error))
+	}
+
+	return convertCOutputArray(res.result), nil
 }
 
 // convertCOutputArray converts a C output array to Go FilterOutput slice
