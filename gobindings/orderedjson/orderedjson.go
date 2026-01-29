@@ -129,7 +129,9 @@ func (o Object) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	writer := jwriter.Writer{}
+	writer := jwriter.Writer{
+		NoEscapeHTML: true,
+	}
 	writer.RawByte('{')
 
 	firstIteration := true
@@ -149,7 +151,13 @@ func (o Object) MarshalJSON() ([]byte, error) {
 		case float32:
 			formatFloat(&writer, float64(vt))
 		default:
-			writer.Raw(json.Marshal(pair.Value))
+			// disable html escaping
+			var buf bytes.Buffer
+			enc := json.NewEncoder(&buf)
+			enc.SetEscapeHTML(false)
+			err := enc.Encode(pair.Value)
+			res := bytes.TrimSuffix(buf.Bytes(), []byte{'\n'})
+			writer.Raw(res, err)
 		}
 	}
 	writer.RawByte('}')

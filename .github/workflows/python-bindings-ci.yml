@@ -33,13 +33,13 @@ jobs:
           pytest
 
   py-format:
-    runs-on: depot-ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: psf/black@stable
 
   py-check:
-    runs-on: depot-ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build sdist
