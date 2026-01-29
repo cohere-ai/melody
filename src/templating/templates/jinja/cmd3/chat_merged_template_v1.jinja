@@ -1,0 +1,5 @@
+{%- set template_v1 = true -%}
+{%- set reasoning_v1 = true if reasoning else false -%}
+{%- set reasoning = false -%}
+{%- set skip_thinking = skip_thinking if skip_thinking is not undefined else false -%}
+{% include "chat_merged_template.jinja" %}
