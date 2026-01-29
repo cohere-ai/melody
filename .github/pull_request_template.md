@@ -6,7 +6,7 @@
 
 ## Related Issue
 
-<!--- Please link to the Github or Linear issue here: -->
+<!--- Please link to the Github or Linear issue here -->
 
 ## Motivation and Context
 
@@ -14,5 +14,5 @@
 
 ## How Has This Been Tested?
 
-<!--- Please describe in detail how you tested your changes. -->
+<!--- Please describe how you tested your changes -->
 <!--- Add new tests to validate the functionality if possible -->
