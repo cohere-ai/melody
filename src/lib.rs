@@ -26,7 +26,7 @@
 //! # Quick Start
 //!
 //! ```rust
-//! use cohere_melody::{FilterOptions, new_filter, Filter};
+//! use cohere_melody::parsing::{FilterOptions, new_filter, Filter};
 //!
 //! // Create a filter with CMD3 configuration
 //! let options = FilterOptions::new().cmd3();
@@ -47,7 +47,7 @@
 //! ## Basic Text Filtering
 //!
 //! ```rust
-//! use cohere_melody::{FilterOptions, new_filter, Filter};
+//! use cohere_melody::parsing::{FilterOptions, new_filter, Filter};
 //!
 //! let options = FilterOptions::new()
 //!     .with_left_trimmed()  // Trim leading whitespace
@@ -61,7 +61,7 @@
 //! ## Citation Parsing (CMD3 Format)
 //!
 //! ```rust
-//! use cohere_melody::{FilterOptions, new_filter, Filter};
+//! use cohere_melody::parsing::{FilterOptions, new_filter, Filter};
 //!
 //! let options = FilterOptions::new().cmd3();
 //! let mut filter = new_filter(options);
@@ -74,7 +74,7 @@
 //! ## Tool Call Extraction
 //!
 //! ```rust
-//! use cohere_melody::{FilterOptions, new_filter, Filter};
+//! use cohere_melody::parsing::{FilterOptions, new_filter, Filter};
 //!
 //! let options = FilterOptions::new()
 //!     .cmd3()

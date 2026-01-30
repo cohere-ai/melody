@@ -19,7 +19,8 @@ use std::collections::HashMap;
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::{Filter, FilterOptions, new_filter, TokenIDsWithLogProb};
+/// use cohere_melody::parsing::{Filter, FilterOptions, new_filter};
+/// use cohere_melody::parsing::types::TokenIDsWithLogProb;
 ///
 /// let options = FilterOptions::new();
 /// let mut filter = new_filter(options);
