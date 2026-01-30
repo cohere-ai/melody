@@ -104,12 +104,12 @@ pub mod errors;
 /// Parsing module for token stream processing and filtering.
 ///
 /// Contains the filter implementation, options, and types for processing
-/// language model outputs with support for citations, tool calls, and structured content.
+/// cohere model outputs with support for citations, tool calls, and structured content.
 pub mod parsing;
 
 /// Templating module for rendering prompts.
 ///
-/// Provides functionality to render CMD3 and CMD4 format prompts with support
+/// Provides functionality to render cohere Command 3 & Command 4 format prompts with support
 /// for messages, tools, documents, and various configuration options.
 pub mod templating;
 

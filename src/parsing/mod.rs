@@ -1,7 +1,7 @@
 //! Parsing module for token stream processing and filtering.
 //!
 //! This module provides the core functionality for parsing and filtering token streams
-//! from language models, with support for citations, tool calls, and various output formats.
+//! from Cohere models with support for citations, tool calls, and various output formats.
 
 mod action_filter;
 mod citations_filter;
