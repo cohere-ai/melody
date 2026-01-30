@@ -60,6 +60,35 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-features  -- -Dwarnings
 
+  rust-examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run all examples
+        run: |
+          for example in examples/*.rs; do
+            name=$(basename "${example%.rs}")
+            echo "Running example: $name"
+            cargo run --example "$name"
+          done
+
   rust-format:
     runs-on: ubuntu-latest
     steps:

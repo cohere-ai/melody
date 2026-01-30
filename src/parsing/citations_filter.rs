@@ -5,8 +5,10 @@
 //! tool results.
 //!
 
-use crate::filter::{FilterImpl, find_partial};
-use crate::types::{FilterCitation, FilterMode, FilterOutput, Source, TokenIDsWithLogProb};
+use crate::parsing::filter::{FilterImpl, find_partial};
+use crate::parsing::types::{
+    FilterCitation, FilterMode, FilterOutput, Source, TokenIDsWithLogProb,
+};
 
 // Citation marker constants
 const START_FIRST_CIT: &str = "<co: ";
@@ -351,7 +353,7 @@ fn convert_string_to_int_list(s: &str) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::filter::FilterImpl;
+    use crate::parsing::filter::FilterImpl;
 
     #[test]
     fn test_handle_citations_standard_case() {

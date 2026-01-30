@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::filter::{Filter, FilterImpl};
-    use crate::options::FilterOptions;
-    use crate::types::*;
+    use crate::parsing::types::*;
+    use crate::parsing::{Filter, FilterImpl, FilterOptions};
 
     use tokenizers::Tokenizer;
 
@@ -289,7 +288,7 @@ mod tests {
             likelihood_buffer.clear();
         }
 
-        let mut filter = crate::options::new_filter(tt.options);
+        let mut filter = crate::parsing::new_filter(tt.options);
         for (i, chunk) in text_chunks.iter().enumerate() {
             let mut out = filter.write_decoded(chunk, likelihoods_chunks[i].clone());
             if i == text_chunks.len() - 1 {

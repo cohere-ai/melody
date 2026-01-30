@@ -3,7 +3,8 @@
 //! This module provides Python bindings using `PyO3`, allowing the Melody parser
 //! to be used directly from Python code.
 
-use crate::{Filter, FilterImpl, FilterOptions, FilterOutput, TokenIDsWithLogProb, new_filter};
+use crate::parsing::types::{FilterOutput, TokenIDsWithLogProb};
+use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use pyo3::prelude::*;
 
 /// Python wrapper for the streaming filter.

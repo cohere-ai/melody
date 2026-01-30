@@ -14,19 +14,33 @@ use std::collections::BTreeMap;
 #[serde(default)]
 #[serde(deny_unknown_fields)]
 pub struct RenderCmd3Options<'a> {
+    /// Messages to include in the rendered prompt.
     pub messages: Vec<Message>,
+    /// Template string to use for rendering.
     pub template: &'a str,
+    /// Optional developer instruction to include in the prompt.
     pub dev_instruction: Option<String>,
+    /// Documents to include for grounding.
     pub documents: Vec<Document>,
+    /// Tools available to the model.
     pub available_tools: Vec<Tool>,
+    /// Safety mode configuration.
     pub safety_mode: Option<SafetyMode>,
+    /// Citation quality setting.
     pub citation_quality: Option<CitationQuality>,
+    /// Reasoning/thinking mode configuration.
     pub reasoning_type: Option<ReasoningType>,
+    /// Whether to skip the preamble section.
     pub skip_preamble: bool,
+    /// Optional prefix for the response.
     pub response_prefix: Option<String>,
+    /// Optional JSON schema for structured output.
     pub json_schema: Option<String>,
+    /// Whether to enable JSON mode.
     pub json_mode: bool,
+    /// Additional fields to substitute in the template.
     pub additional_template_fields: Map<String, Value>,
+    /// Special tokens to escape in the output.
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 // for now always set the template to cmd3v1.
@@ -58,17 +72,29 @@ impl Default for RenderCmd3Options<'_> {
 #[serde(default)]
 #[serde(deny_unknown_fields)]
 pub struct RenderCmd4Options<'a> {
+    /// Messages to include in the rendered prompt.
     pub messages: Vec<Message>,
+    /// Template string to use for rendering.
     pub template: &'a str,
+    /// Optional developer instruction to include in the prompt.
     pub dev_instruction: Option<String>,
+    /// Optional platform instruction override.
     pub platform_instruction: Option<String>,
+    /// Documents to include for grounding.
     pub documents: Vec<Document>,
+    /// Tools available to the model.
     pub available_tools: Vec<Tool>,
+    /// Grounding configuration.
     pub grounding: Option<Grounding>,
+    /// Optional prefix for the response.
     pub response_prefix: Option<String>,
+    /// Optional JSON schema for structured output.
     pub json_schema: Option<String>,
+    /// Whether to enable JSON mode.
     pub json_mode: bool,
+    /// Additional fields to substitute in the template.
     pub additional_template_fields: Map<String, Value>,
+    /// Special tokens to escape in the output.
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 
@@ -92,6 +118,14 @@ impl Default for RenderCmd4Options<'_> {
     }
 }
 
+/// Renders a CMD3 format prompt from the given options.
+///
+/// # Errors
+///
+/// Returns a `MelodyError` if:
+/// - JSON serialization of documents fails
+/// - Template parsing fails
+/// - Template rendering fails
 pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(
@@ -172,6 +206,14 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     Ok(template.render(&liquid::object!(&substitutions))?)
 }
 
+/// Renders a CMD4 format prompt from the given options.
+///
+/// # Errors
+///
+/// Returns a `MelodyError` if:
+/// - JSON serialization of documents fails
+/// - Template parsing fails
+/// - Template rendering fails
 pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let messages = messages_to_template(

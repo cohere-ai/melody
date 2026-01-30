@@ -21,14 +21,13 @@
 //! thread at a time, or protected by external synchronization.
 //!
 
-use crate::filter::{Filter, FilterImpl};
-use crate::options::{FilterOptions, new_filter};
+use crate::parsing::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
+use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };
 use crate::templating::{RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4};
-use crate::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;

@@ -4,9 +4,9 @@
 //! It supports both basic types (numbers, booleans, null) and complex types
 //! (strings, objects, arrays) with proper JSON validation.
 
-use crate::action_filter::ActionMode;
-use crate::filter::{FilterImpl, find_partial};
-use crate::types::FilterOutput;
+use crate::parsing::action_filter::ActionMode;
+use crate::parsing::filter::{FilterImpl, find_partial};
+use crate::parsing::types::FilterOutput;
 
 /// State machine for parsing parameter values.
 ///
@@ -177,8 +177,8 @@ pub(crate) fn find_valid_json_value(buffer: &str, s: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::action_filter::FilterAction;
-    use crate::filter::FilterImpl;
+    use crate::parsing::action_filter::FilterAction;
+    use crate::parsing::filter::FilterImpl;
 
     fn starting_metadata() -> FilterAction {
         FilterAction {

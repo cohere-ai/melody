@@ -2,8 +2,8 @@
 //!
 //! This module provides the `FilterOptions` builder for configuring filter behavior.
 
-use crate::filter::FilterImpl;
-use crate::types::FilterMode;
+use crate::parsing::filter::FilterImpl;
+use crate::parsing::types::FilterMode;
 use std::collections::HashMap;
 
 /// Configuration builder for creating filters.
@@ -17,7 +17,8 @@ use std::collections::HashMap;
 /// ## Using presets
 ///
 /// ```rust
-/// use cohere_melody::{FilterOptions, new_filter};
+/// use cohere_melody::parsing::FilterOptions;
+/// use cohere_melody::parsing::new_filter;
 ///
 /// // Use Command 3 preset configuration
 /// let options = FilterOptions::new().cmd3();
@@ -72,7 +73,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new();
     /// ```
@@ -103,7 +104,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::{FilterOptions, new_filter};
+    /// use cohere_melody::parsing::{FilterOptions, new_filter};
     ///
     /// let options = FilterOptions::new().cmd3();
     /// let mut filter = new_filter(options);
@@ -141,7 +142,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::{FilterOptions, new_filter};
+    /// use cohere_melody::parsing::{FilterOptions, new_filter};
     ///
     /// let options = FilterOptions::new().cmd4();
     /// let mut filter = new_filter(options);
@@ -180,7 +181,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new()
     ///     .with_inclusive_stops(vec!["DONE".to_string()]);
@@ -203,7 +204,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new()
     ///     .with_exclusive_stops(vec!["</output>".to_string()]);
@@ -223,7 +224,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new().with_left_trimmed();
     /// ```
@@ -241,7 +242,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new().with_right_trimmed();
     /// ```
@@ -263,7 +264,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new().with_chunk_size(10);
     /// ```
@@ -287,7 +288,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::{FilterOptions, new_filter};
+    /// use cohere_melody::parsing::{FilterOptions, new_filter};
     ///
     /// let options = FilterOptions::new().handle_rag();
     /// let mut filter = new_filter(options);
@@ -318,7 +319,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::{FilterOptions, new_filter};
+    /// use cohere_melody::parsing::{FilterOptions, new_filter};
     ///
     /// let options = FilterOptions::new().handle_search_query();
     /// let mut filter = new_filter(options);
@@ -353,7 +354,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::{FilterOptions, new_filter};
+    /// use cohere_melody::parsing::{FilterOptions, new_filter};
     ///
     /// let options = FilterOptions::new().handle_multi_hop();
     /// let mut filter = new_filter(options);
@@ -387,7 +388,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new()
     ///     .handle_rag()
@@ -407,7 +408,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new()
     ///     .cmd3()
@@ -428,7 +429,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new()
     ///     .cmd3()
@@ -452,7 +453,7 @@ impl FilterOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::FilterOptions;
+    /// use cohere_melody::parsing::FilterOptions;
     ///
     /// let options = FilterOptions::new()
     ///     .cmd3()
@@ -481,7 +482,7 @@ impl FilterOptions {
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::{FilterOptions, new_filter, Filter};
+/// use cohere_melody::parsing::{FilterOptions, new_filter, Filter};
 ///
 /// let options = FilterOptions::new().cmd3();
 /// let mut filter = new_filter(options);

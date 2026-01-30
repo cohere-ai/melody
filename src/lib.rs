@@ -26,7 +26,7 @@
 //! # Quick Start
 //!
 //! ```rust
-//! use cohere_melody::{FilterOptions, new_filter, Filter};
+//! use cohere_melody::parsing::{FilterOptions, new_filter, Filter};
 //!
 //! // Create a filter with CMD3 configuration
 //! let options = FilterOptions::new().cmd3();
@@ -47,7 +47,7 @@
 //! ## Basic Text Filtering
 //!
 //! ```rust
-//! use cohere_melody::{FilterOptions, new_filter, Filter};
+//! use cohere_melody::parsing::{FilterOptions, new_filter, Filter};
 //!
 //! let options = FilterOptions::new()
 //!     .with_left_trimmed()  // Trim leading whitespace
@@ -61,7 +61,7 @@
 //! ## Citation Parsing (CMD3 Format)
 //!
 //! ```rust
-//! use cohere_melody::{FilterOptions, new_filter, Filter};
+//! use cohere_melody::parsing::{FilterOptions, new_filter, Filter};
 //!
 //! let options = FilterOptions::new().cmd3();
 //! let mut filter = new_filter(options);
@@ -74,7 +74,7 @@
 //! ## Tool Call Extraction
 //!
 //! ```rust
-//! use cohere_melody::{FilterOptions, new_filter, Filter};
+//! use cohere_melody::parsing::{FilterOptions, new_filter, Filter};
 //!
 //! let options = FilterOptions::new()
 //!     .cmd3()
@@ -98,15 +98,20 @@
 //! unsafe code for cross-language interoperability. See their respective module
 //! documentation for safety requirements.
 
+/// Error types for the Melody library.
 pub mod errors;
-pub mod filter;
-pub mod options;
-pub mod types;
 
-mod action_filter;
-mod citations_filter;
-mod param_filter;
-mod templating;
+/// Parsing module for token stream processing and filtering.
+///
+/// Contains the filter implementation, options, and types for processing
+/// cohere model outputs with support for citations, tool calls, and structured content.
+pub mod parsing;
+
+/// Templating module for rendering prompts.
+///
+/// Provides functionality to render cohere Command 3 & Command 4 format prompts with support
+/// for messages, tools, documents, and various configuration options.
+pub mod templating;
 
 // FFI bindings for calling from other languages (Go, Python, etc.)
 #[cfg(feature = "ffi")]
@@ -139,10 +144,3 @@ pub mod tokenizers;
 
 #[cfg(test)]
 mod tests;
-
-pub use filter::{Filter, FilterImpl};
-pub use options::{FilterOptions, new_filter};
-pub use types::{
-    FilterCitation, FilterOutput, FilterSearchQueryDelta, FilterToolCallDelta, FilterToolParameter,
-    Source, TokenIDsWithLogProb,
-};
