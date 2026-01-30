@@ -2,8 +2,8 @@
 //!
 //! This module provides the `FilterOptions` builder for configuring filter behavior.
 
-use crate::filter::FilterImpl;
-use crate::types::FilterMode;
+use crate::parsing::filter::FilterImpl;
+use crate::parsing::types::FilterMode;
 use std::collections::HashMap;
 
 /// Configuration builder for creating filters.
@@ -17,7 +17,7 @@ use std::collections::HashMap;
 /// ## Using presets
 ///
 /// ```rust
-/// use cohere_melody::{FilterOptions, new_filter};
+/// use cohere_melody::parsing::options::FilterOptions;
 ///
 /// // Use Command 3 preset configuration
 /// let options = FilterOptions::new().cmd3();

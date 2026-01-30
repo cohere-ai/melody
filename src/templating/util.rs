@@ -1,5 +1,5 @@
-use crate::FilterCitation;
 use crate::errors::MelodyError;
+use crate::parsing::types::FilterCitation;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
 use serde_json::{Map, Value, to_string};
 use std::collections::{BTreeMap, HashMap};
