@@ -1,4 +1,4 @@
-package gobindings
+package orderedjson
 
 import (
 	"encoding/json"
@@ -112,12 +112,17 @@ func TestObject_MarshalJSON(t *testing.T) {
 			input:    New(WithInitialData(Pair{"loan_amount", 1000000.0}, Pair{"interest_rate", 0.03}, Pair{"loan_period", 30})),
 			expected: `{"loan_amount":1e+06,"interest_rate":0.03,"loan_period":30}`,
 		},
+		{
+			name:     "doesn't escape html characters",
+			input:    New(WithInitialData(Pair{"b", "<>&'\""}, Pair{"a", 2})),
+			expected: `{"b":"<>&'\"","a":2}`,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := json.Marshal(tc.input)
+			got, err := tc.input.MarshalJSON()
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, string(got))
 		})
@@ -150,6 +155,10 @@ func TestObject_UnmarshalJSON(t *testing.T) {
 			name:     "handles scientific notation",
 			input:    `{"loan_amount":1e+06,"interest_rate":0.03,"loan_period":30}`,
 			expected: New(WithInitialData(Pair{"loan_amount", float64(1000000.0)}, Pair{"interest_rate", float64(0.03)}, Pair{"loan_period", int64(30)})),
+		}, {
+			name:     "ensure escaped characters are handled correctly",
+			input:    `{"key": "hel\\\"lo"}`,
+			expected: New(WithInitialData(Pair{"key", `hel\"lo`})),
 		},
 	}
 

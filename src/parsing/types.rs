@@ -16,7 +16,7 @@ use serde::Deserialize;
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::TokenIDsWithLogProb;
+/// use cohere_melody::parsing::types::TokenIDsWithLogProb;
 ///
 /// let mut logprobs = TokenIDsWithLogProb::new();
 /// assert!(logprobs.token_ids.is_empty());
@@ -43,7 +43,7 @@ impl TokenIDsWithLogProb {
     /// # Examples
     ///
     /// ```rust
-    /// use cohere_melody::TokenIDsWithLogProb;
+    /// use cohere_melody::parsing::types::TokenIDsWithLogProb;
     ///
     /// let logprobs = TokenIDsWithLogProb::new();
     /// assert!(logprobs.token_ids.is_empty());
@@ -83,7 +83,7 @@ impl TokenIDsWithLogProb {
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::{FilterOutput, FilterCitation};
+/// use cohere_melody::parsing::types::{FilterOutput, FilterCitation};
 ///
 /// let output = FilterOutput {
 ///     text: "Hello world".to_string(),
@@ -120,7 +120,7 @@ pub struct FilterOutput {
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::FilterSearchQueryDelta;
+/// use cohere_melody::parsing::types::FilterSearchQueryDelta;
 ///
 /// let delta = FilterSearchQueryDelta {
 ///     index: 0,
@@ -173,7 +173,7 @@ pub struct FilterToolCallDelta {
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::FilterToolParameter;
+/// use cohere_melody::parsing::types::FilterToolParameter;
 ///
 /// let param = FilterToolParameter {
 ///     name: "query".to_string(),
@@ -204,7 +204,7 @@ pub struct FilterToolParameter {
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::{FilterCitation, Source};
+/// use cohere_melody::parsing::types::{FilterCitation, Source};
 ///
 /// let citation = FilterCitation {
 ///     start_index: 6,
@@ -243,7 +243,7 @@ pub struct FilterCitation {
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::Source;
+/// use cohere_melody::parsing::types::Source;
 ///
 /// let source = Source {
 ///     tool_call_index: 0,
