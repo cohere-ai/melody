@@ -21,25 +21,26 @@ cargo run --example basic
 
 ## Usage
 
-### Basic Filter
+### Parsing
 
 ```rust
-use cohere_melody::{FilterOptions, TokenIDsWithLogProb, new_filter};
+use cohere_melody::parsing::Filter;
+use cohere_melody::*;
 
 // Create a filter with options
-let options = FilterOptions::new().cmd3();
+let options = parsing::FilterOptions::new().cmd3();
 
-let mut filter = new_filter(options);
+let mut filter = parsing::new_filter(options);
 
 // Simulate text
-let text = "Hello <co: 1>world</co: 1>!";
-let logprobs = TokenIDsWithLogProb {
+let citation_text = "Hello <co: 1>world</co: 1>!";
+let logprobs = parsing::types::TokenIDsWithLogProb {
     token_ids: vec![1, 2, 3],
     logprobs: vec![0.1, 0.2, 0.3],
 };
 
 // Write text
-let outputs = filter.write_decoded(text, logprobs);
+let outputs = filter.write_decoded(citation_text, logprobs);
 
 // Process outputs
 for output in outputs {
@@ -54,6 +55,49 @@ for output in outputs {
 
 // Flush remaining tokens
 let final_outputs = filter.flush_partials();
+```
+
+### Templating
+
+```rust
+use cohere_melody::parsing::Filter;
+use cohere_melody::*;
+
+// Assemble inputs into the template (e.g. conversation history)
+let options = templating::RenderCmd4Options {
+    messages: vec![
+        templating::types::Message {
+            role: templating::types::Role::System,
+            content: vec![templating::types::Content {
+                content_type: templating::types::ContentType::Text,
+                text: Some("You are a helpful assistant.".to_string()),
+                thinking: None,
+                image: None,
+                document: None,
+            }],
+            tool_calls: vec![],
+            tool_call_id: None,
+            citations: vec![],
+        },
+        templating::types::Message {
+            role: templating::types::Role::User,
+            content: vec![templating::types::Content {
+                content_type: templating::types::ContentType::Text,
+                text: Some("Hello Command!.".to_string()),
+                thinking: None,
+                image: None,
+                document: None,
+            }],
+            tool_calls: vec![],
+            tool_call_id: None,
+            citations: vec![],
+        },
+    ],
+    ..Default::default()
+};
+
+// Render prompt
+let prompt = templating::render_cmd4(&options).unwrap();
 ```
 
 ## Building Python Bindings
@@ -71,23 +115,31 @@ let final_outputs = filter.flush_partials();
    uv run python -c "import cohere_melody;"
    ```
 
-## DEBUGGING
+## Debugging
+
 You may run into issues calling the Rust static library from other languages (e.g. Golang via CGO). One effective way to debug these issues is to:
+
 1. Build the library in debug mode. You can do this by adding these lines to the `Cargo.toml` file:
+
 ```toml
 [profile.release]
 debug = true
 ```
+
 and then building the library normally: `make rust-build-with-tokenizers`.
 
 2. Create a binary to debug. In Golang, I create a binary from a test:
+
 ```bash
 go test -count=1 ./gobindings/... -c
 ```
+
 3. Use `gdb` (`brew install gdb` on macOS).
+
 ```bash
 gdb ./gobindings.test
 break melody_render_cmd3
 run
 ```
+
 4. When it hits the breakpoint, you can step through the Rust code to see where things might be going wrong.
