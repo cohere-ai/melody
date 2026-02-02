@@ -3,9 +3,11 @@
 //! This module contains the main filter implementation that processes streaming tokens
 //! and extracts structured information.
 
-use crate::FilterOptions;
-use crate::action_filter::FilterAction;
-use crate::types::{FilterMode, FilterOutput, FilterSearchQueryDelta, TokenIDsWithLogProb};
+use crate::parsing::action_filter::FilterAction;
+use crate::parsing::options::FilterOptions;
+use crate::parsing::types::{
+    FilterMode, FilterOutput, FilterSearchQueryDelta, TokenIDsWithLogProb,
+};
 use std::collections::HashMap;
 
 /// Core trait for streaming token parsers.
@@ -17,7 +19,8 @@ use std::collections::HashMap;
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::{Filter, FilterOptions, new_filter, TokenIDsWithLogProb};
+/// use cohere_melody::parsing::{Filter, FilterOptions, new_filter};
+/// use cohere_melody::parsing::types::TokenIDsWithLogProb;
 ///
 /// let options = FilterOptions::new();
 /// let mut filter = new_filter(options);
@@ -514,14 +517,12 @@ pub(crate) fn find_partial<'a>(
         if let Some(idx) = s.find(stop) {
             return (idx, stop.clone());
         }
-
         // Go through the substrings of the stop sequence
-        for i in 0..s.len() {
-            let suffix = if stop.len() > s.len() - i {
-                &stop[..s.len() - i]
-            } else {
-                stop
-            };
+        'inner: for i in 0..stop.len() {
+            if !stop.is_char_boundary(stop.len() - i) {
+                continue 'inner;
+            }
+            let suffix = &stop[..stop.len() - i];
 
             if s.ends_with(suffix) {
                 let idx = s.len() - suffix.len();
@@ -545,7 +546,7 @@ pub(crate) fn find_partial<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::filter::find_partial;
+    use crate::parsing::filter::find_partial;
 
     #[test]
     fn test_find_partial() {
@@ -564,5 +565,14 @@ mod tests {
         // Test no match
         let (idx, _) = find_partial("hello world", stops.iter());
         assert_eq!(idx, usize::MAX);
+    }
+
+    #[test]
+    fn test_find_partial_utf8() {
+        // This test ensures we don't slice in the middle of a UTF-8 character (we used to panic here).
+        let stops = vec!["RÈGLES".to_string()];
+        let (idx, found) = find_partial("ÈÈÈÈÈÈÈR", stops.iter());
+        assert_eq!(idx, 14);
+        assert_eq!(found, "");
     }
 }
