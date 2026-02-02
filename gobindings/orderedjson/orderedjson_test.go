@@ -116,6 +116,10 @@ func TestObject_MarshalJSON(t *testing.T) {
 			name:     "doesn't escape html characters",
 			input:    New(WithInitialData(Pair{"b", "<>&'\""}, Pair{"a", 2})),
 			expected: `{"b":"<>&'\"","a":2}`,
+		}, {
+			name:     "empty object marshals",
+			input:    Object{},
+			expected: `null`,
 		},
 	}
 
@@ -137,6 +141,11 @@ func TestObject_UnmarshalJSON(t *testing.T) {
 		expected    Object
 		expectedErr error
 	}{
+		{
+			name:     "null object unmarshals",
+			input:    `null`,
+			expected: Object{},
+		},
 		{
 			name:     "basic object",
 			input:    `{"b" : "v1", "a": 2}`,

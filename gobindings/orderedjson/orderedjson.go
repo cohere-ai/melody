@@ -261,6 +261,10 @@ func (o *Object) UnmarshalJSON(data []byte) error {
 	if o.pairs == nil {
 		*o = New()
 	}
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		*o = Object{}
+		return nil
+	}
 	return jsonparser.ObjectEach(data,
 		func(keyData []byte, valueData []byte, dataType jsonparser.ValueType, offset int) error {
 			if dataType == jsonparser.String {
