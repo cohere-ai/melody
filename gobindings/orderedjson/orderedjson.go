@@ -188,48 +188,96 @@ func dumpWriter(writer *jwriter.Writer) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func quoteBytes(b []byte) []byte {
+	var buf bytes.Buffer
+	buf.WriteByte('"')
+	buf.Write(b)
+	buf.WriteByte('"')
+	return buf.Bytes()
+}
+
+func parseArray(arrData []byte) ([]any, error) {
+	res := make([]any, 0)
+	var firstErr error
+	_, err := jsonparser.ArrayEach(arrData, func(elemData []byte, elemType jsonparser.ValueType, offset int, cbErr error) {
+		if firstErr != nil {
+			return
+		}
+		if cbErr != nil {
+			firstErr = cbErr
+			return
+		}
+		// restore enclosing quotes for strings to make valid JSON
+		if elemType == jsonparser.String {
+			elemData = quoteBytes(elemData)
+		}
+		v, e := parseValue(elemData, elemType)
+		if e != nil {
+			firstErr = e
+			return
+		}
+		res = append(res, v)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return res, nil
+}
+
+func parseValue(vData []byte, vType jsonparser.ValueType) (any, error) {
+	switch vType {
+	case jsonparser.Object:
+		obj := New()
+		if err := obj.UnmarshalJSON(vData); err != nil {
+			return nil, err
+		}
+		return obj, nil
+	case jsonparser.Array:
+		return parseArray(vData)
+	case jsonparser.Number:
+		if intVal, err := jsonparser.ParseInt(vData); err == nil {
+			return intVal, nil
+		}
+		if floatVal, err := jsonparser.ParseFloat(vData); err == nil {
+			return floatVal, nil
+		}
+		return nil, errors.New("invalid numeric value")
+	default:
+		var value interface{}
+		if err := json.Unmarshal(vData, &value); err != nil {
+			return nil, err
+		}
+		return value, nil
+	}
+}
+
 func (o *Object) UnmarshalJSON(data []byte) error {
-	if o == nil || o.pairs == nil {
+	if o == nil {
+		return errors.New("orderedjson.Object: UnmarshalJSON on nil pointer")
+	}
+	if o.pairs == nil {
 		*o = New()
 	}
-
 	return jsonparser.ObjectEach(data,
 		func(keyData []byte, valueData []byte, dataType jsonparser.ValueType, offset int) error {
 			if dataType == jsonparser.String {
 				// jsonparser removes the enclosing quotes; we need to restore them to make a valid JSON
-				valueData = data[offset-len(valueData)-2 : offset]
+				valueData = quoteBytes(valueData)
 			}
 
 			key, err := decodeUTF8(keyData)
 			if err != nil {
 				return err
 			}
-			// if value is an object, unmarshal it into a nested Object
-			switch dataType {
-			case jsonparser.Object:
-				obj := New()
-				if err := obj.UnmarshalJSON(valueData); err != nil {
-					return err
-				}
-				o.Set(key, obj)
-			case jsonparser.Number:
-				if intVal, err := jsonparser.ParseInt(valueData); err == nil {
-					o.Set(key, intVal)
-					return nil
-				}
-				if floatVal, err := jsonparser.ParseFloat(valueData); err == nil {
-					o.Set(key, floatVal)
-					return nil
-				}
-				// neither float nor int, dafuq?
-				return errors.New("invalid numeric value")
-			default:
-				var value interface{}
-				if err := json.Unmarshal(valueData, &value); err != nil {
-					return err
-				}
-				o.Set(key, value)
+
+			val, err := parseValue(valueData, dataType)
+			if err != nil {
+				return err
 			}
+			o.Set(key, val)
 			return nil
 		})
 }

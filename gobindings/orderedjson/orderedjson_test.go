@@ -159,6 +159,19 @@ func TestObject_UnmarshalJSON(t *testing.T) {
 			name:     "ensure escaped characters are handled correctly",
 			input:    `{"key": "hel\\\"lo"}`,
 			expected: New(WithInitialData(Pair{"key", `hel\"lo`})),
+		}, {
+			name:  "array of nested objects are recursively unmarshalled as ordered json",
+			input: `{"arr": [{"b": "1", "a": "2"}, {"d": "4", "c": [[{"foo": 2, "bar": 5}, {"tuv": 6}], {"xyz": 9}]}]}`,
+			expected: New(WithInitialData(Pair{"arr", []any{
+				New(WithInitialData(Pair{"b", "1"}, Pair{"a", "2"})),
+				New(WithInitialData(Pair{"d", "4"}, Pair{"c", []any{
+					[]any{
+						New(WithInitialData(Pair{"foo", int64(2)}, Pair{"bar", int64(5)})),
+						New(WithInitialData(Pair{"tuv", int64(6)})),
+					},
+					New(WithInitialData(Pair{"xyz", int64(9)})),
+				}})),
+			}})),
 		},
 	}
 
