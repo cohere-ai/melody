@@ -14,6 +14,8 @@ func TestObjectLen(t *testing.T) {
 	require.Equal(t, 1, ob.Len())
 	ob.Delete("b")
 	require.Equal(t, 0, ob.Len())
+	ob = Object{}
+	require.Equal(t, 0, ob.Len())
 }
 
 func TestObjectInit(t *testing.T) {
@@ -50,6 +52,8 @@ func TestObject_ToMap(t *testing.T) {
 	ob.Set("f", ob2)
 	m = ob.ToMap()
 	require.Equal(t, map[string]any{"b": "1", "a": "2", "f": map[string]any{"c": []string{"3"}, "d": 4, "e": []any{"5", 6}}}, m)
+	ob = Object{}
+	require.Equal(t, map[string]any{}, ob.ToMap())
 }
 
 func TestObjectSetGetDelete(t *testing.T) {
@@ -78,6 +82,16 @@ func TestObjectSetGetDelete(t *testing.T) {
 	// remove key
 	ob.Delete("a")
 	require.Equal(t, []string{"b", "c"}, ob.Keys())
+
+	ob = Object{}
+	v, ok = ob.Get("c")
+	require.False(t, ok)
+	require.Nil(t, v)
+	ob.Delete("c") // don't panic
+	ob.Set("c", 5)
+	v, ok = ob.Get("c")
+	require.True(t, ok)
+	require.Equal(t, 5, v)
 }
 
 func TestObject_MarshalJSON(t *testing.T) {
