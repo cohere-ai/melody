@@ -119,7 +119,7 @@ func TestObject_MarshalJSON(t *testing.T) {
 		}, {
 			name:     "empty object marshals",
 			input:    Object{},
-			expected: `null`,
+			expected: `{}`,
 		},
 	}
 

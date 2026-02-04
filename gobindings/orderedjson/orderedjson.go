@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -44,17 +45,16 @@ func New(opts ...InitOption) Object {
 	return *obj
 }
 
-// Pairs returns an iterator, enable when we upgrade to Go 1.23
-// func (o *Object) Pairs() iter.Seq2[string, any] {
-//	return func(yield func(string, any) bool) {
-//		for _, key := range o.order {
-//			pair := o.pairs[key]
-//			if !yield(key, pair.Value) {
-//				return
-//			}
-//		}
-//	}
-// }
+func (o *Object) Pairs() iter.Seq2[string, any] {
+	return func(yield func(string, any) bool) {
+		for _, key := range o.order {
+			pair := o.pairs[key]
+			if !yield(key, pair.Value) {
+				return
+			}
+		}
+	}
+}
 
 func (o *Object) Keys() []string {
 	return o.order
@@ -68,11 +68,17 @@ func (o *Object) Len() int {
 }
 
 func (o *Object) Contains(key string) bool {
+	if o.pairs == nil {
+		return false
+	}
 	_, present := o.pairs[key]
 	return present
 }
 
 func (o *Object) Get(key string) (any, bool) {
+	if o.pairs == nil {
+		return nil, false
+	}
 	pair, present := o.pairs[key]
 	return pair.Value, present
 }
@@ -91,6 +97,9 @@ func (o *Object) Delete(key string) {
 }
 
 func (o *Object) Set(key string, value any) {
+	if o.pairs == nil {
+		o.pairs = make(map[string]Pair)
+	}
 	if o.Contains(key) {
 		o.pairs[key] = Pair{
 			Key:   key,
@@ -126,7 +135,7 @@ var (
 
 func (o Object) MarshalJSON() ([]byte, error) {
 	if o.pairs == nil {
-		return []byte("null"), nil
+		return []byte("{}"), nil
 	}
 
 	writer := jwriter.Writer{
