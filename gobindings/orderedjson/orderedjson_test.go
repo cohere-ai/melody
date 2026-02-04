@@ -28,20 +28,24 @@ func TestObjectInit(t *testing.T) {
 	require.Equal(t, []string{"b"}, ob2.Keys())
 }
 
-// func TestObjectIter(t *testing.T) {
-//	ob := New(WithInitialData(Pair{"b", "1"}, Pair{"a", "2"}))
-//	i := 0
-//	for k, v := range ob.Pairs() {
-//		if i == 0 {
-//			require.Equal(t, "b", k)
-//			require.Equal(t, "1", v)
-//		} else {
-//			require.Equal(t, "a", k)
-//			require.Equal(t, "2", v)
-//		}
-//		i++
-//	}
-// }
+func TestObjectIter(t *testing.T) {
+	ob := New(WithInitialData(Pair{"b", "1"}, Pair{"a", "2"}))
+	i := 0
+	for k, v := range ob.Pairs() {
+		if i == 0 {
+			require.Equal(t, "b", k)
+			require.Equal(t, "1", v)
+		} else {
+			require.Equal(t, "a", k)
+			require.Equal(t, "2", v)
+		}
+		i++
+	}
+	ob = Object{}
+	for k, v := range ob.Pairs() {
+		require.Fail(t, "should not iterate over empty object", "key: %s, value: %v", k, v)
+	}
+}
 
 func TestObject_ToMap(t *testing.T) {
 	ob := New(WithInitialData(Pair{"b", "1"}, Pair{"a", "2"}))
