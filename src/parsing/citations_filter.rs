@@ -5,8 +5,10 @@
 //! tool results.
 //!
 
-use crate::filter::{FilterImpl, find_partial};
-use crate::types::{FilterCitation, FilterMode, FilterOutput, Source, TokenIDsWithLogProb};
+use crate::parsing::filter::{FilterImpl, find_partial};
+use crate::parsing::types::{
+    FilterCitation, FilterMode, FilterOutput, Source, TokenIDsWithLogProb,
+};
 
 // Citation marker constants
 const START_FIRST_CIT: &str = "<co: ";
@@ -145,7 +147,7 @@ impl FilterImpl {
         }
 
         // We have found a whole citation, now find the indexes for the citation
-        let start_index = self.cur_text_index + start_first_id;
+        let start_index = self.cur_text_index + s[0..start_first_id].chars().count();
         let end_of_cit = end_last_id + 1;
         let cit_txt = &s[end_first_id + 1..start_last_id];
         let mut text = format!("{}{}", &s[..start_first_id], cit_txt);
@@ -351,7 +353,7 @@ fn convert_string_to_int_list(s: &str) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::filter::FilterImpl;
+    use crate::parsing::filter::FilterImpl;
 
     #[test]
     fn test_handle_citations_standard_case() {
@@ -401,6 +403,31 @@ mod tests {
             vec![2, 1]
         );
         assert_eq!(remove, 28);
+    }
+
+    #[test]
+    fn test_handle_citations_multibyte() {
+        let mut filter = FilterImpl::new();
+        filter.stream_non_grounded_answer = false;
+        filter.cur_citation_byte_index = None;
+
+        let input = "hello🌈<co: 2,1>foo🌈</co: 2,1>.";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hello🌈foo🌈.");
+        assert_eq!(output.citations.len(), 1);
+        assert_eq!(output.citations[0].start_index, 6);
+        assert_eq!(output.citations[0].end_index, 10);
+        assert_eq!(output.citations[0].text, "foo🌈");
+        assert_eq!(output.citations[0].sources.len(), 1);
+        assert_eq!(output.citations[0].sources[0].tool_call_index, 0);
+        assert_eq!(
+            output.citations[0].sources[0].tool_result_indices,
+            vec![2, 1]
+        );
+        assert_eq!(remove, 36);
     }
 
     #[test]

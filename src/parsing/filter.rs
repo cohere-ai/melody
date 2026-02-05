@@ -3,9 +3,11 @@
 //! This module contains the main filter implementation that processes streaming tokens
 //! and extracts structured information.
 
-use crate::FilterOptions;
-use crate::action_filter::FilterAction;
-use crate::types::{FilterMode, FilterOutput, FilterSearchQueryDelta, TokenIDsWithLogProb};
+use crate::parsing::action_filter::FilterAction;
+use crate::parsing::options::FilterOptions;
+use crate::parsing::types::{
+    FilterMode, FilterOutput, FilterSearchQueryDelta, TokenIDsWithLogProb,
+};
 use std::collections::HashMap;
 
 /// Core trait for streaming token parsers.
@@ -17,7 +19,8 @@ use std::collections::HashMap;
 /// # Examples
 ///
 /// ```rust
-/// use cohere_melody::{Filter, FilterOptions, new_filter, TokenIDsWithLogProb};
+/// use cohere_melody::parsing::{Filter, FilterOptions, new_filter};
+/// use cohere_melody::parsing::types::TokenIDsWithLogProb;
 ///
 /// let options = FilterOptions::new();
 /// let mut filter = new_filter(options);
@@ -543,7 +546,7 @@ pub(crate) fn find_partial<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::filter::find_partial;
+    use crate::parsing::filter::find_partial;
 
     #[test]
     fn test_find_partial() {

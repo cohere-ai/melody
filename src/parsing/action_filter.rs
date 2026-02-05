@@ -4,9 +4,9 @@
 //! model output. It uses a state machine to incrementally parse tool names, IDs, and
 //! parameters as tokens arrive.
 
-use crate::filter::FilterImpl;
-use crate::param_filter::ParamState;
-use crate::types::{FilterOutput, FilterToolCallDelta, FilterToolParameter};
+use crate::parsing::filter::FilterImpl;
+use crate::parsing::param_filter::ParamState;
+use crate::parsing::types::{FilterOutput, FilterToolCallDelta, FilterToolParameter};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -185,7 +185,7 @@ impl FilterImpl {
     }
 
     fn handle_raw_param(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        use crate::param_filter::find_valid_json_value;
+        use crate::parsing::param_filter::find_valid_json_value;
 
         let idx = find_valid_json_value(&self.action_metadata.param_value_buffer, s);
 
@@ -389,7 +389,7 @@ fn find_non_escaped_char(s: &str, ch: char) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::filter::FilterImpl;
+    use crate::parsing::filter::FilterImpl;
 
     fn starting_metadata() -> FilterAction {
         FilterAction {

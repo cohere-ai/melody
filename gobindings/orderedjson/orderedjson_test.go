@@ -14,6 +14,8 @@ func TestObjectLen(t *testing.T) {
 	require.Equal(t, 1, ob.Len())
 	ob.Delete("b")
 	require.Equal(t, 0, ob.Len())
+	ob = Object{}
+	require.Equal(t, 0, ob.Len())
 }
 
 func TestObjectInit(t *testing.T) {
@@ -26,20 +28,24 @@ func TestObjectInit(t *testing.T) {
 	require.Equal(t, []string{"b"}, ob2.Keys())
 }
 
-// func TestObjectIter(t *testing.T) {
-//	ob := New(WithInitialData(Pair{"b", "1"}, Pair{"a", "2"}))
-//	i := 0
-//	for k, v := range ob.Pairs() {
-//		if i == 0 {
-//			require.Equal(t, "b", k)
-//			require.Equal(t, "1", v)
-//		} else {
-//			require.Equal(t, "a", k)
-//			require.Equal(t, "2", v)
-//		}
-//		i++
-//	}
-// }
+func TestObjectIter(t *testing.T) {
+	ob := New(WithInitialData(Pair{"b", "1"}, Pair{"a", "2"}))
+	i := 0
+	for k, v := range ob.Pairs() {
+		if i == 0 {
+			require.Equal(t, "b", k)
+			require.Equal(t, "1", v)
+		} else {
+			require.Equal(t, "a", k)
+			require.Equal(t, "2", v)
+		}
+		i++
+	}
+	ob = Object{}
+	for k, v := range ob.Pairs() {
+		require.Fail(t, "should not iterate over empty object", "key: %s, value: %v", k, v)
+	}
+}
 
 func TestObject_ToMap(t *testing.T) {
 	ob := New(WithInitialData(Pair{"b", "1"}, Pair{"a", "2"}))
@@ -50,6 +56,8 @@ func TestObject_ToMap(t *testing.T) {
 	ob.Set("f", ob2)
 	m = ob.ToMap()
 	require.Equal(t, map[string]any{"b": "1", "a": "2", "f": map[string]any{"c": []string{"3"}, "d": 4, "e": []any{"5", 6}}}, m)
+	ob = Object{}
+	require.Equal(t, map[string]any{}, ob.ToMap())
 }
 
 func TestObjectSetGetDelete(t *testing.T) {
@@ -78,6 +86,16 @@ func TestObjectSetGetDelete(t *testing.T) {
 	// remove key
 	ob.Delete("a")
 	require.Equal(t, []string{"b", "c"}, ob.Keys())
+
+	ob = Object{}
+	v, ok = ob.Get("c")
+	require.False(t, ok)
+	require.Nil(t, v)
+	ob.Delete("c") // don't panic
+	ob.Set("c", 5)
+	v, ok = ob.Get("c")
+	require.True(t, ok)
+	require.Equal(t, 5, v)
 }
 
 func TestObject_MarshalJSON(t *testing.T) {
@@ -112,12 +130,21 @@ func TestObject_MarshalJSON(t *testing.T) {
 			input:    New(WithInitialData(Pair{"loan_amount", 1000000.0}, Pair{"interest_rate", 0.03}, Pair{"loan_period", 30})),
 			expected: `{"loan_amount":1e+06,"interest_rate":0.03,"loan_period":30}`,
 		},
+		{
+			name:     "doesn't escape html characters",
+			input:    New(WithInitialData(Pair{"b", "<>&'\""}, Pair{"a", 2})),
+			expected: `{"b":"<>&'\"","a":2}`,
+		}, {
+			name:     "empty object marshals",
+			input:    Object{},
+			expected: `{}`,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := json.Marshal(tc.input)
+			got, err := tc.input.MarshalJSON()
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, string(got))
 		})
@@ -132,6 +159,11 @@ func TestObject_UnmarshalJSON(t *testing.T) {
 		expected    Object
 		expectedErr error
 	}{
+		{
+			name:     "null object unmarshals",
+			input:    `null`,
+			expected: Object{},
+		},
 		{
 			name:     "basic object",
 			input:    `{"b" : "v1", "a": 2}`,
@@ -154,6 +186,19 @@ func TestObject_UnmarshalJSON(t *testing.T) {
 			name:     "ensure escaped characters are handled correctly",
 			input:    `{"key": "hel\\\"lo"}`,
 			expected: New(WithInitialData(Pair{"key", `hel\"lo`})),
+		}, {
+			name:  "array of nested objects are recursively unmarshalled as ordered json",
+			input: `{"arr": [{"b": "1", "a": "2"}, {"d": "4", "c": [[{"foo": 2, "bar": 5}, {"tuv": 6}], {"xyz": 9}]}]}`,
+			expected: New(WithInitialData(Pair{"arr", []any{
+				New(WithInitialData(Pair{"b", "1"}, Pair{"a", "2"})),
+				New(WithInitialData(Pair{"d", "4"}, Pair{"c", []any{
+					[]any{
+						New(WithInitialData(Pair{"foo", int64(2)}, Pair{"bar", int64(5)})),
+						New(WithInitialData(Pair{"tuv", int64(6)})),
+					},
+					New(WithInitialData(Pair{"xyz", int64(9)})),
+				}})),
+			}})),
 		},
 	}
 
