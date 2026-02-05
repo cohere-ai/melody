@@ -7,7 +7,7 @@ use crate::templating::util::{
 };
 use minijinja::Environment;
 use serde::Deserialize;
-use serde_json::{json, Map, Value, to_string};
+use serde_json::{Map, Value, json, to_string};
 use std::collections::BTreeMap;
 
 /// Options for cmd3 rendering.
@@ -129,7 +129,7 @@ fn get_minijinja_env<'a>(
     Ok(env)
 }
 
-fn convert_messages_for_jinja(messages: &Vec<Value>) -> Vec<Value> {
+fn convert_messages_for_jinja(messages: &[Value]) -> Vec<Value> {
     messages
         .iter()
         .map(|m| -> Value {
@@ -178,7 +178,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         .collect::<Result<Vec<_>, _>>()?;
 
     if opts.use_jinja {
-        messages = convert_messages_for_jinja(&messages)
+        messages = convert_messages_for_jinja(&messages);
     }
 
     let mut substitutions = opts.additional_template_fields.clone();
@@ -305,7 +305,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
         opts.response_prefix
             .clone()
             .map_or(json!(""), Value::String),
-);
+    );
     substitutions.insert(
         "json_schema".to_string(),
         opts.json_schema.clone().map_or(Value::Null, Value::String),
