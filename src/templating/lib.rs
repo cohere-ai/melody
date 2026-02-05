@@ -7,7 +7,7 @@ use crate::templating::util::{
 };
 use minijinja::Environment;
 use serde::Deserialize;
-use serde_json::{Map, Value, to_string};
+use serde_json::{json, Map, Value, to_string};
 use std::collections::BTreeMap;
 
 /// Options for cmd3 rendering.
@@ -129,6 +129,36 @@ fn get_minijinja_env<'a>(
     Ok(env)
 }
 
+fn convert_messages_for_jinja(messages: &Vec<Value>) -> Vec<Value> {
+    messages
+        .iter()
+        .map(|m| -> Value {
+            let mut new_m = m.clone();
+            if let Some(mobj) = new_m.as_object_mut() {
+                let mut def_val = Value::Null;
+                let mut def_vec = Vec::<Value>::new();
+                let content = mobj
+                    .get_mut("content")
+                    .unwrap_or(&mut def_val)
+                    .as_array_mut()
+                    .unwrap_or(&mut def_vec);
+                for c in content.iter_mut() {
+                    let mut def_map = Map::new();
+                    let content_item = c.as_object_mut().unwrap_or(&mut def_map);
+                    if let Some(content_type) = content_item.get("type") {
+                        let data = content_item.get("data").unwrap_or_default();
+                        content_item.insert(
+                            content_type.as_str().unwrap_or_default().to_string(),
+                            data.clone(),
+                        );
+                    }
+                }
+            }
+            new_m
+        })
+        .collect::<Vec<Value>>()
+}
+
 pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let template_tools = tools_to_template(&opts.available_tools)?;
     let mut messages = messages_to_template(
@@ -148,33 +178,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         .collect::<Result<Vec<_>, _>>()?;
 
     if opts.use_jinja {
-        messages = messages
-            .iter()
-            .map(|m| -> Value {
-                let mut new_m = m.clone();
-                if let Some(mobj) = new_m.as_object_mut() {
-                    let mut def_val = Value::Null;
-                    let mut def_vec = Vec::<Value>::new();
-                    let content = mobj
-                        .get_mut("content")
-                        .unwrap_or(&mut def_val)
-                        .as_array_mut()
-                        .unwrap_or(&mut def_vec);
-                    for c in content.iter_mut() {
-                        let mut def_map = Map::new();
-                        let content_item = c.as_object_mut().unwrap_or(&mut def_map);
-                        if let Some(content_type) = content_item.get("type") {
-                            let data = content_item.get("data").unwrap_or_default();
-                            content_item.insert(
-                                content_type.as_str().unwrap_or_default().to_string(),
-                                data.clone(),
-                            );
-                        }
-                    }
-                }
-                new_m
-            })
-            .collect();
+        messages = convert_messages_for_jinja(&messages)
     }
 
     let mut substitutions = opts.additional_template_fields.clone();
@@ -221,14 +225,12 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         "skip_thinking".to_string(),
         Value::Bool(matches!(opts.reasoning_type, Some(ReasoningType::Disabled))),
     );
-    if opts.response_prefix.is_some() || !opts.use_jinja {
-        substitutions.insert(
-            "response_prefix".to_string(),
-            opts.response_prefix
-                .clone()
-                .map_or(Value::Null, Value::String),
-        );
-    }
+    substitutions.insert(
+        "response_prefix".to_string(),
+        opts.response_prefix
+            .clone()
+            .map_or(json!(""), Value::String),
+    );
     substitutions.insert(
         "json_schema".to_string(),
         opts.json_schema.clone().map_or(Value::Null, Value::String),
@@ -298,14 +300,12 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
             .as_ref()
             .map_or(Value::Null, |g| Value::String(g.as_str().to_string())),
     );
-    if opts.response_prefix.is_some() || !opts.use_jinja {
-        substitutions.insert(
-            "response_prefix".to_string(),
-            opts.response_prefix
-                .clone()
-                .map_or(Value::Null, Value::String),
-        );
-    }
+    substitutions.insert(
+        "response_prefix".to_string(),
+        opts.response_prefix
+            .clone()
+            .map_or(json!(""), Value::String),
+);
     substitutions.insert(
         "json_schema".to_string(),
         opts.json_schema.clone().map_or(Value::Null, Value::String),
