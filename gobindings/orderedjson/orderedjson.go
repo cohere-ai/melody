@@ -274,6 +274,12 @@ func (o *Object) UnmarshalJSON(data []byte) error {
 		*o = Object{}
 		return nil
 	}
+	{
+		var m map[string]any
+		if err := json.Unmarshal(data, &m); err != nil {
+			return err
+		}
+	}
 	return jsonparser.ObjectEach(data,
 		func(keyData []byte, valueData []byte, dataType jsonparser.ValueType, offset int) error {
 			if dataType == jsonparser.String {

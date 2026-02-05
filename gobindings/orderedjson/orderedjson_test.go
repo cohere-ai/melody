@@ -2,6 +2,7 @@ package orderedjson
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -153,6 +154,7 @@ func TestObject_MarshalJSON(t *testing.T) {
 
 func TestObject_UnmarshalJSON(t *testing.T) {
 	t.Parallel()
+	typeOfObject := reflect.TypeOf(map[string]any{})
 	tests := []struct {
 		name        string
 		input       string
@@ -163,6 +165,11 @@ func TestObject_UnmarshalJSON(t *testing.T) {
 			name:     "null object unmarshals",
 			input:    `null`,
 			expected: Object{},
+		},
+		{
+			name:        "wrong type",
+			input:       `"a string"`,
+			expectedErr: &json.UnmarshalTypeError{Value: "string", Type: typeOfObject, Offset: 10},
 		},
 		{
 			name:     "basic object",
