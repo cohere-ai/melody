@@ -296,7 +296,7 @@ impl PyFilter {
 /// render_cmd3({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
 /// ```
 #[pyfunction]
-#[allow(clippy::needless_pass_by_value)] // PyO3 FromPyObject extraction returns owned values
+#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts this argument by value, consuming it, so the API must take ownership (pass-by-value)
 fn render_cmd3(config: PyRenderCmd3Options) -> PyResult<String> {
     let opts: RenderCmd3Options = serde_path_to_error::deserialize(&config.0)
         .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
