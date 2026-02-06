@@ -2,11 +2,6 @@
 //!
 //! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4` for templating.
 
-// Python docstrings don't use markdown backticks
-#![allow(clippy::doc_markdown)]
-// PyO3 extracts by value
-#![allow(clippy::needless_pass_by_value)]
-
 use crate::parsing::types::{FilterOutput, TokenIDsWithLogProb};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use crate::templating::{
@@ -19,7 +14,7 @@ use pyo3::types::PyDict;
 use pythonize::depythonize;
 use serde_json::Value;
 
-/// Config for render_cmd3, accepts a dict.
+/// Config for `render_cmd3`, accepts a dict.
 struct PyRenderCmd3Options(Value);
 
 impl<'a, 'py> FromPyObject<'a, 'py> for PyRenderCmd3Options {
@@ -33,7 +28,7 @@ impl<'a, 'py> FromPyObject<'a, 'py> for PyRenderCmd3Options {
     }
 }
 
-/// Config for render_cmd4, accepts a dict.
+/// Config for `render_cmd4`, accepts a dict.
 struct PyRenderCmd4Options(Value);
 
 impl<'a, 'py> FromPyObject<'a, 'py> for PyRenderCmd4Options {
@@ -49,11 +44,14 @@ impl<'a, 'py> FromPyObject<'a, 'py> for PyRenderCmd4Options {
 
 /// Configuration builder for creating filters.
 ///
-/// Use the builder pattern to configure filter behavior:
+/// Use the builder pattern to configure filter behavior.
 ///
-/// Example:
-///     opts = PyFilterOptions().cmd3().with_chunk_size(10)
-///     filter = PyFilter(opts)
+/// # Example
+///
+/// ```python
+/// opts = PyFilterOptions().cmd3().with_chunk_size(10)
+/// filter = PyFilter(opts)
+/// ```
 #[pyclass]
 #[derive(Clone)]
 struct PyFilterOptions {
@@ -176,19 +174,25 @@ impl PyFilterOptions {
 
 /// Streaming filter for parsing Cohere model outputs.
 ///
-/// Create filters using PyFilterOptions or factory methods:
+/// Create filters using `PyFilterOptions` or factory methods.
 ///
-/// Example with options:
-///     opts = PyFilterOptions().cmd3().with_chunk_size(10)
-///     filter = PyFilter(opts)
+/// # Example with options
 ///
-/// Example with factory methods:
-///     filter = PyFilter.cmd3()
-///     for token in tokens:
-///         for output in filter.write_decoded(token):
-///             print(output.text)
-///     for output in filter.flush_partials():
+/// ```python
+/// opts = PyFilterOptions().cmd3().with_chunk_size(10)
+/// filter = PyFilter(opts)
+/// ```
+///
+/// # Example with factory methods
+///
+/// ```python
+/// filter = PyFilter.cmd3()
+/// for token in tokens:
+///     for output in filter.write_decoded(token):
 ///         print(output.text)
+/// for output in filter.flush_partials():
+///     print(output.text)
+/// ```
 #[pyclass]
 struct PyFilter {
     inner: FilterImpl,
@@ -197,7 +201,7 @@ struct PyFilter {
 
 #[pymethods]
 impl PyFilter {
-    /// Create a filter from PyFilterOptions.
+    /// Create a filter from `PyFilterOptions`.
     #[new]
     fn new(options: &PyFilterOptions) -> Self {
         PyFilter {
@@ -208,8 +212,9 @@ impl PyFilter {
 
     /// Create a filter for Command 3 format.
     ///
-    /// Args:
-    ///     chunk_size: Characters to buffer before emitting (default: 1)
+    /// # Arguments
+    ///
+    /// * `chunk_size` - Characters to buffer before emitting (default: 1)
     #[staticmethod]
     #[pyo3(signature = (chunk_size = None))]
     fn cmd3(chunk_size: Option<usize>) -> Self {
@@ -225,8 +230,9 @@ impl PyFilter {
 
     /// Create a filter for Command 4 format.
     ///
-    /// Args:
-    ///     chunk_size: Characters to buffer before emitting (default: 1)
+    /// # Arguments
+    ///
+    /// * `chunk_size` - Characters to buffer before emitting (default: 1)
     #[staticmethod]
     #[pyo3(signature = (chunk_size = None))]
     fn cmd4(chunk_size: Option<usize>) -> Self {
@@ -242,11 +248,13 @@ impl PyFilter {
 
     /// Process a decoded token and return any completed outputs.
     ///
-    /// Args:
-    ///     decoded_token: The decoded text for this token
+    /// # Arguments
     ///
-    /// Returns:
-    ///     List of FilterOutput objects (may be empty if content is buffered)
+    /// * `decoded_token` - The decoded text for this token
+    ///
+    /// # Returns
+    ///
+    /// List of `FilterOutput` objects (may be empty if content is buffered)
     fn write_decoded(&mut self, decoded_token: &str) -> Vec<FilterOutput> {
         self.inner
             .write_decoded(decoded_token, TokenIDsWithLogProb::new())
@@ -256,8 +264,9 @@ impl PyFilter {
     ///
     /// Call this at the end of generation to get remaining content.
     ///
-    /// Returns:
-    ///     List of remaining FilterOutput objects
+    /// # Returns
+    ///
+    /// List of remaining `FilterOutput` objects
     fn flush_partials(&mut self) -> Vec<FilterOutput> {
         self.inner.flush_partials()
     }
@@ -269,19 +278,25 @@ impl PyFilter {
 
 /// Render a Command 3 format prompt.
 ///
-/// Args:
-///     config: Dict with rendering options.
-///         Required: messages (list of message dicts)
-///         Optional: dev_instruction, documents, available_tools,
-///                   safety_mode, citation_quality, reasoning_type,
-///                   skip_preamble, response_prefix, json_schema, json_mode
+/// # Arguments
 ///
-/// Returns:
-///     The rendered prompt string
+/// * `config` - Dict with rendering options.
+///   - Required: `messages` (list of message dicts)
+///   - Optional: `dev_instruction`, `documents`, `available_tools`,
+///     `safety_mode`, `citation_quality`, `reasoning_type`,
+///     `skip_preamble`, `response_prefix`, `json_schema`, `json_mode`
 ///
-/// Example:
-///     render_cmd3({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
+/// # Returns
+///
+/// The rendered prompt string
+///
+/// # Example
+///
+/// ```python
+/// render_cmd3({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
+/// ```
 #[pyfunction]
+#[allow(clippy::needless_pass_by_value)] // PyO3 FromPyObject extraction returns owned values
 fn render_cmd3(config: PyRenderCmd3Options) -> PyResult<String> {
     let opts: RenderCmd3Options = serde_path_to_error::deserialize(&config.0)
         .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
@@ -290,19 +305,25 @@ fn render_cmd3(config: PyRenderCmd3Options) -> PyResult<String> {
 
 /// Render a Command 4 format prompt.
 ///
-/// Args:
-///     config: Dict with rendering options.
-///         Required: messages (list of message dicts)
-///         Optional: dev_instruction, platform_instruction, documents,
-///                   available_tools, grounding, response_prefix,
-///                   json_schema, json_mode
+/// # Arguments
 ///
-/// Returns:
-///     The rendered prompt string
+/// * `config` - Dict with rendering options.
+///   - Required: `messages` (list of message dicts)
+///   - Optional: `dev_instruction`, `platform_instruction`, `documents`,
+///     `available_tools`, `grounding`, `response_prefix`,
+///     `json_schema`, `json_mode`
 ///
-/// Example:
-///     render_cmd4({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
+/// # Returns
+///
+/// The rendered prompt string
+///
+/// # Example
+///
+/// ```python
+/// render_cmd4({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
+/// ```
 #[pyfunction]
+#[allow(clippy::needless_pass_by_value)] // PyO3 FromPyObject extraction returns owned values
 fn render_cmd4(config: PyRenderCmd4Options) -> PyResult<String> {
     let opts: RenderCmd4Options = serde_path_to_error::deserialize(&config.0)
         .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
