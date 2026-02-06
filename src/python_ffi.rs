@@ -324,7 +324,7 @@ fn render_cmd3(config: PyRenderCmd3Options) -> PyResult<String> {
 /// ```
 #[pyfunction]
 #[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts an owned value and consumes it,
-                                          // so the Py-exposed API must take config by value rather than by reference.
+// so the Py-exposed API must take config by value rather than by reference.
 fn render_cmd4(config: PyRenderCmd4Options) -> PyResult<String> {
     let opts: RenderCmd4Options = serde_path_to_error::deserialize(&config.0)
         .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
