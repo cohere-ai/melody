@@ -280,15 +280,24 @@ impl PyFilter {
 ///
 /// # Arguments
 ///
-/// * `config` - Dict with rendering options.
-///   - Required: `messages` (list of message dicts)
-///   - Optional: `dev_instruction`, `documents`, `available_tools`,
-///     `safety_mode`, `citation_quality`, `reasoning_type`,
-///     `skip_preamble`, `response_prefix`, `json_schema`, `json_mode`
+/// * `config` - Dict with rendering options:
+///   - `messages` (required): List of message dicts to include in the prompt.
+///   - `dev_instruction` (optional): Developer instruction to include.
+///   - `documents` (optional): Documents to include for grounding.
+///   - `available_tools` (optional): Tools available to the model.
+///   - `safety_mode` (optional): Safety mode configuration.
+///   - `citation_quality` (optional): Citation quality setting (default: "on").
+///   - `reasoning_type` (optional): Reasoning/thinking mode configuration.
+///   - `skip_preamble` (optional): Whether to skip the preamble section (default: false).
+///   - `response_prefix` (optional): Prefix for the response.
+///   - `json_schema` (optional): JSON schema for structured output.
+///   - `json_mode` (optional): Whether to enable JSON mode (default: false).
+///   - `additional_template_fields` (optional): Additional fields to substitute in the template.
+///   - `escaped_special_tokens` (optional): Special tokens to escape in the output.
 ///
 /// # Returns
 ///
-/// The rendered prompt string
+/// The rendered prompt string.
 ///
 /// # Example
 ///
@@ -307,15 +316,22 @@ fn render_cmd3(config: PyRenderCmd3Options) -> PyResult<String> {
 ///
 /// # Arguments
 ///
-/// * `config` - Dict with rendering options.
-///   - Required: `messages` (list of message dicts)
-///   - Optional: `dev_instruction`, `platform_instruction`, `documents`,
-///     `available_tools`, `grounding`, `response_prefix`,
-///     `json_schema`, `json_mode`
+/// * `config` - Dict with rendering options:
+///   - `messages` (required): List of message dicts to include in the prompt.
+///   - `dev_instruction` (optional): Developer instruction to include.
+///   - `platform_instruction` (optional): Platform instruction override.
+///   - `documents` (optional): Documents to include for grounding.
+///   - `available_tools` (optional): Tools available to the model.
+///   - `grounding` (optional): Grounding configuration (default: "enabled").
+///   - `response_prefix` (optional): Prefix for the response.
+///   - `json_schema` (optional): JSON schema for structured output.
+///   - `json_mode` (optional): Whether to enable JSON mode (default: false).
+///   - `additional_template_fields` (optional): Additional fields to substitute in the template.
+///   - `escaped_special_tokens` (optional): Special tokens to escape in the output.
 ///
 /// # Returns
 ///
-/// The rendered prompt string
+/// The rendered prompt string.
 ///
 /// # Example
 ///
