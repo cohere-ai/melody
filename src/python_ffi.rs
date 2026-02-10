@@ -14,30 +14,17 @@ use pyo3::types::PyDict;
 use pythonize::depythonize;
 use serde_json::Value;
 
-fn extract_dict_as_value(ob: Borrowed<'_, '_, PyAny>) -> Result<Value, PyErr> {
-    let dict: Borrowed<'_, '_, PyDict> = ob.cast()?;
-    depythonize(&dict).map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))
-}
+/// A Python dict extracted as a JSON value.
+struct PyDictValue(Value);
 
-/// Config for `render_cmd3`, accepts a dict.
-struct PyRenderCmd3Options(Value);
-
-impl<'a, 'py> FromPyObject<'a, 'py> for PyRenderCmd3Options {
+impl<'a, 'py> FromPyObject<'a, 'py> for PyDictValue {
     type Error = PyErr;
 
     fn extract(ob: Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
-        extract_dict_as_value(ob).map(PyRenderCmd3Options)
-    }
-}
-
-/// Config for `render_cmd4`, accepts a dict.
-struct PyRenderCmd4Options(Value);
-
-impl<'a, 'py> FromPyObject<'a, 'py> for PyRenderCmd4Options {
-    type Error = PyErr;
-
-    fn extract(ob: Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
-        extract_dict_as_value(ob).map(PyRenderCmd4Options)
+        let dict: Borrowed<'a, 'py, PyDict> = ob.cast()?;
+        let value: Value = depythonize(&dict)
+            .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
+        Ok(PyDictValue(value))
     }
 }
 
@@ -304,8 +291,8 @@ impl PyFilter {
 /// render_cmd3({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
 /// ```
 #[pyfunction]
-#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts this argument by value, consuming it, so the API must take ownership (pass-by-value)
-fn render_cmd3(config: PyRenderCmd3Options) -> PyResult<String> {
+#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts owned values
+fn render_cmd3(config: PyDictValue) -> PyResult<String> {
     let opts: RenderCmd3Options = serde_path_to_error::deserialize(&config.0)
         .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
     rust_render_cmd3(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
@@ -338,9 +325,8 @@ fn render_cmd3(config: PyRenderCmd3Options) -> PyResult<String> {
 /// render_cmd4({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
 /// ```
 #[pyfunction]
-#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts an owned value and consumes it,
-// so the Py-exposed API must take config by value rather than by reference.
-fn render_cmd4(config: PyRenderCmd4Options) -> PyResult<String> {
+#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts owned values
+fn render_cmd4(config: PyDictValue) -> PyResult<String> {
     let opts: RenderCmd4Options = serde_path_to_error::deserialize(&config.0)
         .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
     rust_render_cmd4(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
