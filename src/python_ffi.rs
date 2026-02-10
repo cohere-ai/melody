@@ -14,6 +14,11 @@ use pyo3::types::PyDict;
 use pythonize::depythonize;
 use serde_json::Value;
 
+fn extract_dict_as_value(ob: Borrowed<'_, '_, PyAny>) -> Result<Value, PyErr> {
+    let dict: Borrowed<'_, '_, PyDict> = ob.cast()?;
+    depythonize(&dict).map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))
+}
+
 /// Config for `render_cmd3`, accepts a dict.
 struct PyRenderCmd3Options(Value);
 
@@ -21,10 +26,7 @@ impl<'a, 'py> FromPyObject<'a, 'py> for PyRenderCmd3Options {
     type Error = PyErr;
 
     fn extract(ob: Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
-        let dict: Borrowed<'a, 'py, PyDict> = ob.cast()?;
-        let value: Value = depythonize(&dict)
-            .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
-        Ok(PyRenderCmd3Options(value))
+        extract_dict_as_value(ob).map(PyRenderCmd3Options)
     }
 }
 
@@ -35,10 +37,7 @@ impl<'a, 'py> FromPyObject<'a, 'py> for PyRenderCmd4Options {
     type Error = PyErr;
 
     fn extract(ob: Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
-        let dict: Borrowed<'a, 'py, PyDict> = ob.cast()?;
-        let value: Value = depythonize(&dict)
-            .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
-        Ok(PyRenderCmd4Options(value))
+        extract_dict_as_value(ob).map(PyRenderCmd4Options)
     }
 }
 
