@@ -3,12 +3,13 @@ use crate::templating::types::{
     CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
 };
 use crate::templating::util::{
-    add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template,
+    add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template, tools_to_template_jinja, docs_to_template, docs_to_template_jinja, add_spaces_to_json_encoding2
 };
 use minijinja::Environment;
 use serde::Deserialize;
 use serde_json::{Map, Value, json, to_string};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// Options for cmd3 rendering.
 #[derive(Debug, Clone, Deserialize)]
@@ -54,6 +55,8 @@ static CMD3_JINJA_TEMPLATE_BASE: &str =
     include_str!("templates/jinja/cmd3/chat_merged_template.jinja");
 static CMD3V1_JINJA_TEMPLATE: &str =
     include_str!("templates/jinja/cmd3/chat_merged_template_v1.jinja");
+static CMD3V3_JINJA_TEMPLATE: &str =
+    include_str!("templates/jinja/cmd3/chat_merged_template_default_thinking.jinja");
 
 impl Default for RenderCmd3Options<'_> {
     fn default() -> Self {
@@ -135,6 +138,7 @@ impl Default for RenderCmd4Options<'_> {
 fn tojson(value: &minijinja::Value) -> Result<minijinja::Value, minijinja::Error> {
     // Based off of the minijinja version: https://github.com/mitsuhiko/minijinja/blob/64d933eaf325ba20e7af0012505571d7ae32364a/minijinja/src/filters.rs#L991
     // but we don't need indenting and we don't want the html char conversion, so using this
+    println!("minijinja val {}", value);
     serde_json::to_string(&value)
         .map_err(|err| {
             minijinja::Error::new(
@@ -143,8 +147,19 @@ fn tojson(value: &minijinja::Value) -> Result<minijinja::Value, minijinja::Error
             )
             .with_source(err)
         })
-        .map(minijinja::Value::from_safe_string)
+        .map(|s| minijinja::Value::from_safe_string(add_spaces_to_json_encoding2(&s)))
+    // minijinja::Value::from_safe_string
+    // "parameters": serde_json::to_string(&tool.parameters).map(|s| add_spaces_to_json_encoding(&s))?,
 }
+
+// fn tojson(value: &minijinja::Value) -> Result<String, minijinja::Error> {
+//     // Based off of the minijinja version: https://github.com/mitsuhiko/minijinja/blob/64d933eaf325ba20e7af0012505571d7ae32364a/minijinja/src/filters.rs#L991
+//     // but we don't need indenting and we don't want the html char conversion, so using this
+//     serde_json::to_string(&value)
+//     .map_err(|err| {
+//         minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, "cannot serialize to JSON").with_source(err)
+//     })
+// }
 
 fn get_minijinja_env<'a>(
     template_name: &'a str,
@@ -158,34 +173,148 @@ fn get_minijinja_env<'a>(
     Ok(env)
 }
 
-fn convert_messages_for_jinja(messages: &[Value]) -> Vec<Value> {
-    messages
-        .iter()
-        .map(|m| -> Value {
+fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyError> {
+    fn get_vec<'a>(val_map: &'a mut Map<String, Value>, key: &str, def_val: &'a mut Value, def_vec: &'a mut Vec<Value>) -> &'a mut Vec<Value> {
+        let val_vec = val_map
+            .get_mut(key)
+            .unwrap_or(def_val)
+            .as_array_mut()
+            .unwrap_or(def_vec);
+        val_vec
+    }
+
+    //  if "tool_results" in message:
+    //                 if "content" not in message:
+    //                     message["content"] = []
+    //                 tool_call_id_to_msg = {}
+    //                 if message["tool_results"]:
+    //                     res_call_id = str(message["tool_results"][0]["tool_call_id"])
+    //                     tool_call_id_to_msg[res_call_id] = message
+    //                     message["tool_call_id"] = res_call_id
+    //                 for res in message["tool_results"]:
+    //                     res_call_id = str(res["tool_call_id"])
+    //                     if res_call_id not in tool_call_id_to_msg:
+    //                         # We need to add a new message for this tool result
+    //                         new_msg = {
+    //                             "role": "tool",
+    //                             "tool_call_id": res_call_id,
+    //                             "content": [],
+    //                         }
+    //                         new_msgs.append((new_msg, message))
+    //                         tool_call_id_to_msg[res_call_id] = new_msg
+    //                     cur_msg = tool_call_id_to_msg[res_call_id]
+    //                     for doc in res["documents"]:
+    //                         cur_msg["content"].append(json.loads(doc))
+    let mut new_messages = vec![];
+    let converted_messages = messages.iter().enumerate()
+        .map(|(msg_idx, m)| -> Result<Value, MelodyError> {
+            println!("orig msg {}", serde_json::to_string(m).unwrap());
             let mut new_m = m.clone();
             if let Some(mobj) = new_m.as_object_mut() {
+                let def_str = json!("");
                 let mut def_val = Value::Null;
                 let mut def_vec = Vec::<Value>::new();
-                let content = mobj
-                    .get_mut("content")
-                    .unwrap_or(&mut def_val)
-                    .as_array_mut()
-                    .unwrap_or(&mut def_vec);
-                for c in content.iter_mut() {
+                let mobj_tmp = mobj.clone();
+                let role = mobj_tmp.get("role").unwrap_or( &def_str).as_str().unwrap_or_default();
+                // let content = mobj
+                //     .get_mut("content")
+                //     .unwrap_or(&mut def_val)
+                //     .as_array_mut()
+                //     .unwrap_or(&mut def_vec);
+                let tool_calls = get_vec( mobj, "tool_calls", &mut def_val, &mut def_vec);
+                let has_tool_calls = !tool_calls.is_empty();
+                for t in tool_calls.iter_mut() {
+                    let t_str = t.as_str().unwrap_or_default();
+                    if t_str.is_empty() {
+                        continue;
+                    }
+                    let tool_call: Map<String, Value> = serde_json::from_str(t_str)?;
+                     *t = json!({
+                        "id": tool_call.get("tool_call_id"),
+                        "type": "function",
+                        "function": {
+                            "name": tool_call.get("tool_name"),
+                            "arguments": tool_call.get("parameters")
+                        }
+                    })
+                }
+                let content = get_vec( mobj, "content", &mut def_val, &mut def_vec);
+                for (content_idx, c) in content.iter_mut().enumerate() {
                     let mut def_map = Map::new();
                     let content_item = c.as_object_mut().unwrap_or(&mut def_map);
-                    if let Some(content_type) = content_item.get("type") {
-                        let data = content_item.get("data").unwrap_or_default();
-                        content_item.insert(
-                            content_type.as_str().unwrap_or_default().to_string(),
-                            data.clone(),
-                        );
+                    if role != "Tool" {
+                        if let Some(content_type) = content_item.get("type") {
+                            let mut type_str = content_type.as_str().unwrap_or_default().to_string();
+                            if type_str == "text" && content_idx == 0 && has_tool_calls {
+                                type_str = "thinking".to_string();
+                                content_item.insert("type".to_string(), Value::String(type_str.clone()));
+                            }
+                            let data = content_item.get("data").unwrap_or_default();
+                            content_item.insert(
+                                type_str,
+                                data.clone(),
+                            );
+                        }
+                    }
+                }
+                let tool_results = get_vec( mobj, "tool_results", &mut def_val, &mut def_vec);
+                let mut tool_call_to_new_msg: BTreeMap<i64, usize> = BTreeMap::new();
+                for tres_val in tool_results.iter_mut() {
+                    let def_map = Map::new();
+                    let tres = tres_val.as_object().unwrap_or(&def_map);
+                    let tool_call_id = tres.get("tool_call_id").unwrap_or_default().as_i64().ok_or(MelodyError::TemplateValidation("Invalid tool call id in results during jinja conversion".to_string()))?;
+                    let documents = tres.get("documents").unwrap_or_default().as_array().ok_or(MelodyError::TemplateValidation("Invalid tool result documents during jinja conversion".to_string()))?;
+                    if !tool_call_to_new_msg.contains_key(&tool_call_id) {
+                        // let new_msg = Arc::new(json!({
+                        //     "role": "tool",
+                        //     "tool_call_id": tool_call_id,
+                        //     "content": Value::Array(Vec::new()),
+                        // }));
+                        // new_messages.push(Arc::clone(new_msg));
+                        // // let msg_ref = new_messages[new_messages.len()-1];
+                        // tool_call_to_new_msg.insert(tool_call_id,  Arc::clone(&new_msg));
+
+                        let new_msg = json!({
+                            "role": "tool",
+                            "tool_call_id": tool_call_id,
+                            "content": Value::Array(Vec::new()),
+                        });
+                        new_messages.push((msg_idx, new_msg));
+                        // let msg_ref = new_messages[new_messages.len()-1];
+                        tool_call_to_new_msg.insert(tool_call_id, new_messages.len()-1);
+                    }
+                    let new_msg_idx = tool_call_to_new_msg[&tool_call_id];
+                    let (_, msg_ref) = &mut new_messages[new_msg_idx];
+                    for doc in documents {
+                        let doc_str = doc.as_str().ok_or(MelodyError::TemplateValidation("Invalid tool document format during jinja conversion".to_string()))?;
+                        msg_ref.get_mut("content").unwrap().as_array_mut().unwrap().push(serde_json::from_str(doc_str)?)
                     }
                 }
             }
-            new_m
+            println!("new msg {}", serde_json::to_string(&new_m).unwrap());
+            Ok(new_m)
         })
-        .collect::<Vec<Value>>()
+        .collect::<Result<Vec<Value>, MelodyError>>()?;
+        if new_messages.is_empty() {
+            return Ok(converted_messages);
+        }
+        let msgs_len = messages.len();
+        let mut new_msg_idx1 = new_messages.len();
+        let mut all_msgs_rev = Vec::with_capacity(msgs_len + new_messages.len());
+        for (msg_rev_idx, msg) in converted_messages.iter().rev().enumerate() {
+            let msg_idx = msgs_len - msg_rev_idx - 1;
+            let mut was_replaced = false;
+            while new_msg_idx1 > 0 && let (insrt_idx, new_msg) = &new_messages[new_msg_idx1-1] && insrt_idx == &msg_idx {
+                all_msgs_rev.push(new_msg.clone());
+                was_replaced = true;
+                new_msg_idx1 -= 1;
+            }
+            if !was_replaced {
+                all_msgs_rev.push(msg.clone());
+            }
+        }
+        all_msgs_rev.reverse();
+        Ok(all_msgs_rev)
 }
 
 /// Renders a CMD3 format prompt from the given options.
@@ -197,30 +326,40 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Vec<Value> {
 /// - Template parsing fails
 /// - Template rendering fails
 pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
-    let template_tools = tools_to_template(&opts.available_tools)?;
+    let mut tools_key = "available_tools";
+    let mut preamble_key = "preamble";
+    let mut template_tools = tools_to_template(&opts.available_tools)?;
     let mut messages = messages_to_template(
         &opts.messages,
         !opts.documents.is_empty(),
         &opts.escaped_special_tokens,
     )?;
-    let docs: Vec<String> = opts
-        .documents
-        .iter()
-        .map(|d| -> Result<String, MelodyError> {
-            Ok(add_spaces_to_json_encoding(&escape_special_tokens(
-                &to_string(d)?,
-                &opts.escaped_special_tokens,
-            )))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    // let docs: Vec<String> = opts
+    //     .documents
+    //     .iter()
+    //     .map(|d| -> Result<String, MelodyError> {
+    //         Ok(add_spaces_to_json_encoding(&escape_special_tokens(
+    //             &to_string(d)?,
+    //             &opts.escaped_special_tokens,
+    //         )))
+    //     })
+    //     .collect::<Result<Vec<_>, _>>()?;
+    let mut docs = docs_to_template(&opts.documents, &opts.escaped_special_tokens)?;
 
     if opts.use_jinja {
-        messages = convert_messages_for_jinja(&messages);
+        // println!("opt msgs {:?}", opts.messages);
+        docs = docs_to_template_jinja(&opts.documents, &opts.escaped_special_tokens)?;
+        // println!("msgs {:?}", messages);
+        messages = convert_messages_for_jinja(&messages)?;
+        template_tools = tools_to_template_jinja(&opts.available_tools)?;
+        tools_key = "tools";
+        preamble_key = "developer_preamble";
+        // println!("modified msgs {:?}", messages);
     }
 
     let mut substitutions = opts.additional_template_fields.clone();
     substitutions.insert(
-        "preamble".to_string(),
+        preamble_key.to_string(),
         opts.dev_instruction
             .clone()
             .map_or(Value::Null, Value::String),
@@ -228,11 +367,12 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     substitutions.insert("messages".to_string(), Value::Array(messages));
     substitutions.insert(
         "documents".to_string(),
-        Value::Array(docs.into_iter().map(Value::String).collect()),
+        // Value::Array(docs.into_iter().map(Value::String).collect()),
+        Value::Array(docs),
     );
     substitutions.insert(
-        "available_tools".to_string(),
-        Value::Array(template_tools.into_iter().map(Value::Object).collect()),
+        tools_key.to_string(),
+        Value::Array(template_tools.clone().into_iter().map(Value::Object).collect()),
     );
     substitutions.insert(
         "citation_mode".to_string(),
@@ -276,11 +416,49 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
 
     if opts.use_jinja {
         substitutions.insert("add_generation_prompt".to_string(), Value::Bool(true));
+        substitutions.insert("bos_token".to_string(), json!("<BOS_TOKEN>"));
+        substitutions.insert("regen_tool_call_ids".to_string(), json!(false));
+        if opts.citation_quality.as_ref().is_none_or(|v| *v != CitationQuality::Off) {
+            substitutions.insert("enable_citations".to_string(), json!(true));
+        }
+        if opts.reasoning_type.is_some() {
+            let reasoning_enabled = matches!(opts.reasoning_type, Some(ReasoningType::Enabled));
+            substitutions.insert("reasoning".to_string(), Value::Bool(reasoning_enabled));
+        }
+        if opts.json_mode || opts.json_schema.is_some() {
+            let mut json_val = json!({"type": "json_object"});
+            if let Some(json_schema) = &opts.json_schema {
+                json_val = json!({
+                    "type": "json_object",
+                    "schema": json_schema
+                });
+            }
+            substitutions.insert("response_format".to_string(), json_val);
+        }
+        // if !opts.available_tools.is_empty() {
+        //     let mut tools = vec!();
+        //     for tool in &opts.available_tools {
+        //         let t = json!({
+        //             "type": "function",
+        //             "function": {
+        //                 "name": tool.name,
+        //                 "description": tool.description,
+        //                 "parameters": Value::Object(tool.parameters.clone()),
+        //             }
+        //         });
+        //         print!("{}", serde_json::to_string_pretty(&t).unwrap());
+        //         tools.push(t);
+        //     }
+        //     substitutions.insert("tools".to_string(), Value::Array(tools));
+        // }
+        // substitutions.insert("tools".to_string(), Value::Array(template_tools.clone().into_iter().map(Value::Object).collect()));
+        println!("sub tools: {}", substitutions["tools"]);
         let template_name = "chat_template.jinja";
         let mut env = get_minijinja_env(template_name, opts.template_jinja)?;
         env.add_template("chat_merged_template.jinja", CMD3_JINJA_TEMPLATE_BASE)?;
         let template = env.get_template(template_name)?;
         let template_str = template.render(&substitutions)?;
+        // println!("{}", template_str);
 
         Ok(template_str)
     } else {
@@ -417,6 +595,24 @@ mod tests {
     #[test]
     fn test_render_cmd3_jinja_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v1") {
+            println!("Running cmd3 jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            let rendered = render_cmd3(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd3_jinja_from_dir2() {
+        for (test_name, input_json, expected) in read_test_cases("cmd3") {
+            // if test_name != "one_hop_with_tools_and_documents_citation_quality_off" {
+            //     continue;
+            // }
+            if test_name == "template_provided" {
+                // Doesn't make sense for jinja since it's liquid format
+                continue;
+            }
             println!("Running cmd3 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;

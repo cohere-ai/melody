@@ -76,7 +76,9 @@
 {%- endif -%}
 {%- endmacro %}
 {%- macro print_msg(msg) %}
-    {%- if msg.content is string -%}
+    {%- if msg is string -%}
+{{ msg }}
+    {%- elif msg.content is string -%}
 {{ msg.content }}
     {%- else %}
     {%- set last_was_text = namespace(value=false) %}

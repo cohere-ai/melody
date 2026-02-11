@@ -1,7 +1,7 @@
 use crate::errors::MelodyError;
 use crate::parsing::types::FilterCitation;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
-use serde_json::{Map, Value, to_string};
+use serde_json::{Map, Value, json, to_string};
 use std::collections::{BTreeMap, HashMap};
 
 pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
@@ -20,6 +20,14 @@ pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
     }
     b
 }
+
+pub(crate) fn add_spaces_to_json_encoding2(input: &str) -> String {
+    println!("mapped val before {}", input);
+    let b = add_spaces_to_json_encoding(input);
+    println!("mapped val {}", b);
+    b
+}
+
 pub(crate) fn json_escape_string(s: &str) -> String {
     let b = serde_json::to_string(s).unwrap_or_default();
     if b.len() < 2 {
@@ -179,6 +187,61 @@ pub(crate) fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>
         template_tools.push(tool_map);
     }
     Ok(template_tools)
+}
+
+// Convert tools to template
+pub(crate) fn tools_to_template_jinja(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, MelodyError> {
+    let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
+    for tool in tools {
+        let mut tool_map = Map::new();
+        tool_map.insert("type".to_string(), Value::String("function".to_string()));
+        let func = json!({
+            "name": json_escape_string(&tool.name),
+            "description": json_escape_string(&tool.description),
+            "parameters": tool.parameters,
+        });
+        tool_map.insert("function".to_string(), func);
+        template_tools.push(tool_map);
+
+    }
+    Ok(template_tools)
+}
+
+pub(crate) fn docs_to_template(documents: &[Map<String, Value>], special_token_map: &BTreeMap<String, String>) -> Result<Vec<Value>, MelodyError> {
+    documents
+        .iter()
+        .map(|d| -> Result<_, MelodyError> {
+            let escaped = &escape_special_tokens(&to_string(d)?, special_token_map);
+            Ok(Value::String(add_spaces_to_json_encoding(escaped)))
+        })
+        .collect::<Result<Vec<_>, _>>()
+}
+
+pub(crate) fn docs_to_template_jinja(documents: &[Map<String, Value>], special_token_map: &BTreeMap<String, String>) -> Result<Vec<Value>, MelodyError> {
+    // documents
+    //     .iter()
+    //     .map(|d| -> Result<_, MelodyError> {
+    //         //  -> Result<(String, Value), MelodyError>
+    //         let new_d = d.iter().map(|(k, v)| -> Result<(String, Value), MelodyError> {
+    //             // let stringv = &to_string(v)?;
+    //             let stringv = v.as_str().unwrap();
+    //             let escaped = &escape_special_tokens(stringv, special_token_map);
+    //             let new_v = Value::String(add_spaces_to_json_encoding(escaped));
+    //             // let new_v = Value::String(escaped.clone());
+    //             // Ok((k.clone(), new_v))
+    //             Ok((k.clone(), v.clone()))
+    //         }).collect::<Result<Map<String, Value>, MelodyError>>()?;
+    //         Ok(Value::Object(new_d))
+    //     })
+    //     .collect::<Result<Vec<_>, _>>()
+    documents
+        .iter()
+        .map(|d| -> Result<_, MelodyError> {
+            // let d_str = Value::Object(d.clone()).as_str();
+            let escaped = &escape_special_tokens(&to_string(d)?, special_token_map);
+            Ok(serde_json::from_str(escaped.as_str())?)
+        })
+        .collect::<Result<Vec<_>, _>>()
 }
 
 fn build_text_with_citation(text: &String, citation_inserts: &mut [CitationInsertInfo]) -> String {
