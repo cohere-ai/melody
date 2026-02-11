@@ -397,6 +397,20 @@ mod tests {
     }
 
     #[test]
+    fn test_render_cmd3v3_jinja_from_liquid_dir() {
+        for (test_name, input_json, expected) in read_test_cases("cmd3_v3") {
+            println!("Running cmd3 jinja liquid test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            if test_name != "template_provided" {
+                opts.template_jinja = CMD3V3_JINJA_TEMPLATE;
+            }
+            let rendered = render_cmd3(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
     fn test_render_cmd4_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd4") {
             println!("Running cmd4 test case: {}", test_name);
