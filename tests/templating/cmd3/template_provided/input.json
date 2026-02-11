@@ -1,5 +1,6 @@
 {
   "template": "Here is the dev instruction:\n{{ preamble }}.\nHere are the messages:{% for message in messages %}\n{{ message.role }}: {% for content in message.content %}{{content.data}}{% endfor %}{% endfor %}",
+  "template_jinja": "Here is the dev instruction:\n{{ developer_preamble }}.\nHere are the messages:\n{% for message in messages %}\n{{ message.role }}: {% for content in message.content %}{{content.text}}{% endfor %}{% endfor %}",
   "dev_instruction": "talk like a pirate",
   "messages": [
     {
