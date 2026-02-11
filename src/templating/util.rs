@@ -580,7 +580,7 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                 for (content_idx, c) in content.iter_mut().enumerate() {
                     let mut def_map = Map::new();
                     let content_item = c.as_object_mut().unwrap_or(&mut def_map);
-                    if role != "Tool"
+                    if role.to_lowercase() != "tool"
                         && let Some(content_type) = content_item.get("type")
                     {
                         let mut type_str = content_type.as_str().unwrap_or_default().to_string();
