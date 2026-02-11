@@ -3,7 +3,7 @@ use crate::templating::types::{
     CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
 };
 use crate::templating::util::{
-    add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template, docs_to_template, get_minijinja_env, get_jinja_vars, add_jinja_substitutions_common, add_jinja_substitutions_cmd3
+    add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template, docs_to_template, get_minijinja_env, get_jinja_vars, add_jinja_substitutions_common, add_jinja_substitutions_cmd3, add_jinja_substitutions_cmd4
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json, to_string};
@@ -88,6 +88,8 @@ pub struct RenderCmd4Options<'a> {
     pub messages: Vec<Message>,
     /// Template string to use for rendering.
     pub template: &'a str,
+    /// Jinja template string
+    pub template_jinja: &'a str,
     /// Whether to use jinja template
     pub use_jinja: bool,
     /// Optional developer instruction to include in the prompt.
@@ -113,11 +115,13 @@ pub struct RenderCmd4Options<'a> {
 }
 
 static CMD4V1_TEMPLATE: &str = include_str!("templates/cmd4-v1.tmpl");
+static CMD4V1_JINJA_TEMPLATE: &str = include_str!("templates/jinja/cmd4/chat_template.jinja");
 impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
             messages: Vec::new(),
             template: CMD4V1_TEMPLATE,
+            template_jinja: CMD4V1_JINJA_TEMPLATE,
             use_jinja: false,
             dev_instruction: None,
             platform_instruction: None,
@@ -238,22 +242,17 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
 /// - Template parsing fails
 /// - Template rendering fails
 pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
-    let template_tools = tools_to_template(&opts.available_tools)?;
-    let messages = messages_to_template(
+    let mut template_tools = tools_to_template(&opts.available_tools)?;
+    let mut messages = messages_to_template(
         &opts.messages,
         !opts.documents.is_empty(),
         &opts.escaped_special_tokens,
     )?;
-    let docs: Vec<String> = opts
-        .documents
-        .iter()
-        .map(|d| -> Result<String, MelodyError> {
-            Ok(add_spaces_to_json_encoding(&escape_special_tokens(
-                &to_string(d)?,
-                &opts.escaped_special_tokens,
-            )))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut docs = docs_to_template(&opts.documents, &opts.escaped_special_tokens)?;
+
+    if opts.use_jinja {
+        (messages, template_tools, docs) = get_jinja_vars(&messages, &opts.available_tools, &opts.documents, &opts.escaped_special_tokens)?;
+    }
 
     let mut substitutions = opts.additional_template_fields.clone();
     substitutions.insert(
@@ -271,7 +270,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     substitutions.insert("messages".to_string(), Value::Array(messages));
     substitutions.insert(
         "documents".to_string(),
-        Value::Array(docs.into_iter().map(Value::String).collect()),
+        Value::Array(docs),
     );
     substitutions.insert(
         "available_tools".to_string(),
@@ -295,10 +294,22 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    let parser = liquid::ParserBuilder::with_stdlib().build()?;
-    let template = parser.parse(opts.template)?;
+    if opts.use_jinja {
+        add_jinja_substitutions_common(&mut substitutions);
+        add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
-    Ok(template.render(&liquid::object!(&substitutions))?)
+        let template_name = "chat_template.jinja";
+        let env = get_minijinja_env(template_name, opts.template_jinja)?;
+        let template = env.get_template(template_name)?;
+        let template_str = template.render(&substitutions)?;
+
+        Ok(template_str)
+    } else {
+        let parser = liquid::ParserBuilder::with_stdlib().build()?;
+        let template = parser.parse(opts.template)?;
+
+        Ok(template.render(&liquid::object!(&substitutions))?)
+    }
 }
 
 #[cfg(test)]
@@ -379,6 +390,17 @@ mod tests {
         for (test_name, input_json, expected) in read_test_cases("cmd4") {
             println!("Running cmd4 test case: {}", test_name);
             let opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            let rendered = render_cmd4(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd4_jinja_from_liquid_dir() {
+        for (test_name, input_json, expected) in read_test_cases("cmd4") {
+            println!("Running cmd4 jinja liquid test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            opts.use_jinja = true;
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }

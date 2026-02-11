@@ -4,7 +4,7 @@ use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
 use serde_json::{Map, Value, json, to_string};
 use std::collections::{BTreeMap, HashMap};
 use minijinja::Environment;
-use crate::templating::{CitationQuality, RenderCmd3Options, ReasoningType};
+use crate::templating::{CitationQuality, RenderCmd3Options, RenderCmd4Options, ReasoningType};
 
 pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
     let mut b = String::with_capacity(input.len());
@@ -655,6 +655,19 @@ pub(crate) fn add_jinja_substitutions_cmd3(substitutions: &mut Map<String, Value
         let reasoning_enabled = matches!(opts.reasoning_type, Some(ReasoningType::Enabled));
         substitutions.insert("reasoning".to_string(), Value::Bool(reasoning_enabled));
     }
+    if opts.json_mode || opts.json_schema.is_some() {
+        let mut json_val = json!({"type": "json_object"});
+        if let Some(json_schema) = &opts.json_schema {
+            json_val = json!({
+                "type": "json_object",
+                "schema": json_schema
+            });
+        }
+        substitutions.insert("response_format".to_string(), json_val);
+    }
+}
+
+pub(crate) fn add_jinja_substitutions_cmd4(substitutions: &mut Map<String, Value>, opts:&RenderCmd4Options) {
     if opts.json_mode || opts.json_schema.is_some() {
         let mut json_val = json!({"type": "json_object"});
         if let Some(json_schema) = &opts.json_schema {
