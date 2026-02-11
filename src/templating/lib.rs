@@ -54,6 +54,7 @@ static CMD3_JINJA_TEMPLATE_BASE: &str =
     include_str!("templates/jinja/cmd3/chat_merged_template.jinja");
 static CMD3V1_JINJA_TEMPLATE: &str =
     include_str!("templates/jinja/cmd3/chat_merged_template_v1.jinja");
+#[allow(dead_code)]
 static CMD3V3_JINJA_TEMPLATE: &str =
     include_str!("templates/jinja/cmd3/chat_merged_template_default_thinking.jinja");
 

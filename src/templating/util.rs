@@ -185,7 +185,7 @@ pub(crate) fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>
 }
 
 // Convert tools to template
-fn tools_to_template_jinja(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, MelodyError> {
+fn tools_to_template_jinja(tools: &[Tool]) -> Vec<Map<String, Value>> {
     let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
     for tool in tools {
         let mut tool_map = Map::new();
@@ -198,7 +198,7 @@ fn tools_to_template_jinja(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, Me
         tool_map.insert("function".to_string(), func);
         template_tools.push(tool_map);
     }
-    Ok(template_tools)
+    template_tools
 }
 
 pub(crate) fn docs_to_template(
@@ -526,6 +526,7 @@ pub(crate) fn get_minijinja_env<'a>(
     Ok(env)
 }
 
+#[allow(clippy::too_many_lines)]
 fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyError> {
     fn get_vec<'a>(
         val_map: &'a mut Map<String, Value>,
@@ -533,12 +534,11 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
         def_val: &'a mut Value,
         def_vec: &'a mut Vec<Value>,
     ) -> &'a mut Vec<Value> {
-        let val_vec = val_map
+        (val_map
             .get_mut(key)
             .unwrap_or(def_val)
             .as_array_mut()
-            .unwrap_or(def_vec);
-        val_vec
+            .unwrap_or(def_vec)) as _
     }
 
     let mut new_messages = vec![];
@@ -573,25 +573,24 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                             "name": tool_call.get("tool_name"),
                             "arguments": tool_call.get("parameters")
                         }
-                    })
+                    });
                 }
 
                 let content = get_vec(mobj, "content", &mut def_val, &mut def_vec);
                 for (content_idx, c) in content.iter_mut().enumerate() {
                     let mut def_map = Map::new();
                     let content_item = c.as_object_mut().unwrap_or(&mut def_map);
-                    if role != "Tool" {
-                        if let Some(content_type) = content_item.get("type") {
-                            let mut type_str =
-                                content_type.as_str().unwrap_or_default().to_string();
-                            if type_str == "text" && content_idx == 0 && has_tool_calls {
-                                type_str = "thinking".to_string();
-                                content_item
-                                    .insert("type".to_string(), Value::String(type_str.clone()));
-                            }
-                            let data = content_item.get("data").unwrap_or_default();
-                            content_item.insert(type_str, data.clone());
+                    if role != "Tool"
+                        && let Some(content_type) = content_item.get("type")
+                    {
+                        let mut type_str = content_type.as_str().unwrap_or_default().to_string();
+                        if type_str == "text" && content_idx == 0 && has_tool_calls {
+                            type_str = "thinking".to_string();
+                            content_item
+                                .insert("type".to_string(), Value::String(type_str.clone()));
                         }
+                        let data = content_item.get("data").unwrap_or_default();
+                        content_item.insert(type_str, data.clone());
                     }
                 }
 
@@ -612,17 +611,17 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                             "Invalid tool result documents during jinja conversion".to_string(),
                         ),
                     )?;
-                    if !tool_call_to_new_msg.contains_key(&tool_call_id) {
-                        let new_msg = json!({
-                            "role": "tool",
-                            "tool_call_id": tool_call_id,
-                            "content": Value::Array(Vec::new()),
+                    let new_msg_idx =
+                        tool_call_to_new_msg.entry(tool_call_id).or_insert_with(|| {
+                            let new_msg = json!({
+                                "role": "tool",
+                                "tool_call_id": tool_call_id,
+                                "content": Value::Array(Vec::new()),
+                            });
+                            new_messages.push((msg_idx, new_msg));
+                            new_messages.len() - 1
                         });
-                        new_messages.push((msg_idx, new_msg));
-                        tool_call_to_new_msg.insert(tool_call_id, new_messages.len() - 1);
-                    }
-                    let new_msg_idx = tool_call_to_new_msg[&tool_call_id];
-                    let (_, msg_ref) = &mut new_messages[new_msg_idx];
+                    let (_, msg_ref) = &mut new_messages[*new_msg_idx];
                     for doc in documents {
                         let doc_str = doc.as_str().ok_or(MelodyError::TemplateValidation(
                             "Invalid tool document format during jinja conversion".to_string(),
@@ -632,7 +631,7 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                             .unwrap()
                             .as_array_mut()
                             .unwrap()
-                            .push(serde_json::from_str(doc_str)?)
+                            .push(serde_json::from_str(doc_str)?);
                     }
                 }
             }
@@ -665,6 +664,7 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
     Ok(all_msgs_rev)
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn get_jinja_vars(
     messages: &[Value],
     tools: &[Tool],
@@ -672,13 +672,14 @@ pub(crate) fn get_jinja_vars(
     special_token_map: &BTreeMap<String, String>,
 ) -> Result<(Vec<Value>, Vec<Map<String, Value>>, Vec<Value>), MelodyError> {
     // println!("msgs {}", serde_json::to_string(&messages)?);
-    let messages = convert_messages_for_jinja(&messages)?;
-    let template_tools = tools_to_template_jinja(tools)?;
+    let messages = convert_messages_for_jinja(messages)?;
+    let template_tools = tools_to_template_jinja(tools);
     let docs = docs_to_template_jinja(documents, special_token_map)?;
     // println!("modified msgs {}", serde_json::to_string(&messages)?);
     Ok((messages, template_tools, docs))
 }
 
+#[allow(clippy::ref_option)]
 pub(crate) fn add_jinja_substitutions_common(
     substitutions: &mut Map<String, Value>,
     json_mode: bool,
