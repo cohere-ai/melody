@@ -740,6 +740,7 @@ pub(crate) fn add_jinja_substitutions_cmd4(
             .unwrap_or_default()
             .clone(),
     );
+    // TODO not currently used in cmd4 template but probably should be for backwards compatibility
     substitutions.insert(
         "enable_citations".to_string(),
         substitutions.get("grounding").unwrap_or_default().clone(),

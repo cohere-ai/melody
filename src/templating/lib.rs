@@ -178,7 +178,6 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         "available_tools".to_string(),
         Value::Array(
             template_tools
-                .clone()
                 .into_iter()
                 .map(Value::Object)
                 .collect(),
