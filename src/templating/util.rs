@@ -637,17 +637,28 @@ pub(crate) fn get_jinja_vars(messages: &[Value], tools: &[Tool], documents: &[Ma
     Ok((messages, template_tools, docs))
 }
 
-pub(crate) fn add_jinja_substitutions_common(substitutions: &mut Map<String, Value>) {
+pub(crate) fn add_jinja_substitutions_common(substitutions: &mut Map<String, Value>, json_mode: bool, json_schema: &Option<String>) {
     // TODO The next two substitutions should be configurable if used with vllm
     substitutions.insert("add_generation_prompt".to_string(), Value::Bool(true));
     substitutions.insert("bos_token".to_string(), json!("<BOS_TOKEN>"));
     substitutions.insert("regen_tool_call_ids".to_string(), json!(false));
 
     substitutions.insert("tools".to_string(), substitutions.get("available_tools").unwrap_or_default().clone());
-    substitutions.insert("developer_preamble".to_string(), substitutions.get("preamble").unwrap_or_default().clone());
+
+    if json_mode || json_schema.is_some() {
+        let mut json_val = json!({"type": "json_object"});
+        if let Some(json_schema) = &json_schema {
+            json_val = json!({
+                "type": "json_object",
+                "schema": json_schema
+            });
+        }
+        substitutions.insert("response_format".to_string(), json_val);
+    }
 }
 
 pub(crate) fn add_jinja_substitutions_cmd3(substitutions: &mut Map<String, Value>, opts:&RenderCmd3Options) {
+    substitutions.insert("developer_preamble".to_string(), substitutions.get("preamble").unwrap_or_default().clone());
     if opts.citation_quality.as_ref().is_none_or(|v| *v != CitationQuality::Off) {
         substitutions.insert("enable_citations".to_string(), json!(true));
     }
@@ -655,27 +666,9 @@ pub(crate) fn add_jinja_substitutions_cmd3(substitutions: &mut Map<String, Value
         let reasoning_enabled = matches!(opts.reasoning_type, Some(ReasoningType::Enabled));
         substitutions.insert("reasoning".to_string(), Value::Bool(reasoning_enabled));
     }
-    if opts.json_mode || opts.json_schema.is_some() {
-        let mut json_val = json!({"type": "json_object"});
-        if let Some(json_schema) = &opts.json_schema {
-            json_val = json!({
-                "type": "json_object",
-                "schema": json_schema
-            });
-        }
-        substitutions.insert("response_format".to_string(), json_val);
-    }
 }
 
-pub(crate) fn add_jinja_substitutions_cmd4(substitutions: &mut Map<String, Value>, opts:&RenderCmd4Options) {
-    if opts.json_mode || opts.json_schema.is_some() {
-        let mut json_val = json!({"type": "json_object"});
-        if let Some(json_schema) = &opts.json_schema {
-            json_val = json!({
-                "type": "json_object",
-                "schema": json_schema
-            });
-        }
-        substitutions.insert("response_format".to_string(), json_val);
-    }
+pub(crate) fn add_jinja_substitutions_cmd4(substitutions: &mut Map<String, Value>, _:&RenderCmd4Options) {
+    substitutions.insert("developer_preamble".to_string(), substitutions.get("developer_instructions").unwrap_or_default().clone());
+    substitutions.insert("enable_citations".to_string(), substitutions.get("grounding").unwrap_or_default().clone());
 }

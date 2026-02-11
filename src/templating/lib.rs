@@ -3,10 +3,10 @@ use crate::templating::types::{
     CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
 };
 use crate::templating::util::{
-    add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template, docs_to_template, get_minijinja_env, get_jinja_vars, add_jinja_substitutions_common, add_jinja_substitutions_cmd3, add_jinja_substitutions_cmd4
+    messages_to_template, tools_to_template, docs_to_template, get_minijinja_env, get_jinja_vars, add_jinja_substitutions_common, add_jinja_substitutions_cmd3, add_jinja_substitutions_cmd4
 };
 use serde::Deserialize;
-use serde_json::{Map, Value, json, to_string};
+use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 
 /// Options for cmd3 rendering.
@@ -215,7 +215,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
     if opts.use_jinja {
-        add_jinja_substitutions_common(&mut substitutions);
+        add_jinja_substitutions_common(&mut substitutions, opts.json_mode, &opts.json_schema);
         add_jinja_substitutions_cmd3(&mut substitutions, opts);
 
         let template_name = "chat_template.jinja";
@@ -295,7 +295,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
     if opts.use_jinja {
-        add_jinja_substitutions_common(&mut substitutions);
+        add_jinja_substitutions_common(&mut substitutions, opts.json_mode, &opts.json_schema);
         add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
         let template_name = "chat_template.jinja";
