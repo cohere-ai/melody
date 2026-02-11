@@ -176,12 +176,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     substitutions.insert("documents".to_string(), Value::Array(docs));
     substitutions.insert(
         "available_tools".to_string(),
-        Value::Array(
-            template_tools
-                .into_iter()
-                .map(Value::Object)
-                .collect(),
-        ),
+        Value::Array(template_tools.into_iter().map(Value::Object).collect()),
     );
     substitutions.insert(
         "citation_mode".to_string(),
