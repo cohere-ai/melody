@@ -36,13 +36,16 @@ class TestPyFilterWriteDecoded:
 
     def test_transition_thinking_to_response(self, cmd3_filter):
         """Test transitioning from thinking to response."""
-        cmd3_filter.write_decoded("<|START_THINKING|>Thinking...")
+        thinking_outputs = cmd3_filter.write_decoded("<|START_THINKING|>Thinking...")
+        assert all(o.is_reasoning for o in thinking_outputs)
+
         outputs = cmd3_filter.write_decoded(
             "<|END_THINKING|><|START_RESPONSE|>Response"
         )
-        # Should have transitioned to response mode
+        # Should have transitioned to response mode with non-reasoning output
         response_outputs = [o for o in outputs if not o.is_reasoning]
-        assert len(response_outputs) >= 0  # May or may not have output yet
+        assert len(response_outputs) > 0
+        assert "Response" in "".join(o.text for o in response_outputs)
 
 
 class TestPyFilterFlushPartials:
