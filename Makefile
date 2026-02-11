@@ -65,7 +65,7 @@ rust-build-with-tokenizers:
 #--------------------
 
 venv-setup:
-	uv venv --allow-existing && uv pip install maturin pytest ty vllm
+	uv venv --allow-existing && uv pip install maturin pytest ty
 
 python-bindings: venv-setup
 	uv run maturin develop --features python_ffi
