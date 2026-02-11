@@ -76,33 +76,102 @@ class TestRenderCmd3:
         )
         assert "Doc 1" in result or "content" in result
 
-    @pytest.mark.parametrize(
-        "safety_mode",
-        ["none", "strict", "contextual"],
-    )
-    def test_safety_modes(self, safety_mode):
-        """Test rendering with different safety modes."""
+    def test_safety_mode_strict(self):
+        """Test that strict safety mode includes strict safety preamble."""
         result = render_cmd3(
             {
                 "messages": [],
-                "safety_mode": safety_mode,
+                "safety_mode": "strict",
             }
         )
-        assert isinstance(result, str)
+        assert "You are in strict safety mode" in result
+        assert "You are in contextual safety mode" not in result
 
-    @pytest.mark.parametrize(
-        "citation_quality",
-        ["off", "on"],
-    )
-    def test_citation_quality(self, citation_quality):
-        """Test rendering with different citation quality settings."""
+    def test_safety_mode_contextual(self):
+        """Test that contextual safety mode includes contextual safety preamble."""
         result = render_cmd3(
             {
                 "messages": [],
-                "citation_quality": citation_quality,
+                "safety_mode": "contextual",
             }
         )
-        assert isinstance(result, str)
+        assert "You are in contextual safety mode" in result
+        assert "You are in strict safety mode" not in result
+
+    def test_safety_mode_none(self):
+        """Test that none safety mode omits all safety preambles."""
+        result = render_cmd3(
+            {
+                "messages": [],
+                "safety_mode": "none",
+            }
+        )
+        assert "You are in strict safety mode" not in result
+        assert "You are in contextual safety mode" not in result
+
+    def test_safety_modes_produce_different_outputs(self):
+        """Test that different safety modes produce different outputs."""
+        results = {}
+        for mode in ["none", "strict", "contextual"]:
+            results[mode] = render_cmd3(
+                {
+                    "messages": [],
+                    "safety_mode": mode,
+                }
+            )
+        assert results["none"] != results["strict"]
+        assert results["none"] != results["contextual"]
+        assert results["strict"] != results["contextual"]
+
+    def test_citation_quality_on_includes_grounding(self):
+        """Test that citation_quality 'on' includes grounding instructions."""
+        result = render_cmd3(
+            {
+                "messages": [],
+                "citation_quality": "on",
+                "available_tools": [
+                    {
+                        "name": "search",
+                        "description": "Search the web",
+                        "parameters": {"type": "object", "properties": {}},
+                    }
+                ],
+            }
+        )
+        assert "Grounding" in result
+
+    def test_citation_quality_off_excludes_grounding(self):
+        """Test that citation_quality 'off' excludes grounding instructions."""
+        result = render_cmd3(
+            {
+                "messages": [],
+                "citation_quality": "off",
+                "available_tools": [
+                    {
+                        "name": "search",
+                        "description": "Search the web",
+                        "parameters": {"type": "object", "properties": {}},
+                    }
+                ],
+            }
+        )
+        assert "Grounding" not in result
+
+    def test_citation_quality_produces_different_outputs(self):
+        """Test that different citation quality settings produce different outputs."""
+        config_base = {
+            "messages": [],
+            "available_tools": [
+                {
+                    "name": "search",
+                    "description": "Search the web",
+                    "parameters": {"type": "object", "properties": {}},
+                }
+            ],
+        }
+        result_on = render_cmd3({**config_base, "citation_quality": "on"})
+        result_off = render_cmd3({**config_base, "citation_quality": "off"})
+        assert result_on != result_off
 
     def test_with_json_mode(self):
         """Test rendering with JSON mode enabled."""
@@ -255,11 +324,55 @@ class TestRenderCmd4:
         )
         assert isinstance(result, str)
 
-    @pytest.mark.parametrize("grounding", ["enabled", "disabled"])
-    def test_grounding_options(self, grounding):
-        """Test rendering with different grounding options."""
-        result = render_cmd4({"messages": [], "grounding": grounding})
-        assert isinstance(result, str)
+    def test_grounding_enabled_includes_grounding_preamble(self):
+        """Test that grounding 'enabled' includes grounding instructions."""
+        result = render_cmd4(
+            {
+                "messages": [],
+                "grounding": "enabled",
+                "available_tools": [
+                    {
+                        "name": "search",
+                        "description": "Search the web",
+                        "parameters": {"type": "object", "properties": {}},
+                    }
+                ],
+            }
+        )
+        assert "responses and reflections can be grounded" in result
+
+    def test_grounding_disabled_excludes_grounding_preamble(self):
+        """Test that grounding 'disabled' excludes grounding instructions."""
+        result = render_cmd4(
+            {
+                "messages": [],
+                "grounding": "disabled",
+                "available_tools": [
+                    {
+                        "name": "search",
+                        "description": "Search the web",
+                        "parameters": {"type": "object", "properties": {}},
+                    }
+                ],
+            }
+        )
+        assert "responses and reflections can be grounded" not in result
+
+    def test_grounding_produces_different_outputs(self):
+        """Test that different grounding settings produce different outputs."""
+        config_base = {
+            "messages": [],
+            "available_tools": [
+                {
+                    "name": "search",
+                    "description": "Search the web",
+                    "parameters": {"type": "object", "properties": {}},
+                }
+            ],
+        }
+        result_enabled = render_cmd4({**config_base, "grounding": "enabled"})
+        result_disabled = render_cmd4({**config_base, "grounding": "disabled"})
+        assert result_enabled != result_disabled
 
     def test_with_json_mode(self):
         """Test rendering with JSON mode enabled."""
