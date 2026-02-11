@@ -3,7 +3,8 @@ use crate::templating::types::{
     CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
 };
 use crate::templating::util::{
-    messages_to_template, tools_to_template, docs_to_template, get_minijinja_env, get_jinja_vars, add_jinja_substitutions_common, add_jinja_substitutions_cmd3, add_jinja_substitutions_cmd4
+    add_jinja_substitutions_cmd3, add_jinja_substitutions_cmd4, add_jinja_substitutions_common,
+    docs_to_template, get_jinja_vars, get_minijinja_env, messages_to_template, tools_to_template,
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -155,7 +156,12 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let mut docs = docs_to_template(&opts.documents, &opts.escaped_special_tokens)?;
 
     if opts.use_jinja {
-        (messages, template_tools, docs) = get_jinja_vars(&messages, &opts.available_tools, &opts.documents, &opts.escaped_special_tokens)?;
+        (messages, template_tools, docs) = get_jinja_vars(
+            &messages,
+            &opts.available_tools,
+            &opts.documents,
+            &opts.escaped_special_tokens,
+        )?;
     }
 
     let mut substitutions = opts.additional_template_fields.clone();
@@ -166,13 +172,16 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
             .map_or(Value::Null, Value::String),
     );
     substitutions.insert("messages".to_string(), Value::Array(messages));
-    substitutions.insert(
-        "documents".to_string(),
-        Value::Array(docs),
-    );
+    substitutions.insert("documents".to_string(), Value::Array(docs));
     substitutions.insert(
         "available_tools".to_string(),
-        Value::Array(template_tools.clone().into_iter().map(Value::Object).collect()),
+        Value::Array(
+            template_tools
+                .clone()
+                .into_iter()
+                .map(Value::Object)
+                .collect(),
+        ),
     );
     substitutions.insert(
         "citation_mode".to_string(),
@@ -251,7 +260,12 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     let mut docs = docs_to_template(&opts.documents, &opts.escaped_special_tokens)?;
 
     if opts.use_jinja {
-        (messages, template_tools, docs) = get_jinja_vars(&messages, &opts.available_tools, &opts.documents, &opts.escaped_special_tokens)?;
+        (messages, template_tools, docs) = get_jinja_vars(
+            &messages,
+            &opts.available_tools,
+            &opts.documents,
+            &opts.escaped_special_tokens,
+        )?;
     }
 
     let mut substitutions = opts.additional_template_fields.clone();
@@ -268,10 +282,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
             .map_or(Value::Null, Value::String),
     );
     substitutions.insert("messages".to_string(), Value::Array(messages));
-    substitutions.insert(
-        "documents".to_string(),
-        Value::Array(docs),
-    );
+    substitutions.insert("documents".to_string(), Value::Array(docs));
     substitutions.insert(
         "available_tools".to_string(),
         Value::Array(template_tools.into_iter().map(Value::Object).collect()),

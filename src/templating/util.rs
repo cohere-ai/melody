@@ -1,10 +1,10 @@
 use crate::errors::MelodyError;
 use crate::parsing::types::FilterCitation;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
+use crate::templating::{CitationQuality, ReasoningType, RenderCmd3Options, RenderCmd4Options};
+use minijinja::Environment;
 use serde_json::{Map, Value, json, to_string};
 use std::collections::{BTreeMap, HashMap};
-use minijinja::Environment;
-use crate::templating::{CitationQuality, RenderCmd3Options, RenderCmd4Options, ReasoningType};
 
 pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
     let mut b = String::with_capacity(input.len());
@@ -197,12 +197,14 @@ fn tools_to_template_jinja(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, Me
         });
         tool_map.insert("function".to_string(), func);
         template_tools.push(tool_map);
-
     }
     Ok(template_tools)
 }
 
-pub(crate) fn docs_to_template(documents: &[Map<String, Value>], special_token_map: &BTreeMap<String, String>) -> Result<Vec<Value>, MelodyError> {
+pub(crate) fn docs_to_template(
+    documents: &[Map<String, Value>],
+    special_token_map: &BTreeMap<String, String>,
+) -> Result<Vec<Value>, MelodyError> {
     documents
         .iter()
         .map(|d| -> Result<_, MelodyError> {
@@ -212,7 +214,10 @@ pub(crate) fn docs_to_template(documents: &[Map<String, Value>], special_token_m
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn docs_to_template_jinja(documents: &[Map<String, Value>], special_token_map: &BTreeMap<String, String>) -> Result<Vec<Value>, MelodyError> {
+fn docs_to_template_jinja(
+    documents: &[Map<String, Value>],
+    special_token_map: &BTreeMap<String, String>,
+) -> Result<Vec<Value>, MelodyError> {
     documents
         .iter()
         .map(|d| -> Result<_, MelodyError> {
@@ -522,7 +527,12 @@ pub(crate) fn get_minijinja_env<'a>(
 }
 
 fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyError> {
-    fn get_vec<'a>(val_map: &'a mut Map<String, Value>, key: &str, def_val: &'a mut Value, def_vec: &'a mut Vec<Value>) -> &'a mut Vec<Value> {
+    fn get_vec<'a>(
+        val_map: &'a mut Map<String, Value>,
+        key: &str,
+        def_val: &'a mut Value,
+        def_vec: &'a mut Vec<Value>,
+    ) -> &'a mut Vec<Value> {
         let val_vec = val_map
             .get_mut(key)
             .unwrap_or(def_val)
@@ -532,7 +542,9 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
     }
 
     let mut new_messages = vec![];
-    let converted_messages = messages.iter().enumerate()
+    let converted_messages = messages
+        .iter()
+        .enumerate()
         .map(|(msg_idx, m)| -> Result<Value, MelodyError> {
             let mut new_m = m.clone();
             if let Some(mobj) = new_m.as_object_mut() {
@@ -540,9 +552,13 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                 let mut def_val = Value::Null;
                 let mut def_vec = Vec::<Value>::new();
                 let mobj_tmp = mobj.clone();
-                let role = mobj_tmp.get("role").unwrap_or( &def_str).as_str().unwrap_or_default();
+                let role = mobj_tmp
+                    .get("role")
+                    .unwrap_or(&def_str)
+                    .as_str()
+                    .unwrap_or_default();
 
-                let tool_calls = get_vec( mobj, "tool_calls", &mut def_val, &mut def_vec);
+                let tool_calls = get_vec(mobj, "tool_calls", &mut def_val, &mut def_vec);
                 let has_tool_calls = !tool_calls.is_empty();
                 for t in tool_calls.iter_mut() {
                     let t_str = t.as_str().unwrap_or_default();
@@ -550,7 +566,7 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                         continue;
                     }
                     let tool_call: Map<String, Value> = serde_json::from_str(t_str)?;
-                     *t = json!({
+                    *t = json!({
                         "id": tool_call.get("tool_call_id"),
                         "type": "function",
                         "function": {
@@ -560,33 +576,42 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                     })
                 }
 
-                let content = get_vec( mobj, "content", &mut def_val, &mut def_vec);
+                let content = get_vec(mobj, "content", &mut def_val, &mut def_vec);
                 for (content_idx, c) in content.iter_mut().enumerate() {
                     let mut def_map = Map::new();
                     let content_item = c.as_object_mut().unwrap_or(&mut def_map);
                     if role != "Tool" {
                         if let Some(content_type) = content_item.get("type") {
-                            let mut type_str = content_type.as_str().unwrap_or_default().to_string();
+                            let mut type_str =
+                                content_type.as_str().unwrap_or_default().to_string();
                             if type_str == "text" && content_idx == 0 && has_tool_calls {
                                 type_str = "thinking".to_string();
-                                content_item.insert("type".to_string(), Value::String(type_str.clone()));
+                                content_item
+                                    .insert("type".to_string(), Value::String(type_str.clone()));
                             }
                             let data = content_item.get("data").unwrap_or_default();
-                            content_item.insert(
-                                type_str,
-                                data.clone(),
-                            );
+                            content_item.insert(type_str, data.clone());
                         }
                     }
                 }
 
-                let tool_results = get_vec( mobj, "tool_results", &mut def_val, &mut def_vec);
+                let tool_results = get_vec(mobj, "tool_results", &mut def_val, &mut def_vec);
                 let mut tool_call_to_new_msg: BTreeMap<i64, usize> = BTreeMap::new();
                 for tres_val in tool_results.iter_mut() {
                     let def_map = Map::new();
                     let tres = tres_val.as_object().unwrap_or(&def_map);
-                    let tool_call_id = tres.get("tool_call_id").unwrap_or_default().as_i64().ok_or(MelodyError::TemplateValidation("Invalid tool call id in results during jinja conversion".to_string()))?;
-                    let documents = tres.get("documents").unwrap_or_default().as_array().ok_or(MelodyError::TemplateValidation("Invalid tool result documents during jinja conversion".to_string()))?;
+                    let tool_call_id = tres
+                        .get("tool_call_id")
+                        .unwrap_or_default()
+                        .as_i64()
+                        .ok_or(MelodyError::TemplateValidation(
+                            "Invalid tool call id in results during jinja conversion".to_string(),
+                        ))?;
+                    let documents = tres.get("documents").unwrap_or_default().as_array().ok_or(
+                        MelodyError::TemplateValidation(
+                            "Invalid tool result documents during jinja conversion".to_string(),
+                        ),
+                    )?;
                     if !tool_call_to_new_msg.contains_key(&tool_call_id) {
                         let new_msg = json!({
                             "role": "tool",
@@ -594,56 +619,83 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                             "content": Value::Array(Vec::new()),
                         });
                         new_messages.push((msg_idx, new_msg));
-                        tool_call_to_new_msg.insert(tool_call_id, new_messages.len()-1);
+                        tool_call_to_new_msg.insert(tool_call_id, new_messages.len() - 1);
                     }
                     let new_msg_idx = tool_call_to_new_msg[&tool_call_id];
                     let (_, msg_ref) = &mut new_messages[new_msg_idx];
                     for doc in documents {
-                        let doc_str = doc.as_str().ok_or(MelodyError::TemplateValidation("Invalid tool document format during jinja conversion".to_string()))?;
-                        msg_ref.get_mut("content").unwrap().as_array_mut().unwrap().push(serde_json::from_str(doc_str)?)
+                        let doc_str = doc.as_str().ok_or(MelodyError::TemplateValidation(
+                            "Invalid tool document format during jinja conversion".to_string(),
+                        ))?;
+                        msg_ref
+                            .get_mut("content")
+                            .unwrap()
+                            .as_array_mut()
+                            .unwrap()
+                            .push(serde_json::from_str(doc_str)?)
                     }
                 }
             }
             Ok(new_m)
         })
         .collect::<Result<Vec<Value>, MelodyError>>()?;
-        if new_messages.is_empty() {
-            return Ok(converted_messages);
-        }
+    if new_messages.is_empty() {
+        return Ok(converted_messages);
+    }
 
-        let msgs_len = messages.len();
-        let mut new_msg_idx1 = new_messages.len();
-        let mut all_msgs_rev = Vec::with_capacity(msgs_len + new_messages.len());
-        for (msg_rev_idx, msg) in converted_messages.iter().rev().enumerate() {
-            let msg_idx = msgs_len - msg_rev_idx - 1;
-            let mut was_replaced = false;
-            while new_msg_idx1 > 0 && let (insrt_idx, new_msg) = &new_messages[new_msg_idx1-1] && insrt_idx == &msg_idx {
-                all_msgs_rev.push(new_msg.clone());
-                was_replaced = true;
-                new_msg_idx1 -= 1;
-            }
-            if !was_replaced {
-                all_msgs_rev.push(msg.clone());
-            }
+    let msgs_len = messages.len();
+    let mut new_msg_idx1 = new_messages.len();
+    let mut all_msgs_rev = Vec::with_capacity(msgs_len + new_messages.len());
+    for (msg_rev_idx, msg) in converted_messages.iter().rev().enumerate() {
+        let msg_idx = msgs_len - msg_rev_idx - 1;
+        let mut was_replaced = false;
+        while new_msg_idx1 > 0
+            && let (insrt_idx, new_msg) = &new_messages[new_msg_idx1 - 1]
+            && insrt_idx == &msg_idx
+        {
+            all_msgs_rev.push(new_msg.clone());
+            was_replaced = true;
+            new_msg_idx1 -= 1;
         }
-        all_msgs_rev.reverse();
-        Ok(all_msgs_rev)
+        if !was_replaced {
+            all_msgs_rev.push(msg.clone());
+        }
+    }
+    all_msgs_rev.reverse();
+    Ok(all_msgs_rev)
 }
 
-pub(crate) fn get_jinja_vars(messages: &[Value], tools: &[Tool], documents: &[Map<String, Value>], special_token_map: &BTreeMap<String, String>) -> Result<(Vec<Value>, Vec<Map<String, Value>>, Vec<Value>), MelodyError> {
+pub(crate) fn get_jinja_vars(
+    messages: &[Value],
+    tools: &[Tool],
+    documents: &[Map<String, Value>],
+    special_token_map: &BTreeMap<String, String>,
+) -> Result<(Vec<Value>, Vec<Map<String, Value>>, Vec<Value>), MelodyError> {
+    // println!("msgs {}", serde_json::to_string(&messages)?);
     let messages = convert_messages_for_jinja(&messages)?;
     let template_tools = tools_to_template_jinja(tools)?;
     let docs = docs_to_template_jinja(documents, special_token_map)?;
+    // println!("modified msgs {}", serde_json::to_string(&messages)?);
     Ok((messages, template_tools, docs))
 }
 
-pub(crate) fn add_jinja_substitutions_common(substitutions: &mut Map<String, Value>, json_mode: bool, json_schema: &Option<String>) {
+pub(crate) fn add_jinja_substitutions_common(
+    substitutions: &mut Map<String, Value>,
+    json_mode: bool,
+    json_schema: &Option<String>,
+) {
     // TODO The next two substitutions should be configurable if used with vllm
     substitutions.insert("add_generation_prompt".to_string(), Value::Bool(true));
     substitutions.insert("bos_token".to_string(), json!("<BOS_TOKEN>"));
     substitutions.insert("regen_tool_call_ids".to_string(), json!(false));
 
-    substitutions.insert("tools".to_string(), substitutions.get("available_tools").unwrap_or_default().clone());
+    substitutions.insert(
+        "tools".to_string(),
+        substitutions
+            .get("available_tools")
+            .unwrap_or_default()
+            .clone(),
+    );
 
     if json_mode || json_schema.is_some() {
         let mut json_val = json!({"type": "json_object"});
@@ -657,9 +709,19 @@ pub(crate) fn add_jinja_substitutions_common(substitutions: &mut Map<String, Val
     }
 }
 
-pub(crate) fn add_jinja_substitutions_cmd3(substitutions: &mut Map<String, Value>, opts:&RenderCmd3Options) {
-    substitutions.insert("developer_preamble".to_string(), substitutions.get("preamble").unwrap_or_default().clone());
-    if opts.citation_quality.as_ref().is_none_or(|v| *v != CitationQuality::Off) {
+pub(crate) fn add_jinja_substitutions_cmd3(
+    substitutions: &mut Map<String, Value>,
+    opts: &RenderCmd3Options,
+) {
+    substitutions.insert(
+        "developer_preamble".to_string(),
+        substitutions.get("preamble").unwrap_or_default().clone(),
+    );
+    if opts
+        .citation_quality
+        .as_ref()
+        .is_none_or(|v| *v != CitationQuality::Off)
+    {
         substitutions.insert("enable_citations".to_string(), json!(true));
     }
     if opts.reasoning_type.is_some() {
@@ -668,7 +730,19 @@ pub(crate) fn add_jinja_substitutions_cmd3(substitutions: &mut Map<String, Value
     }
 }
 
-pub(crate) fn add_jinja_substitutions_cmd4(substitutions: &mut Map<String, Value>, _:&RenderCmd4Options) {
-    substitutions.insert("developer_preamble".to_string(), substitutions.get("developer_instructions").unwrap_or_default().clone());
-    substitutions.insert("enable_citations".to_string(), substitutions.get("grounding").unwrap_or_default().clone());
+pub(crate) fn add_jinja_substitutions_cmd4(
+    substitutions: &mut Map<String, Value>,
+    _: &RenderCmd4Options,
+) {
+    substitutions.insert(
+        "developer_preamble".to_string(),
+        substitutions
+            .get("developer_instructions")
+            .unwrap_or_default()
+            .clone(),
+    );
+    substitutions.insert(
+        "enable_citations".to_string(),
+        substitutions.get("grounding").unwrap_or_default().clone(),
+    );
 }
