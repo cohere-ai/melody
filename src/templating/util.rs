@@ -671,11 +671,9 @@ pub(crate) fn get_jinja_vars(
     documents: &[Map<String, Value>],
     special_token_map: &BTreeMap<String, String>,
 ) -> Result<(Vec<Value>, Vec<Map<String, Value>>, Vec<Value>), MelodyError> {
-    // println!("msgs {}", serde_json::to_string(&messages)?);
     let messages = convert_messages_for_jinja(messages)?;
     let template_tools = tools_to_template_jinja(tools);
     let docs = docs_to_template_jinja(documents, special_token_map)?;
-    // println!("modified msgs {}", serde_json::to_string(&messages)?);
     Ok((messages, template_tools, docs))
 }
 
