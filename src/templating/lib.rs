@@ -3,7 +3,7 @@ use crate::templating::types::{
     CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
 };
 use crate::templating::util::{
-    add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template, tools_to_template_jinja, docs_to_template, docs_to_template_jinja, convert_messages_for_jinja, get_minijinja_env
+    add_spaces_to_json_encoding, escape_special_tokens, messages_to_template, tools_to_template, docs_to_template, get_minijinja_env, get_jinja_vars, add_jinja_substitutions_common, add_jinja_substitutions_cmd3
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json, to_string};
@@ -151,9 +151,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let mut docs = docs_to_template(&opts.documents, &opts.escaped_special_tokens)?;
 
     if opts.use_jinja {
-        docs = docs_to_template_jinja(&opts.documents, &opts.escaped_special_tokens)?;
-        messages = convert_messages_for_jinja(&messages)?;
-        template_tools = tools_to_template_jinja(&opts.available_tools)?;
+        (messages, template_tools, docs) = get_jinja_vars(&messages, &opts.available_tools, &opts.documents, &opts.escaped_special_tokens)?;
     }
 
     let mut substitutions = opts.additional_template_fields.clone();
@@ -213,30 +211,8 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
     if opts.use_jinja {
-        // TODO The next two substitutions should be configurable if used with vllm
-        substitutions.insert("add_generation_prompt".to_string(), Value::Bool(true));
-        substitutions.insert("bos_token".to_string(), json!("<BOS_TOKEN>"));
-        substitutions.insert("regen_tool_call_ids".to_string(), json!(false));
-
-        substitutions.insert("tools".to_string(), substitutions.get("available_tools").unwrap_or_default().clone());
-        substitutions.insert("developer_preamble".to_string(), substitutions.get("preamble").unwrap_or_default().clone());
-        if opts.citation_quality.as_ref().is_none_or(|v| *v != CitationQuality::Off) {
-            substitutions.insert("enable_citations".to_string(), json!(true));
-        }
-        if opts.reasoning_type.is_some() {
-            let reasoning_enabled = matches!(opts.reasoning_type, Some(ReasoningType::Enabled));
-            substitutions.insert("reasoning".to_string(), Value::Bool(reasoning_enabled));
-        }
-        if opts.json_mode || opts.json_schema.is_some() {
-            let mut json_val = json!({"type": "json_object"});
-            if let Some(json_schema) = &opts.json_schema {
-                json_val = json!({
-                    "type": "json_object",
-                    "schema": json_schema
-                });
-            }
-            substitutions.insert("response_format".to_string(), json_val);
-        }
+        add_jinja_substitutions_common(&mut substitutions);
+        add_jinja_substitutions_cmd3(&mut substitutions, opts);
 
         let template_name = "chat_template.jinja";
         let mut env = get_minijinja_env(template_name, opts.template_jinja)?;

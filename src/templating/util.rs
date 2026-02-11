@@ -4,6 +4,7 @@ use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
 use serde_json::{Map, Value, json, to_string};
 use std::collections::{BTreeMap, HashMap};
 use minijinja::Environment;
+use crate::templating::{CitationQuality, RenderCmd3Options, ReasoningType};
 
 pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
     let mut b = String::with_capacity(input.len());
@@ -184,7 +185,7 @@ pub(crate) fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>
 }
 
 // Convert tools to template
-pub(crate) fn tools_to_template_jinja(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, MelodyError> {
+fn tools_to_template_jinja(tools: &[Tool]) -> Result<Vec<Map<String, Value>>, MelodyError> {
     let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
     for tool in tools {
         let mut tool_map = Map::new();
@@ -211,7 +212,7 @@ pub(crate) fn docs_to_template(documents: &[Map<String, Value>], special_token_m
         .collect::<Result<Vec<_>, _>>()
 }
 
-pub(crate) fn docs_to_template_jinja(documents: &[Map<String, Value>], special_token_map: &BTreeMap<String, String>) -> Result<Vec<Value>, MelodyError> {
+fn docs_to_template_jinja(documents: &[Map<String, Value>], special_token_map: &BTreeMap<String, String>) -> Result<Vec<Value>, MelodyError> {
     documents
         .iter()
         .map(|d| -> Result<_, MelodyError> {
@@ -520,7 +521,7 @@ pub(crate) fn get_minijinja_env<'a>(
     Ok(env)
 }
 
-pub(crate) fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyError> {
+fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyError> {
     fn get_vec<'a>(val_map: &'a mut Map<String, Value>, key: &str, def_val: &'a mut Value, def_vec: &'a mut Vec<Value>) -> &'a mut Vec<Value> {
         let val_vec = val_map
             .get_mut(key)
@@ -627,4 +628,41 @@ pub(crate) fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value
         }
         all_msgs_rev.reverse();
         Ok(all_msgs_rev)
+}
+
+pub(crate) fn get_jinja_vars(messages: &[Value], tools: &[Tool], documents: &[Map<String, Value>], special_token_map: &BTreeMap<String, String>) -> Result<(Vec<Value>, Vec<Map<String, Value>>, Vec<Value>), MelodyError> {
+    let messages = convert_messages_for_jinja(&messages)?;
+    let template_tools = tools_to_template_jinja(tools)?;
+    let docs = docs_to_template_jinja(documents, special_token_map)?;
+    Ok((messages, template_tools, docs))
+}
+
+pub(crate) fn add_jinja_substitutions_common(substitutions: &mut Map<String, Value>) {
+    // TODO The next two substitutions should be configurable if used with vllm
+    substitutions.insert("add_generation_prompt".to_string(), Value::Bool(true));
+    substitutions.insert("bos_token".to_string(), json!("<BOS_TOKEN>"));
+    substitutions.insert("regen_tool_call_ids".to_string(), json!(false));
+
+    substitutions.insert("tools".to_string(), substitutions.get("available_tools").unwrap_or_default().clone());
+    substitutions.insert("developer_preamble".to_string(), substitutions.get("preamble").unwrap_or_default().clone());
+}
+
+pub(crate) fn add_jinja_substitutions_cmd3(substitutions: &mut Map<String, Value>, opts:&RenderCmd3Options) {
+    if opts.citation_quality.as_ref().is_none_or(|v| *v != CitationQuality::Off) {
+        substitutions.insert("enable_citations".to_string(), json!(true));
+    }
+    if opts.reasoning_type.is_some() {
+        let reasoning_enabled = matches!(opts.reasoning_type, Some(ReasoningType::Enabled));
+        substitutions.insert("reasoning".to_string(), Value::Bool(reasoning_enabled));
+    }
+    if opts.json_mode || opts.json_schema.is_some() {
+        let mut json_val = json!({"type": "json_object"});
+        if let Some(json_schema) = &opts.json_schema {
+            json_val = json!({
+                "type": "json_object",
+                "schema": json_schema
+            });
+        }
+        substitutions.insert("response_format".to_string(), json_val);
+    }
 }
