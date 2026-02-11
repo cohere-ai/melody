@@ -738,7 +738,7 @@ pub(crate) fn add_jinja_substitutions_cmd4(
     substitutions.insert(
         "developer_preamble".to_string(),
         substitutions
-            .get("developer_instructions")
+            .get("developer_instruction")
             .unwrap_or_default()
             .clone(),
     );
