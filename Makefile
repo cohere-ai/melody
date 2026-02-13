@@ -1,4 +1,5 @@
 TOKENIZERS_VERSION = v0.9.1
+VLLM_VERSION = 0.14.1
 UNAME := $(shell uname)
 ARCH := $(shell uname -m)
 
@@ -75,3 +76,8 @@ python-bindings-test: venv-setup python-bindings
 
 python-bindings-format:
 	uvx black .
+
+# use a docker container to typecheck the python bindings because vllm doesn't install correctly on macos
+python-typecheck:
+	docker build --build-arg VLLM_VERSION=$(VLLM_VERSION) -f Dockerfile.typecheck -t melody-typecheck . && \
+	docker run --rm -v $(PWD):/app melody-typecheck
