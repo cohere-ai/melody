@@ -7,9 +7,6 @@ on:
   workflow_dispatch:
   release:
     types: [published]
-  push:
-    tags:
-      - "v*.*.*"
 
 permissions:
   contents: read
@@ -225,9 +222,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'release' ||
-      (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/'))
+    if: github.event_name == 'release'
     needs: [linux, musllinux, windows, macos, sdist]
     permissions:
       # Used for PyPI trusted publishing (OIDC)
