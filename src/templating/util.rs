@@ -732,6 +732,7 @@ pub(crate) fn add_jinja_substitutions_cmd3(
 pub(crate) fn add_jinja_substitutions_cmd4(
     substitutions: &mut Map<String, Value>,
     _: &RenderCmd4Options,
+    grounding: bool,
 ) {
     substitutions.insert(
         "developer_preamble".to_string(),
@@ -743,6 +744,6 @@ pub(crate) fn add_jinja_substitutions_cmd4(
     // TODO not currently used in cmd4 template but probably should be for backwards compatibility
     substitutions.insert(
         "enable_citations".to_string(),
-        substitutions.get("grounding").unwrap_or_default().clone(),
+        Value::Bool(grounding),
     );
 }
