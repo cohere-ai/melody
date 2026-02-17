@@ -12,7 +12,7 @@ use std::sync::LazyLock;
 
 // Compile regexes once at startup to avoid recompilation in hot path
 static TOOL_CALL_ID_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#""tool_call[^"]*":\s*""#).expect("Invalid tool_call_id regex"));
+    LazyLock::new(|| Regex::new(r#""tool_call(_id)?":\s*""#).expect("Invalid tool_call_id regex"));
 static TOOL_NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#""tool_name":\s*""#).expect("Invalid tool_name regex"));
 static PARAM_REGEX: LazyLock<Regex> =
