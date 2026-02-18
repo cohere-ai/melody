@@ -1,7 +1,7 @@
 use crate::errors::MelodyError;
 use crate::parsing::types::FilterCitation;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
-use crate::templating::{CitationQuality, ReasoningType, RenderCmd3Options, RenderCmd4Options};
+use crate::templating::{CitationQuality, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options};
 use minijinja::Environment;
 use serde_json::{Map, Value, json, to_string};
 use std::collections::{BTreeMap, HashMap};
@@ -184,7 +184,8 @@ pub(crate) fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>
     Ok(template_tools)
 }
 
-// Convert tools to template
+// Convert tools to template for jinja. Takes the input format of 'available_tools' and converts it to
+// chat completions tool format: https://developers.openai.com/api/reference/resources/chat#(resource)%20chat.completions%20%3E%20(model)%20chat_completion_tool%20%3E%20(schema) 
 fn tools_to_template_jinja(tools: &[Tool]) -> Vec<Map<String, Value>> {
     let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
     for tool in tools {
@@ -214,6 +215,11 @@ pub(crate) fn docs_to_template(
         .collect::<Result<Vec<_>, _>>()
 }
 
+// Goes through docs, converts them to json strings, escapes them, then loads them back as json objects.
+// This is done because the jinja template is intended to work outside of melody, where the user would
+// pass the documents as an object instead of escaped strings (which the function for the liquid template
+// returns). So we do this slightly roundabout way of escaping, otherwise would need to explore the nested
+// documents structure and escape each field.
 fn docs_to_template_jinja(
     documents: &[Map<String, Value>],
     special_token_map: &BTreeMap<String, String>,
@@ -500,9 +506,9 @@ pub(crate) fn messages_to_template(
     Ok(message_to_map(&template_messages))
 }
 
+// Based off of the minijinja version: https://github.com/mitsuhiko/minijinja/blob/64d933eaf325ba20e7af0012505571d7ae32364a/minijinja/src/filters.rs#L991
+// but we don't need indenting and we don't want the html char conversion, so using this
 fn tojson(value: &minijinja::Value) -> Result<minijinja::Value, minijinja::Error> {
-    // Based off of the minijinja version: https://github.com/mitsuhiko/minijinja/blob/64d933eaf325ba20e7af0012505571d7ae32364a/minijinja/src/filters.rs#L991
-    // but we don't need indenting and we don't want the html char conversion, so using this
     serde_json::to_string(&value)
         .map_err(|err| {
             minijinja::Error::new(
@@ -514,6 +520,8 @@ fn tojson(value: &minijinja::Value) -> Result<minijinja::Value, minijinja::Error
         .map(|s| minijinja::Value::from_safe_string(add_spaces_to_json_encoding(&s)))
 }
 
+// Set the minijinja env according to the huggingface settings:
+// https://github.com/huggingface/transformers/blob/57278c904c5158999d31a0db8bfcd63360c37b48/src/transformers/utils/chat_template_utils.py#L455-L460
 pub(crate) fn get_minijinja_env<'a>(
     template_name: &'a str,
     template: &'a str,
@@ -526,6 +534,8 @@ pub(crate) fn get_minijinja_env<'a>(
     Ok(env)
 }
 
+// This function does the majority of work needed to convert from our internal message format to 
+// the jinja supported chat completions format
 #[allow(clippy::too_many_lines)]
 fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyError> {
     fn get_vec<'a>(
@@ -541,7 +551,9 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
             .unwrap_or(def_vec)) as _
     }
 
+    // These are new messages due to tool results that we will insert after other conversions
     let mut new_messages = vec![];
+    // First bit of code is just to be able to loop through the messages mutably
     let converted_messages = messages
         .iter()
         .enumerate()
@@ -558,6 +570,8 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                     .as_str()
                     .unwrap_or_default();
 
+                // If there are tool calls in the message, we want to change the format to match chat completions:
+                // https://developers.openai.com/api/reference/resources/chat#(resource)%20chat.completions%20%3E%20(model)%20chat_completion_message_tool_call%20%3E%20(schema)
                 let tool_calls = get_vec(mobj, "tool_calls", &mut def_val, &mut def_vec);
                 let has_tool_calls = !tool_calls.is_empty();
                 for t in tool_calls.iter_mut() {
@@ -576,6 +590,9 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                     });
                 }
 
+                // This next section modifies the content array to use the appropriate chat completions field name
+                // instead of "data" to match our v2 api: https://docs.cohere.com/reference/chat#request.body.messages
+                // This mostly aligns with the chat completions format but we have our own thinking type
                 let content = get_vec(mobj, "content", &mut def_val, &mut def_vec);
                 for (content_idx, c) in content.iter_mut().enumerate() {
                     let mut def_map = Map::new();
@@ -594,7 +611,13 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                     }
                 }
 
+                // Here we deal with tool_results which is the most complicated because while our liquid template has the
+                // tool results of multiple tool calls in one array we have to split it out to a message per tool call id
+                // to match the chat completions / our v2 format: https://docs.cohere.com/reference/chat#request.body.messages.Tool-Message
+                // As a result this code creates a vector of new messages to insert and stores at which index to insert them
                 let tool_results = get_vec(mobj, "tool_results", &mut def_val, &mut def_vec);
+                // We build a map of tool call to new message index so that we can grab the correct existing 'new' message if the tool results
+                // for some reason has the same tool call id in multiple array items or create a new one
                 let mut tool_call_to_new_msg: BTreeMap<i64, usize> = BTreeMap::new();
                 for tres_val in tool_results.iter_mut() {
                     let def_map = Map::new();
@@ -606,11 +629,13 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                         .ok_or(MelodyError::TemplateValidation(
                             "Invalid tool call id in results during jinja conversion".to_string(),
                         ))?;
+                    // Get the documents to append to the new tool message content
                     let documents = tres.get("documents").unwrap_or_default().as_array().ok_or(
                         MelodyError::TemplateValidation(
                             "Invalid tool result documents during jinja conversion".to_string(),
                         ),
                     )?;
+                    // Get the new tool message idx from the map for this tool call id or insert it if not present
                     let new_msg_idx =
                         tool_call_to_new_msg.entry(tool_call_id).or_insert_with(|| {
                             let new_msg = json!({
@@ -621,7 +646,9 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                             new_messages.push((msg_idx, new_msg));
                             new_messages.len() - 1
                         });
+                    // Get the new message itself
                     let (_, msg_ref) = &mut new_messages[*new_msg_idx];
+                    // Append the documents to the message content
                     for doc in documents {
                         let doc_str = doc.as_str().ok_or(MelodyError::TemplateValidation(
                             "Invalid tool document format during jinja conversion".to_string(),
@@ -639,15 +666,27 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
         })
         .collect::<Result<Vec<Value>, MelodyError>>()?;
     if new_messages.is_empty() {
+        // There are no new messages to insert due to tool results, so just return the
+        // messages converted for jinja
         return Ok(converted_messages);
     }
 
+    // There are new tool messages to insert due to tool results
     let msgs_len = messages.len();
+    // Get the index of the new message to insert. Because this is a usize and we can't
+    // subtract 1 from a unsigned type, we actually have the index as the 1-based index not 0-based
+    // so that we can check when it is 0 to know it is done / no longer valid.
     let mut new_msg_idx1 = new_messages.len();
+    // Allocate a new messages vector with the size of the existing messages plus new messages.
+    // In reality we will skip some tool_results messages so this will be slightly oversized
     let mut all_msgs_rev = Vec::with_capacity(msgs_len + new_messages.len());
+    // Iterate over the messages and insert new messages at the appropriate indexes
+    // Do so in reverse order so that adding new messages does not affect
+    // the insertion index of subsequent iterations
     for (msg_rev_idx, msg) in converted_messages.iter().rev().enumerate() {
         let msg_idx = msgs_len - msg_rev_idx - 1;
         let mut was_replaced = false;
+        // While there is a tool message to insert at this message index, loop and insert it
         while new_msg_idx1 > 0
             && let (insrt_idx, new_msg) = &new_messages[new_msg_idx1 - 1]
             && insrt_idx == &msg_idx
@@ -656,6 +695,8 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
             was_replaced = true;
             new_msg_idx1 -= 1;
         }
+        // If this was a tool results message that was replaced by individual tool role messages
+        // then skip it, otherwise add it to all the messages
         if !was_replaced {
             all_msgs_rev.push(msg.clone());
         }
@@ -664,6 +705,7 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
     Ok(all_msgs_rev)
 }
 
+// Helper function to reduce duplication
 #[allow(clippy::type_complexity)]
 pub(crate) fn get_jinja_vars(
     messages: &[Value],
@@ -677,6 +719,7 @@ pub(crate) fn get_jinja_vars(
     Ok((messages, template_tools, docs))
 }
 
+// Common jinja subsitutions for cmd3 and cmd4
 #[allow(clippy::ref_option)]
 pub(crate) fn add_jinja_substitutions_common(
     substitutions: &mut Map<String, Value>,
@@ -731,8 +774,7 @@ pub(crate) fn add_jinja_substitutions_cmd3(
 
 pub(crate) fn add_jinja_substitutions_cmd4(
     substitutions: &mut Map<String, Value>,
-    _: &RenderCmd4Options,
-    grounding: bool,
+    opts: &RenderCmd4Options,
 ) {
     substitutions.insert(
         "developer_preamble".to_string(),
@@ -742,5 +784,9 @@ pub(crate) fn add_jinja_substitutions_cmd4(
             .clone(),
     );
     // TODO not currently used in cmd4 template but probably should be for backwards compatibility
+    let grounding = opts
+            .grounding
+            .as_ref()
+            .is_some_and(|x| *x == Grounding::Enabled);
     substitutions.insert("enable_citations".to_string(), Value::Bool(grounding));
 }

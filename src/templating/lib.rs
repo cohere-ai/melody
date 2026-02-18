@@ -302,11 +302,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
 
     if opts.use_jinja {
         add_jinja_substitutions_common(&mut substitutions, opts.json_mode, &opts.json_schema);
-        let grounding = opts
-            .grounding
-            .as_ref()
-            .is_some_and(|x| *x == Grounding::Enabled);
-        add_jinja_substitutions_cmd4(&mut substitutions, opts, grounding);
+        add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
         let template_name = "chat_template.jinja";
         let env = get_minijinja_env(template_name, opts.template_jinja)?;
