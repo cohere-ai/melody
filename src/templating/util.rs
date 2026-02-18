@@ -672,37 +672,32 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
     }
 
     // There are new tool messages to insert due to tool results
+    let new_msgs_len = new_messages.len();
     let msgs_len = messages.len();
-    // Get the index of the new message to insert. Because this is a usize and we can't
-    // subtract 1 from a unsigned type, we actually have the index as the 1-based index not 0-based
-    // so that we can check when it is 0 to know it is done / no longer valid.
-    let mut new_msg_idx1 = new_messages.len();
-    // Allocate a new messages vector with the size of the existing messages plus new messages.
+    // The index of the new message to insert
+    let mut new_msg_idx = 0;
+    // Allocate a new 'all_msgs' vector with the size of the existing messages plus new messages.
     // In reality we will skip some tool_results messages so this will be slightly oversized
-    let mut all_msgs_rev = Vec::with_capacity(msgs_len + new_messages.len());
+    let mut all_msgs = Vec::with_capacity(msgs_len + new_msgs_len);
     // Iterate over the messages and insert new messages at the appropriate indexes
-    // Do so in reverse order so that adding new messages does not affect
-    // the insertion index of subsequent iterations
-    for (msg_rev_idx, msg) in converted_messages.iter().rev().enumerate() {
-        let msg_idx = msgs_len - msg_rev_idx - 1;
+    for (msg_idx, msg) in converted_messages.iter().enumerate() {
         let mut was_replaced = false;
         // While there is a tool message to insert at this message index, loop and insert it
-        while new_msg_idx1 > 0
-            && let (insrt_idx, new_msg) = &new_messages[new_msg_idx1 - 1]
+        while new_msg_idx < new_msgs_len
+            && let (insrt_idx, new_msg) = &new_messages[new_msg_idx]
             && insrt_idx == &msg_idx
         {
-            all_msgs_rev.push(new_msg.clone());
+            all_msgs.push(new_msg.clone());
             was_replaced = true;
-            new_msg_idx1 -= 1;
+            new_msg_idx += 1;
         }
         // If this was a tool results message that was replaced by individual tool role messages
         // then skip it, otherwise add it to all the messages
         if !was_replaced {
-            all_msgs_rev.push(msg.clone());
+            all_msgs.push(msg.clone());
         }
     }
-    all_msgs_rev.reverse();
-    Ok(all_msgs_rev)
+    Ok(all_msgs)
 }
 
 // Helper function to reduce duplication
