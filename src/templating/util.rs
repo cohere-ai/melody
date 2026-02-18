@@ -1,7 +1,9 @@
 use crate::errors::MelodyError;
 use crate::parsing::types::FilterCitation;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
-use crate::templating::{CitationQuality, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options};
+use crate::templating::{
+    CitationQuality, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options,
+};
 use minijinja::Environment;
 use serde_json::{Map, Value, json, to_string};
 use std::collections::{BTreeMap, HashMap};
@@ -185,7 +187,7 @@ pub(crate) fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>
 }
 
 // Convert tools to template for jinja. Takes the input format of 'available_tools' and converts it to
-// chat completions tool format: https://developers.openai.com/api/reference/resources/chat#(resource)%20chat.completions%20%3E%20(model)%20chat_completion_tool%20%3E%20(schema) 
+// chat completions tool format: https://developers.openai.com/api/reference/resources/chat#(resource)%20chat.completions%20%3E%20(model)%20chat_completion_tool%20%3E%20(schema)
 fn tools_to_template_jinja(tools: &[Tool]) -> Vec<Map<String, Value>> {
     let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
     for tool in tools {
@@ -534,7 +536,7 @@ pub(crate) fn get_minijinja_env<'a>(
     Ok(env)
 }
 
-// This function does the majority of work needed to convert from our internal message format to 
+// This function does the majority of work needed to convert from our internal message format to
 // the jinja supported chat completions format
 #[allow(clippy::too_many_lines)]
 fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyError> {
@@ -780,8 +782,8 @@ pub(crate) fn add_jinja_substitutions_cmd4(
     );
     // TODO not currently used in cmd4 template but probably should be for backwards compatibility
     let grounding = opts
-            .grounding
-            .as_ref()
-            .is_some_and(|x| *x == Grounding::Enabled);
+        .grounding
+        .as_ref()
+        .is_some_and(|x| *x == Grounding::Enabled);
     substitutions.insert("enable_citations".to_string(), Value::Bool(grounding));
 }
