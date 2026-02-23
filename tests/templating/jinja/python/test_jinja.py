@@ -84,20 +84,22 @@ def read_test_data(file_path: str) -> Any:
 
 
 def get_template_info(template_path: str) -> tuple[str, str, str]:
-    if template_path == "jinja/cmd3_v1/template.jinja":
-        template_dir = "jinja/cmd3_v1"
-        test_dir = "jinja_tests/cmd3_v1"
-        template_name = "template.jinja"
-    else:
-        # Get template directory, and the directory's name
-        template_dir = dirname(template_path)
-        template_dir_name = basename(template_dir)
+    # Get template directory, and the directory's name
+    template_dir = dirname(template_path)
+    template_dir_name = basename(template_dir)
 
-        # Get template name
-        template_name = basename(template_path)
-        template_name_no_ext = template_name.replace(".jinja", "")
+    # Get template name
+    template_name = basename(template_path)
+    template_name_no_ext = template_name.replace(".jinja", "")
 
-        test_dir = f"jinja_tests/{template_dir_name}/{template_name_no_ext}"
+    if template_name_no_ext == "chat_merged_template_v1":
+        template_dir_name = "cmd3_v1_hf"
+    elif template_name_no_ext == "chat_merged_template":
+        template_dir_name = "cmd3_reasoning_hf"
+    elif template_name_no_ext == "chat_template":
+        template_dir_name = "cmd4_v1"
+
+    test_dir = f"jinja_tests/{template_dir_name}/{template_name_no_ext}"
 
     return template_dir, test_dir, template_name
 
@@ -105,17 +107,9 @@ def get_template_info(template_path: str) -> tuple[str, str, str]:
 @pytest.mark.parametrize(
     "template_path",
     [
-        "jinja/cmd3_v1/template.jinja",
-        "jinja/cmd3_v1_hf/default.jinja",
-        "jinja/cmd3_v1_hf/rag.jinja",
-        "jinja/cmd3_v1_hf/tool_use.jinja",
-        "jinja/cmd3_v1_hf/default_with_preamble.jinja",
-        "jinja/cmd3_v1_hf/chat_merged_template_v1.jinja",
-        "jinja/cmd3_reasoning_hf/chat_template.jinja",
-        "jinja/cmd3_reasoning_hf/rag.jinja",
-        "jinja/cmd3_reasoning_hf/tool_use.jinja",
-        "jinja/cmd3_reasoning_hf/chat_merged_template.jinja",
-        "jinja/cmd4_v1/chat_template.jinja",
+        "templates/jinja/cmd3/chat_merged_template_v1.jinja",
+        "templates/jinja/cmd3/chat_merged_template.jinja",
+        "templates/jinja/cmd4/chat_template.jinja",
     ],
 )
 @pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
