@@ -1,0 +1,23 @@
+target-version = "py311"
+
+[lint]
+select = [
+    "F",    # Pyflakes
+    "E",    # pycodestyle (error)
+    "W",    # pycodestyle (warning)
+    "I",    # isort
+    "C90",  # mccabe
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "ICN",  # flake8-import-conventions
+    "PIE",  # flake8-pie
+    "SIM",  # flake8-simplify
+    "RET",  # flake8-return
+    "TID",  # flake8-tidy-imports
+    "TCH",  # flake8-type-checking
+    "PGH",  # pygrep-hooks
+    "PERF", # Perflint
+    "RUF",  # Ruff-specific
+]
