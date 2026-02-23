@@ -50,7 +50,7 @@ jobs:
       - name: Install dependencies
         if: env.run_jinja_tests
         run: pip install -r requirements.txt
-        working-directory: tests/jinja/python
+        working-directory: tests/templating/jinja/python
 
       - name: Lint
         if: env.run_jinja_tests
@@ -58,9 +58,9 @@ jobs:
           ruff format --check
           ruff check
           mypy
-        working-directory: tests/jinja/python
+        working-directory: tests/templating/jinja/python
 
       - name: Run Jinja tests
         if: env.run_jinja_tests
         run: pytest --color=yes
-        working-directory: tests/jinja/python
+        working-directory: tests/templating/inja/python
