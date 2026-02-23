@@ -1,7 +1,11 @@
 use crate::errors::MelodyError;
 use crate::parsing::types::FilterCitation;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
-use serde_json::{Map, Value, to_string};
+use crate::templating::{
+    CitationQuality, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options,
+};
+use minijinja::Environment;
+use serde_json::{Map, Value, json, to_string};
 use std::collections::{BTreeMap, HashMap};
 
 pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
@@ -20,6 +24,7 @@ pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
     }
     b
 }
+
 pub(crate) fn json_escape_string(s: &str) -> String {
     let b = serde_json::to_string(s).unwrap_or_default();
     if b.len() < 2 {
@@ -179,6 +184,55 @@ pub(crate) fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>
         template_tools.push(tool_map);
     }
     Ok(template_tools)
+}
+
+// Convert tools to template for jinja. Takes the input format of 'available_tools' and converts it to
+// chat completions tool format: https://developers.openai.com/api/reference/resources/chat#(resource)%20chat.completions%20%3E%20(model)%20chat_completion_tool%20%3E%20(schema)
+fn tools_to_template_jinja(tools: &[Tool]) -> Vec<Map<String, Value>> {
+    let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
+    for tool in tools {
+        let mut tool_map = Map::new();
+        tool_map.insert("type".to_string(), Value::String("function".to_string()));
+        let func = json!({
+            "name": json_escape_string(&tool.name),
+            "description": json_escape_string(&tool.description),
+            "parameters": tool.parameters,
+        });
+        tool_map.insert("function".to_string(), func);
+        template_tools.push(tool_map);
+    }
+    template_tools
+}
+
+pub(crate) fn docs_to_template(
+    documents: &[Map<String, Value>],
+    special_token_map: &BTreeMap<String, String>,
+) -> Result<Vec<Value>, MelodyError> {
+    documents
+        .iter()
+        .map(|d| -> Result<_, MelodyError> {
+            let escaped = &escape_special_tokens(&to_string(d)?, special_token_map);
+            Ok(Value::String(add_spaces_to_json_encoding(escaped)))
+        })
+        .collect::<Result<Vec<_>, _>>()
+}
+
+// Goes through docs, converts them to json strings, escapes them, then loads them back as json objects.
+// This is done because the jinja template is intended to work outside of melody, where the user would
+// pass the documents as an object instead of escaped strings (which the function for the liquid template
+// returns). So we do this slightly roundabout way of escaping, otherwise would need to explore the nested
+// documents structure and escape each field.
+fn docs_to_template_jinja(
+    documents: &[Map<String, Value>],
+    special_token_map: &BTreeMap<String, String>,
+) -> Result<Vec<Value>, MelodyError> {
+    documents
+        .iter()
+        .map(|d| -> Result<_, MelodyError> {
+            let escaped = &escape_special_tokens(&to_string(d)?, special_token_map);
+            Ok(serde_json::from_str(escaped.as_str())?)
+        })
+        .collect::<Result<Vec<_>, _>>()
 }
 
 fn build_text_with_citation(text: &String, citation_inserts: &mut [CitationInsertInfo]) -> String {
@@ -452,4 +506,284 @@ pub(crate) fn messages_to_template(
         });
     }
     Ok(message_to_map(&template_messages))
+}
+
+// Based off of the minijinja version: https://github.com/mitsuhiko/minijinja/blob/64d933eaf325ba20e7af0012505571d7ae32364a/minijinja/src/filters.rs#L991
+// but we don't need indenting and we don't want the html char conversion, so using this
+fn tojson(value: &minijinja::Value) -> Result<minijinja::Value, minijinja::Error> {
+    serde_json::to_string(&value)
+        .map_err(|err| {
+            minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "cannot serialize to JSON",
+            )
+            .with_source(err)
+        })
+        .map(|s| minijinja::Value::from_safe_string(add_spaces_to_json_encoding(&s)))
+}
+
+// Set the minijinja env according to the huggingface settings:
+// https://github.com/huggingface/transformers/blob/57278c904c5158999d31a0db8bfcd63360c37b48/src/transformers/utils/chat_template_utils.py#L455-L460
+pub(crate) fn get_minijinja_env<'a>(
+    template_name: &'a str,
+    template: &'a str,
+) -> Result<minijinja::Environment<'a>, minijinja::Error> {
+    let mut env = Environment::new();
+    env.set_trim_blocks(true);
+    env.set_lstrip_blocks(true);
+    env.add_filter("tojson", tojson);
+    env.add_template(template_name, template)?;
+    Ok(env)
+}
+
+// This function does the majority of work needed to convert from our internal message format to
+// the jinja supported chat completions format
+#[allow(clippy::too_many_lines)]
+fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyError> {
+    fn get_vec<'a>(
+        val_map: &'a mut Map<String, Value>,
+        key: &str,
+        def_val: &'a mut Value,
+        def_vec: &'a mut Vec<Value>,
+    ) -> &'a mut Vec<Value> {
+        (val_map
+            .get_mut(key)
+            .unwrap_or(def_val)
+            .as_array_mut()
+            .unwrap_or(def_vec)) as _
+    }
+
+    // These are new messages due to tool results that we will insert after other conversions
+    let mut new_messages = vec![];
+    // First bit of code is just to be able to loop through the messages mutably
+    let converted_messages = messages
+        .iter()
+        .enumerate()
+        .map(|(msg_idx, m)| -> Result<Value, MelodyError> {
+            let mut new_m = m.clone();
+            if let Some(mobj) = new_m.as_object_mut() {
+                let def_str = json!("");
+                let mut def_val = Value::Null;
+                let mut def_vec = Vec::<Value>::new();
+                let mobj_tmp = mobj.clone();
+                let role = mobj_tmp
+                    .get("role")
+                    .unwrap_or(&def_str)
+                    .as_str()
+                    .unwrap_or_default();
+
+                // If there are tool calls in the message, we want to change the format to match chat completions:
+                // https://developers.openai.com/api/reference/resources/chat#(resource)%20chat.completions%20%3E%20(model)%20chat_completion_message_tool_call%20%3E%20(schema)
+                let tool_calls = get_vec(mobj, "tool_calls", &mut def_val, &mut def_vec);
+                let has_tool_calls = !tool_calls.is_empty();
+                for t in tool_calls.iter_mut() {
+                    let t_str = t.as_str().unwrap_or_default();
+                    if t_str.is_empty() {
+                        continue;
+                    }
+                    let tool_call: Map<String, Value> = serde_json::from_str(t_str)?;
+                    *t = json!({
+                        "id": tool_call.get("tool_call_id"),
+                        "type": "function",
+                        "function": {
+                            "name": tool_call.get("tool_name"),
+                            "arguments": tool_call.get("parameters")
+                        }
+                    });
+                }
+
+                // This next section modifies the content array to use the appropriate chat completions field name
+                // instead of "data" to match our v2 api: https://docs.cohere.com/reference/chat#request.body.messages
+                // This mostly aligns with the chat completions format but we have our own thinking type
+                let content = get_vec(mobj, "content", &mut def_val, &mut def_vec);
+                for (content_idx, c) in content.iter_mut().enumerate() {
+                    let mut def_map = Map::new();
+                    let content_item = c.as_object_mut().unwrap_or(&mut def_map);
+                    if role.to_lowercase() != "tool"
+                        && let Some(content_type) = content_item.get("type")
+                    {
+                        let mut type_str = content_type.as_str().unwrap_or_default().to_string();
+                        if type_str == "text" && content_idx == 0 && has_tool_calls {
+                            type_str = "thinking".to_string();
+                            content_item
+                                .insert("type".to_string(), Value::String(type_str.clone()));
+                        }
+                        let data = content_item.get("data").unwrap_or_default();
+                        content_item.insert(type_str, data.clone());
+                    }
+                }
+
+                // Here we deal with tool_results which is the most complicated because while our liquid template has the
+                // tool results of multiple tool calls in one array we have to split it out to a message per tool call id
+                // to match the chat completions / our v2 format: https://docs.cohere.com/reference/chat#request.body.messages.Tool-Message
+                // As a result this code creates a vector of new messages to insert and stores at which index to insert them
+                let tool_results = get_vec(mobj, "tool_results", &mut def_val, &mut def_vec);
+                // We build a map of tool call to new message index so that we can grab the correct existing 'new' message if the tool results
+                // for some reason has the same tool call id in multiple array items or create a new one
+                let mut tool_call_to_new_msg: BTreeMap<i64, usize> = BTreeMap::new();
+                for tres_val in tool_results.iter_mut() {
+                    let def_map = Map::new();
+                    let tres = tres_val.as_object().unwrap_or(&def_map);
+                    let tool_call_id = tres
+                        .get("tool_call_id")
+                        .unwrap_or_default()
+                        .as_i64()
+                        .ok_or(MelodyError::TemplateValidation(
+                            "Invalid tool call id in results during jinja conversion".to_string(),
+                        ))?;
+                    // Get the documents to append to the new tool message content
+                    let documents = tres.get("documents").unwrap_or_default().as_array().ok_or(
+                        MelodyError::TemplateValidation(
+                            "Invalid tool result documents during jinja conversion".to_string(),
+                        ),
+                    )?;
+                    // Get the new tool message idx from the map for this tool call id or insert it if not present
+                    let new_msg_idx =
+                        tool_call_to_new_msg.entry(tool_call_id).or_insert_with(|| {
+                            let new_msg = json!({
+                                "role": "tool",
+                                "tool_call_id": tool_call_id,
+                                "content": Value::Array(Vec::new()),
+                            });
+                            new_messages.push((msg_idx, new_msg));
+                            new_messages.len() - 1
+                        });
+                    // Get the new message itself
+                    let (_, msg_ref) = &mut new_messages[*new_msg_idx];
+                    // Append the documents to the message content
+                    for doc in documents {
+                        let doc_str = doc.as_str().ok_or(MelodyError::TemplateValidation(
+                            "Invalid tool document format during jinja conversion".to_string(),
+                        ))?;
+                        msg_ref
+                            .get_mut("content")
+                            .unwrap()
+                            .as_array_mut()
+                            .unwrap()
+                            .push(serde_json::from_str(doc_str)?);
+                    }
+                }
+            }
+            Ok(new_m)
+        })
+        .collect::<Result<Vec<Value>, MelodyError>>()?;
+    if new_messages.is_empty() {
+        // There are no new messages to insert due to tool results, so just return the
+        // messages converted for jinja
+        return Ok(converted_messages);
+    }
+
+    // There are new tool messages to insert due to tool results
+    let new_msgs_len = new_messages.len();
+    let msgs_len = messages.len();
+    // The index of the new message to insert
+    let mut new_msg_idx = 0;
+    // Allocate a new 'all_msgs' vector with the size of the existing messages plus new messages.
+    // In reality we will skip some tool_results messages so this will be slightly oversized
+    let mut all_msgs = Vec::with_capacity(msgs_len + new_msgs_len);
+    // Iterate over the messages and insert new messages at the appropriate indexes
+    for (msg_idx, msg) in converted_messages.iter().enumerate() {
+        let mut was_replaced = false;
+        // While there is a tool message to insert at this message index, loop and insert it
+        while new_msg_idx < new_msgs_len
+            && let (insrt_idx, new_msg) = &new_messages[new_msg_idx]
+            && insrt_idx == &msg_idx
+        {
+            all_msgs.push(new_msg.clone());
+            was_replaced = true;
+            new_msg_idx += 1;
+        }
+        // If this was a tool results message that was replaced by individual tool role messages
+        // then skip it, otherwise add it to all the messages
+        if !was_replaced {
+            all_msgs.push(msg.clone());
+        }
+    }
+    Ok(all_msgs)
+}
+
+// Helper function to reduce duplication
+#[allow(clippy::type_complexity)]
+pub(crate) fn get_jinja_vars(
+    messages: &[Value],
+    tools: &[Tool],
+    documents: &[Map<String, Value>],
+    special_token_map: &BTreeMap<String, String>,
+) -> Result<(Vec<Value>, Vec<Map<String, Value>>, Vec<Value>), MelodyError> {
+    let messages = convert_messages_for_jinja(messages)?;
+    let template_tools = tools_to_template_jinja(tools);
+    let docs = docs_to_template_jinja(documents, special_token_map)?;
+    Ok((messages, template_tools, docs))
+}
+
+// Common jinja subsitutions for cmd3 and cmd4
+#[allow(clippy::ref_option)]
+pub(crate) fn add_jinja_substitutions_common(
+    substitutions: &mut Map<String, Value>,
+    json_mode: bool,
+    json_schema: &Option<String>,
+) {
+    // TODO The next two substitutions should be configurable if used with vllm
+    substitutions.insert("add_generation_prompt".to_string(), Value::Bool(true));
+    substitutions.insert("bos_token".to_string(), json!("<BOS_TOKEN>"));
+    substitutions.insert("regen_tool_call_ids".to_string(), json!(false));
+
+    substitutions.insert(
+        "tools".to_string(),
+        substitutions
+            .get("available_tools")
+            .unwrap_or_default()
+            .clone(),
+    );
+
+    if json_mode || json_schema.is_some() {
+        let mut json_val = json!({"type": "json_object"});
+        if let Some(json_schema) = &json_schema {
+            json_val = json!({
+                "type": "json_object",
+                "schema": json_schema
+            });
+        }
+        substitutions.insert("response_format".to_string(), json_val);
+    }
+}
+
+pub(crate) fn add_jinja_substitutions_cmd3(
+    substitutions: &mut Map<String, Value>,
+    opts: &RenderCmd3Options,
+) {
+    substitutions.insert(
+        "developer_preamble".to_string(),
+        substitutions.get("preamble").unwrap_or_default().clone(),
+    );
+    if opts
+        .citation_quality
+        .as_ref()
+        .is_none_or(|v| *v != CitationQuality::Off)
+    {
+        substitutions.insert("enable_citations".to_string(), json!(true));
+    }
+    if opts.reasoning_type.is_some() {
+        let reasoning_enabled = matches!(opts.reasoning_type, Some(ReasoningType::Enabled));
+        substitutions.insert("reasoning".to_string(), Value::Bool(reasoning_enabled));
+    }
+}
+
+pub(crate) fn add_jinja_substitutions_cmd4(
+    substitutions: &mut Map<String, Value>,
+    opts: &RenderCmd4Options,
+) {
+    substitutions.insert(
+        "developer_preamble".to_string(),
+        substitutions
+            .get("developer_instruction")
+            .unwrap_or_default()
+            .clone(),
+    );
+    // TODO not currently used in cmd4 template but probably should be for backwards compatibility
+    let grounding = opts
+        .grounding
+        .as_ref()
+        .is_some_and(|x| *x == Grounding::Enabled);
+    substitutions.insert("enable_citations".to_string(), Value::Bool(grounding));
 }

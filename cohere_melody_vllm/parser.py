@@ -3,7 +3,7 @@
 Wraps the melody functionality into vLLM parsers for reasoning and tool calls.
 """
 
-from typing import Optional, Sequence, Union
+from typing import Optional, Sequence, Union, TYPE_CHECKING
 from vllm.entrypoints.openai.protocol import (
     ChatCompletionRequest,
     ResponsesRequest,
@@ -15,7 +15,7 @@ from vllm.entrypoints.openai.protocol import (
     ToolCall,
 )
 from vllm.reasoning import ReasoningParser, ReasoningParserManager
-from vllm.entrypoints.openai.tool_parsers import ToolParser, ToolParserManager
+from vllm.tool_parsers import ToolParser, ToolParserManager
 from vllm.transformers_utils.tokenizer import AnyTokenizer
 
 try:
@@ -27,7 +27,6 @@ except ModuleNotFoundError:
 REPLACEMENT_CHAR = "\ufffd"
 
 
-@ReasoningParserManager.register_module(["cohere2"])
 class CohereCommand2ReasoningParser(ReasoningParser):
 
     def __init__(self, tokenizer: AnyTokenizer, *args, **kwargs):
@@ -156,7 +155,10 @@ class CohereCommand2ReasoningParser(ReasoningParser):
         return any(input_id == end_token_id for input_id in reversed(input_ids))
 
 
-@ToolParserManager.register_module(["cohere2"])
+if not TYPE_CHECKING:
+    ReasoningParserManager.register_module(["cohere2"])(CohereCommand2ReasoningParser)
+
+
 class CohereCommand2ToolParser(ToolParser):
 
     def __init__(self, tokenizer: AnyTokenizer):
@@ -245,3 +247,7 @@ class CohereCommand2ToolParser(ToolParser):
             tool_calls=tool_calls,
             content=content,
         )
+
+
+if not TYPE_CHECKING:
+    ToolParserManager.register_module(["cohere2"])(CohereCommand2ToolParser)

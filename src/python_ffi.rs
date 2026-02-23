@@ -1,81 +1,52 @@
-//! Python bindings for the Melody parsing library
+//! Python bindings for the Melody parsing library.
 //!
-//! This module provides Python bindings using `PyO3`, allowing the Melody parser
-//! to be used directly from Python code.
+//! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4` for templating.
 
 use crate::parsing::types::{FilterOutput, TokenIDsWithLogProb};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
+use crate::templating::{
+    RenderCmd3Options, RenderCmd4Options, render_cmd3 as rust_render_cmd3,
+    render_cmd4 as rust_render_cmd4,
+};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use pythonize::depythonize;
+use serde_json::Value;
 
-/// Python wrapper for the streaming filter.
-///
-/// This class provides the main interface for parsing model outputs from Python.
-/// Create an instance with `PyFilterOptions` and then call `write_decoded` for
-/// each token as it arrives.
-#[pyclass]
-struct PyFilter {
-    inner: FilterImpl,
-}
+/// A Python dict extracted as a JSON value.
+struct PyDictValue(Value);
 
-#[pymethods]
-impl PyFilter {
-    /// Create a new filter with the given options.
-    ///
-    /// Args:
-    ///     opts: `PyFilterOptions` instance with desired configuration
-    ///
-    /// Returns:
-    ///     A new `PyFilter` instance
-    // TODO: figure out how we want to pass log probs (if we do)
-    #[new]
-    fn new(opts: &PyFilterOptions) -> Self {
-        PyFilter {
-            inner: new_filter(opts.inner.clone()),
-        }
-    }
+impl<'a, 'py> FromPyObject<'a, 'py> for PyDictValue {
+    type Error = PyErr;
 
-    /// Process a decoded token and return any completed outputs.
-    ///
-    /// Args:
-    ///     `decoded_token`: The decoded text for this token
-    ///
-    /// Returns:
-    ///     List of `FilterOutput` objects (may be empty if content is buffered)
-    ///
-    /// Note:
-    ///     Log probabilities are not currently supported in the Python API
-    fn write_decoded(&mut self, decoded_token: &str) -> Vec<FilterOutput> {
-        self.inner
-            .write_decoded(decoded_token, TokenIDsWithLogProb::new())
-    }
-
-    /// Flush any buffered partial outputs.
-    ///
-    /// Call this at the end of generation to output any content that was
-    /// buffered waiting for special tokens.
-    ///
-    /// Returns:
-    ///     List of remaining `FilterOutput` objects
-    fn flush_partials(&mut self) -> Vec<FilterOutput> {
-        self.inner.flush_partials()
+    fn extract(ob: Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
+        let dict: Borrowed<'a, 'py, PyDict> = ob.cast()?;
+        let value: Value = depythonize(&dict)
+            .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
+        Ok(PyDictValue(value))
     }
 }
 
-/// Python wrapper for filter configuration options.
+/// Configuration builder for creating filters.
 ///
-/// This class provides a builder pattern for configuring filter behavior.
-/// Use preset methods like `cmd3()` or customize with individual setters.
+/// Use the builder pattern to configure filter behavior.
+///
+/// # Example
+///
+/// ```python
+/// opts = PyFilterOptions().cmd3().with_chunk_size(10)
+/// filter = PyFilter(opts)
+/// ```
 #[pyclass]
+#[derive(Clone)]
 struct PyFilterOptions {
     inner: FilterOptions,
 }
 
 #[pymethods]
 impl PyFilterOptions {
-    /// Create a new options instance with default settings.
-    ///
-    /// Returns:
-    ///     A new `PyFilterOptions` instance
+    /// Create new filter options with default settings.
     #[new]
     fn new() -> Self {
         PyFilterOptions {
@@ -83,44 +54,368 @@ impl PyFilterOptions {
         }
     }
 
-    /// Configure for Cohere Command 3 model format.
-    ///
-    /// Enables grounded answer parsing, tool action streaming, and Command 3-style citations.
-    ///
-    /// Returns:
-    ///     Self (for method chaining)
-    fn cmd3(mut slf: PyRefMut<Self>) -> PyRefMut<Self> {
-        slf.inner = std::mem::take(&mut slf.inner).cmd3();
-        slf
+    /// Configure for Command 3 format.
+    fn cmd3(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().cmd3(),
+        }
     }
 
-    /// Configure for Cohere Command 4 model format.
-    ///
-    /// Similar to Command 3 but with different special token markers.
-    ///
-    /// Returns:
-    ///     Self (for method chaining)
-    fn cmd4(mut slf: PyRefMut<Self>) -> PyRefMut<Self> {
-        slf.inner = std::mem::take(&mut slf.inner).cmd4();
-        slf
+    /// Configure for Command 4 format.
+    fn cmd4(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().cmd4(),
+        }
     }
 
-    /// Remove a special token from the configuration.
-    ///
-    /// Args:
-    ///     token: The special token string to remove
-    ///
-    /// Returns:
-    ///     Self (for method chaining)
-    fn remove_token<'a>(mut slf: PyRefMut<'a, Self>, token: &str) -> PyRefMut<'a, Self> {
-        slf.inner = std::mem::take(&mut slf.inner).remove_token(token);
-        slf
+    /// Configure for RAG format.
+    fn rag(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().handle_rag(),
+        }
     }
+
+    /// Configure for multi-hop reasoning format.
+    fn multi_hop(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().handle_multi_hop(),
+        }
+    }
+
+    /// Configure for search query extraction.
+    fn search_query(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().handle_search_query(),
+        }
+    }
+
+    /// Set the chunk size for output batching.
+    fn with_chunk_size(&self, size: usize) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().with_chunk_size(size),
+        }
+    }
+
+    /// Enable left trimming of whitespace.
+    fn with_left_trimmed(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().with_left_trimmed(),
+        }
+    }
+
+    /// Enable right trimming of whitespace.
+    fn with_right_trimmed(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().with_right_trimmed(),
+        }
+    }
+
+    /// Add inclusive stop sequences.
+    fn with_inclusive_stops(&self, stops: Vec<String>) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().with_inclusive_stops(stops),
+        }
+    }
+
+    /// Add exclusive stop sequences.
+    fn with_exclusive_stops(&self, stops: Vec<String>) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().with_exclusive_stops(stops),
+        }
+    }
+
+    /// Enable streaming of tool actions.
+    fn stream_tool_actions(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().stream_tool_actions(),
+        }
+    }
+
+    /// Enable streaming of processed tool parameters.
+    fn stream_processed_params(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().stream_processed_params(),
+        }
+    }
+
+    /// Enable streaming of non-grounded answers.
+    fn stream_non_grounded_answer(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().stream_non_grounded_answer(),
+        }
+    }
+
+    /// Remove a special token from the token map.
+    fn remove_token(&self, token: &str) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().remove_token(token),
+        }
+    }
+
+    #[allow(clippy::unused_self)]
+    fn __repr__(&self) -> &'static str {
+        "PyFilterOptions(...)"
+    }
+}
+
+/// Streaming filter for parsing Cohere model outputs.
+///
+/// Create filters using `PyFilterOptions` or factory methods.
+///
+/// # Example with options
+///
+/// ```python
+/// opts = PyFilterOptions().cmd3().with_chunk_size(10)
+/// filter = PyFilter(opts)
+/// ```
+///
+/// # Example with factory methods
+///
+/// ```python
+/// filter = PyFilter.cmd3()
+/// for token in tokens:
+///     for output in filter.write_decoded(token):
+///         print(output.text)
+/// for output in filter.flush_partials():
+///     print(output.text)
+/// ```
+#[pyclass]
+struct PyFilter {
+    inner: FilterImpl,
+    config: &'static str,
+}
+
+#[pymethods]
+impl PyFilter {
+    /// Create a filter from `PyFilterOptions`.
+    #[new]
+    fn new(options: &PyFilterOptions) -> Self {
+        PyFilter {
+            inner: new_filter(options.inner.clone()),
+            config: "custom",
+        }
+    }
+
+    /// Create a filter for Command 3 format.
+    ///
+    /// # Arguments
+    ///
+    /// * `chunk_size` - Characters to buffer before emitting (default: 1)
+    #[staticmethod]
+    #[pyo3(signature = (chunk_size = None))]
+    fn cmd3(chunk_size: Option<usize>) -> Self {
+        let mut opts = FilterOptions::default().cmd3();
+        if let Some(size) = chunk_size {
+            opts = opts.with_chunk_size(size);
+        }
+        PyFilter {
+            inner: new_filter(opts),
+            config: "cmd3",
+        }
+    }
+
+    /// Create a filter for Command 4 format.
+    ///
+    /// # Arguments
+    ///
+    /// * `chunk_size` - Characters to buffer before emitting (default: 1)
+    #[staticmethod]
+    #[pyo3(signature = (chunk_size = None))]
+    fn cmd4(chunk_size: Option<usize>) -> Self {
+        let mut opts = FilterOptions::default().cmd4();
+        if let Some(size) = chunk_size {
+            opts = opts.with_chunk_size(size);
+        }
+        PyFilter {
+            inner: new_filter(opts),
+            config: "cmd4",
+        }
+    }
+
+    /// Process a decoded token and return any completed outputs.
+    ///
+    /// # Arguments
+    ///
+    /// * `decoded_token` - The decoded text for this token
+    ///
+    /// # Returns
+    ///
+    /// List of `FilterOutput` objects (may be empty if content is buffered)
+    fn write_decoded(&mut self, decoded_token: &str) -> Vec<FilterOutput> {
+        self.inner
+            .write_decoded(decoded_token, TokenIDsWithLogProb::new())
+    }
+
+    /// Flush any buffered partial outputs.
+    ///
+    /// Call this at the end of generation to get remaining content.
+    ///
+    /// # Returns
+    ///
+    /// List of remaining `FilterOutput` objects
+    fn flush_partials(&mut self) -> Vec<FilterOutput> {
+        self.inner.flush_partials()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("PyFilter(\"{}\")", self.config)
+    }
+}
+
+/// Render a Command 3 format prompt.
+///
+/// # Arguments
+///
+/// * `config` - Dict with rendering options:
+///   - `messages` (required): List of message dicts to include in the prompt.
+///   - `dev_instruction` (optional): Developer instruction to include.
+///   - `documents` (optional): Documents to include for grounding.
+///   - `available_tools` (optional): Tools available to the model.
+///   - `safety_mode` (optional): Safety mode configuration.
+///   - `citation_quality` (optional): Citation quality setting (default: "on").
+///   - `reasoning_type` (optional): Reasoning/thinking mode configuration.
+///   - `skip_preamble` (optional): Whether to skip the preamble section (default: false).
+///   - `response_prefix` (optional): Prefix for the response.
+///   - `json_schema` (optional): JSON schema for structured output.
+///   - `json_mode` (optional): Whether to enable JSON mode (default: false).
+///   - `additional_template_fields` (optional): Additional fields to substitute in the template.
+///   - `escaped_special_tokens` (optional): Special tokens to escape in the output.
+///
+/// # Returns
+///
+/// The rendered prompt string.
+///
+/// # Example
+///
+/// ```python
+/// render_cmd3({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
+/// ```
+#[pyfunction]
+#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts owned values
+fn render_cmd3(config: PyDictValue) -> PyResult<String> {
+    let opts: RenderCmd3Options = serde_path_to_error::deserialize(&config.0)
+        .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
+    rust_render_cmd3(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
+}
+
+/// Render a Command 4 format prompt.
+///
+/// # Arguments
+///
+/// * `config` - Dict with rendering options:
+///   - `messages` (required): List of message dicts to include in the prompt.
+///   - `dev_instruction` (optional): Developer instruction to include.
+///   - `platform_instruction` (optional): Platform instruction override.
+///   - `documents` (optional): Documents to include for grounding.
+///   - `available_tools` (optional): Tools available to the model.
+///   - `grounding` (optional): Grounding configuration (default: "enabled").
+///   - `response_prefix` (optional): Prefix for the response.
+///   - `json_schema` (optional): JSON schema for structured output.
+///   - `json_mode` (optional): Whether to enable JSON mode (default: false).
+///   - `additional_template_fields` (optional): Additional fields to substitute in the template.
+///   - `escaped_special_tokens` (optional): Special tokens to escape in the output.
+///
+/// # Returns
+///
+/// The rendered prompt string.
+///
+/// # Example
+///
+/// ```python
+/// render_cmd4({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
+/// ```
+#[pyfunction]
+#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts owned values
+fn render_cmd4(config: PyDictValue) -> PyResult<String> {
+    let opts: RenderCmd4Options = serde_path_to_error::deserialize(&config.0)
+        .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
+    rust_render_cmd4(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
 }
 
 #[pymodule]
 fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyFilter>()?;
     m.add_class::<PyFilterOptions>()?;
+    m.add_class::<PyFilter>()?;
+    m.add_function(wrap_pyfunction!(render_cmd3, m)?)?;
+    m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_write_decoded() {
+        let mut filter = PyFilter::cmd3(None);
+        let outputs = filter.write_decoded("Hello");
+        assert!(outputs.is_empty() || !outputs[0].text.is_empty());
+    }
+
+    #[test]
+    fn test_filter_flush_partials() {
+        let mut filter = PyFilter::cmd3(None);
+        filter.write_decoded("Hello world");
+        let outputs = filter.flush_partials();
+        let text: String = outputs.iter().map(|o| o.text.as_str()).collect();
+        assert!(text.contains("Hello"));
+    }
+
+    #[test]
+    fn test_render_cmd3_empty() {
+        let json = r#"{"messages": []}"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts: RenderCmd3Options = serde_path_to_error::deserialize(&value).unwrap();
+        let result = rust_render_cmd3(&opts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_cmd4_empty() {
+        let json = r#"{"messages": []}"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts: RenderCmd4Options = serde_path_to_error::deserialize(&value).unwrap();
+        let result = rust_render_cmd4(&opts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_cmd3_with_message() {
+        let json = r#"{
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "Hello!"}]}]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts: RenderCmd3Options = serde_path_to_error::deserialize(&value).unwrap();
+        let result = rust_render_cmd3(&opts).unwrap();
+        assert!(result.contains("USER"));
+        assert!(result.contains("Hello!"));
+    }
+
+    #[test]
+    fn test_render_cmd4_with_message() {
+        let json = r#"{
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "Hello!"}]}]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts: RenderCmd4Options = serde_path_to_error::deserialize(&value).unwrap();
+        let result = rust_render_cmd4(&opts).unwrap();
+        assert!(result.contains("USER"));
+        assert!(result.contains("Hello!"));
+    }
+
+    #[test]
+    fn test_render_cmd3_with_tools() {
+        let json = r#"{
+            "messages": [],
+            "available_tools": [{
+                "name": "search",
+                "description": "Search the web",
+                "parameters": {"type": "object"}
+            }]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts: RenderCmd3Options = serde_path_to_error::deserialize(&value).unwrap();
+        let result = rust_render_cmd3(&opts).unwrap();
+        assert!(result.contains("search"));
+    }
 }

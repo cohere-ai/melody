@@ -12,7 +12,7 @@ use std::sync::LazyLock;
 
 // Compile regexes once at startup to avoid recompilation in hot path
 static TOOL_CALL_ID_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#""tool_call_id":\s*""#).expect("Invalid tool_call_id regex"));
+    LazyLock::new(|| Regex::new(r#""tool_call(_id)?":\s*""#).expect("Invalid tool_call_id regex"));
 static TOOL_NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#""tool_name":\s*""#).expect("Invalid tool_name regex"));
 static PARAM_REGEX: LazyLock<Regex> =
@@ -517,6 +517,24 @@ mod tests {
         let (out, actual_remove) = filter.parse_actions(completion);
 
         assert_eq!(actual_remove, 47);
+        assert_eq!(out.len(), 1);
+        assert!(out[0].tool_call_delta.is_some());
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
+        assert_eq!(out[0].tool_call_delta.as_ref().unwrap().id, "0");
+    }
+
+    #[test]
+    fn test_parse_actions_with_tool_call_key_for_id_cmd3() {
+        let mut filter = FilterImpl::new();
+        filter.action_metadata = starting_metadata();
+        filter.stream_tool_actions = true;
+        filter.stream_processed_params = true;
+        filter.has_tool_call_id = true;
+
+        let completion = "Action:\n\t\t\t[\n\t\t\t   {\n\t\t\t\t   \"tool_call\": \"0\",";
+        let (out, actual_remove) = filter.parse_actions(completion);
+
+        assert_eq!(actual_remove, 44);
         assert_eq!(out.len(), 1);
         assert!(out[0].tool_call_delta.is_some());
         assert_eq!(out[0].tool_call_delta.as_ref().unwrap().index, 0);
