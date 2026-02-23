@@ -58,9 +58,7 @@ def get_cmd3_v1_tests() -> list[tuple[str, str, str]]:
 
 def get_cmd3_v3_tests() -> list[tuple[str, str, str]]:
     # get all .json files from the test_dir
-    merged_template = (
-        "templates/jinja/cmd3/chat_merged_template_default_thinking.jinja"
-    )
+    merged_template = "templates/jinja/cmd3/chat_merged_template_default_thinking.jinja"
 
     test_dir = "liquid_tests/rag/cmd3-v3"
 
