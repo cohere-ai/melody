@@ -1,0 +1,102 @@
+{
+    "variables": {
+      "safety_mode": "CONTEXTUAL",
+      "messages": [
+        {
+            "role": "User",
+            "content": [
+              {
+                "type": "text",
+                "data": "Can you check if I have any reminders for the week? If I'm invited to a bday, then delete it. Finally, sanity check that it was indeed deleted"
+              }
+            ]
+        },
+        {
+            "role": "Chatbot",
+            "content": [
+              {
+                "type": "text",
+                "data": "I will first check if there are any reminders for the week. If there is a reminder about a birthday, I will delete it. Then, I will check again to make sure the reminder was deleted."
+              }
+            ],
+            "tool_calls": [
+                "{\"tool_call_id\": \"0\", \"tool_name\": \"GetReminders\", \"parameters\": {}}"
+            ]
+        },
+        {
+            "role": "tool",
+            "tool_results": [
+              {
+                "tool_call_id": 0,
+                "documents": [
+                  "{\"reminder_name\": \"birthday\", \"reminder_description\": \"great birthday party planned in paris\"}",
+                  "{\"reminder_name\": \"new year\", \"reminder_description\": \"preparing for 2025!\"}"
+                ]
+              }
+            ]
+        },
+        {
+            "role": "Chatbot",
+            "content": [
+              {
+                "type": "text",
+                "data": "I found a reminder about a birthday party in Paris. I will now delete this reminder."
+              }
+            ],
+            "tool_calls": [
+              "{\"tool_call_id\": \"1\", \"tool_name\": \"DeleteReminder\", \"parameters\": {\"reminder_name\": \"birthday\"}}"
+            ]
+        },
+        {
+            "role": "tool",
+            "tool_results": [
+              {
+                "tool_call_id": 1,
+                "documents": [
+                  "{\"code\": \"Success\"}"
+                ]
+              }
+            ]
+        },
+        {
+            "role": "Chatbot",
+            "content": [
+              {
+                "type": "text",
+                "data": "I have successfully deleted the reminder. I will now check again to make sure the reminder was deleted."
+              }
+            ],
+            "tool_calls": [
+              "{\"tool_call_id\": \"2\", \"tool_name\": \"GetReminders\", \"parameters\": {}}"
+            ]
+        },
+        {
+          "role": "tool",
+          "tool_results": [
+            {
+              "tool_call_id": 2,
+              "documents": [
+                "{\"reminder_name\": \"new year\", \"reminder_description\": \"preparing for 2025!\"}"
+              ]
+            }
+          ]
+        }
+      ],
+      "available_tools": [
+        {
+            "name": "GetReminders",
+            "definition": {
+              "description": "Get a list of reminders.",
+              "json_schema": "{\"type\": \"object\", \"properties\": {}, \"required\": []}"
+            }
+        },
+        {
+            "name": "DeleteReminder",
+            "definition": {
+              "description": "Delete a reminder.",
+              "json_schema": "{\"type\": \"object\", \"properties\": {\"reminder_id\": {\"type\": \"string\"}}, \"required\": [\"reminder_id\"]}"
+            }
+        }
+      ]
+    }
+  }

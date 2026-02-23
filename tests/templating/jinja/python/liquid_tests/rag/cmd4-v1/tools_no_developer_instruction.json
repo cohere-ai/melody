@@ -1,0 +1,32 @@
+{
+    "variables": {
+        "messages": [
+            {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "How are you?"
+                    }
+                ],
+                "user_name": "User"
+            }
+        ],
+        "available_tools": [
+            {
+                "name": "get_weather",
+                "definition": {
+                     "description": "gets the weather of a given location",
+                     "json_schema": "{\"type\": \"object\", \"properties\": {\"location\": {\"type\": \"string\", \"description\": \"the location to get the weather, example: San Francisco.\"}}, \"required\": [\"location\"]}"
+                }
+            },
+            {
+                "name": "get_capital_city",
+                "definition": {
+                    "description": "gets the capital city of a given country",
+                    "json_schema": "{\"type\": \"object\", \"properties\": {\"country\": {\"type\": \"string\", \"description\": \"the country to get the capital city for\"}}, \"required\": [\"country\"]}"
+                }
+            }
+        ]
+    }
+}

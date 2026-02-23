@@ -1,0 +1,16 @@
+{
+	"conversation": [
+    {
+      "role": "system",
+      "content": "This is a developer preamble"
+    },
+    {
+		  "role": "system",
+      "content": "This is a system msg"
+	  },
+    {
+      "role": "user",
+      "content": "Hi"
+    }
+	]
+}

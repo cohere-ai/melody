@@ -1,0 +1,12 @@
+{
+	"messages": [
+        {
+            "role": "system",
+            "content": "This is a developer preamble"
+        },
+        {
+            "role": "user",
+            "content": "Hi"
+        }
+	]
+}

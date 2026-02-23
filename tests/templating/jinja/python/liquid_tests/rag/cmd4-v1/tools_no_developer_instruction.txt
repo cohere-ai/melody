@@ -1,0 +1,7 @@
+<BOS_TOKEN><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|># Available Tools
+```json
+[
+    {"name": "get_weather", "description": "gets the weather of a given location", "parameters": {"type": "object", "properties": {"location": {"type": "string", "description": "the location to get the weather, example: San Francisco."}}, "required": ["location"]}, "responses": null},
+    {"name": "get_capital_city", "description": "gets the capital city of a given country", "parameters": {"type": "object", "properties": {"country": {"type": "string", "description": "the country to get the capital city for"}}, "required": ["country"]}, "responses": null}
+]
+```<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>How are you?<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>

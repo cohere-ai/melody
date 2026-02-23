@@ -1,0 +1,16 @@
+{
+	"messages": [
+        {
+            "role": "system",
+            "content": "This is a developer preamble"
+        },
+        {
+            "role": "user",
+            "content": "Hi"
+        }
+	],
+    "add_generation_prompt": true,
+    "response_format": {
+      "type": "json_object"
+    }
+}

@@ -1,0 +1,99 @@
+{
+    "variables": {
+      "safety_mode": "CONTEXTUAL",
+      "messages": [
+        {
+          "role": "User",
+          "content": [
+            {
+              "type": "text",
+              "data": "Can you check if I have any reminders for the week?"
+            }
+          ]
+        },
+        {
+          "role": "Chatbot",
+          "content": [
+            {
+              "type": "text",
+              "data": "I will use the GetReminders tool to check if the user has any reminders."
+            }
+          ], 
+          "tool_calls": [
+            "{\"tool_call_id\": \"0\", \"tool_name\": \"GetReminders\", \"parameters\": {}}"
+          ]
+        },
+        {
+            "role": "tool",
+            "tool_results": [
+                {
+                    "tool_call_id": 0,
+                    "documents": [
+                      "{\"reminder_id\": \"59-80bc\", \"task\": \"Buy groceries\", \"due_date\": \"2023-09-11 23:59:59\", \"status\": \"pending\"}",
+                      "{\"reminder_id\": \"14-579a\", \"task\": \"Call Amy\", \"due_date\": \"2023-09-11 23:59:59\", \"status\": \"pending\"}",
+                      "{\"reminder_id\": \"5b-dd80\", \"task\": \"finish your report\", \"due_date\": \"2023-09-15 23:59:59\", \"status\": \"pending\"}",
+                      "{\"reminder_id\": \"20-d9ca\", \"task\": \"call your mom\", \"due_date\": \"2023-09-17 23:59:59\", \"status\": \"pending\"}"
+                    ]
+                }
+            ]
+        },
+        {
+            "role": "Chatbot",
+            "content": [
+              {
+                "type": "text",
+                "data": "I found 4 reminders for you. They are buy groceries, call amy, finish your report and call your mom. Would you like me to delete any of them?"
+              }
+            ]
+        },
+        {
+            "role": "User",
+            "content": [
+              {
+                "type": "text",
+                "data": "Yes, please delete the reminder to call amy."
+              }
+            ]
+        },
+        {
+            "role": "Chatbot",
+            "content": [
+              {
+                "type": "text",
+                "data": "I will use the DeleteReminder tool to delete the reminder to call amy."
+              }
+            ],
+            "tool_calls": [
+              "{\"tool_call_id\": \"1\", \"tool_name\": \"DeleteReminder\", \"parameters\": { \"reminder_id\": \"14-579a\" }}"
+            ]
+        },
+        {
+          "role": "tool",
+          "tool_results": [
+            {
+              "tool_call_id": 1,
+              "documents": [
+                "{\"reminder_id\": \"14-579a\", \"task\": \"Call Amy\", \"due_date\": \"2023-09-11 23:59:59\", \"status\": \"deleted\"}"
+              ]
+            }
+          ]
+        }
+      ],
+      "available_tools": [
+        {
+          "name": "GetReminders",
+          "definition": {
+            "description": "Get a list of reminders.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {}, \"required\": []}"
+          }
+        },
+        {
+          "name": "DeleteReminder",
+          "definition": {
+            "description": "Delete a reminder.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {\"reminder_id\": {\"type\": \"string\"}}, \"required\": [\"reminder_id\"]}"
+          }
+        }
+      ]
+    }
+  }

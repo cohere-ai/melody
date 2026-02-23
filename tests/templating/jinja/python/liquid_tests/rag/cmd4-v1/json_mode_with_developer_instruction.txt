@@ -1,0 +1,8 @@
+<BOS_TOKEN><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|># Available Tools
+```json
+[
+
+]
+```
+
+When generating JSON objects, do not generate block markers. Generate an object directly without prefixing with ```json. Return only the JSON and nothing else.<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>This is a developer instruction<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>Hi<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>

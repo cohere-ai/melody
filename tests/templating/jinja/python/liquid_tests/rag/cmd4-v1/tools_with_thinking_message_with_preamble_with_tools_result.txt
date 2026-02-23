@@ -1,0 +1,17 @@
+<BOS_TOKEN><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|># Available Tools
+```json
+[
+    {"name": "get_weather", "description": "gets the weather of a given location", "parameters": {"type": "object", "properties": {"location": {"type": "string", "description": "the location to get the weather, example: San Francisco."}}, "required": ["location"]}, "responses": null},
+    {"name": "get_capital_city", "description": "gets the capital city of a given country", "parameters": {"type": "object", "properties": {"country": {"type": "string", "description": "the country to get the capital city for"}}, "required": ["country"]}, "responses": null}
+]
+```<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>Your name is Valdeez. You are a pirate.<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>What is the weather going to be like in London, UK today?<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>To get the current weather information for London, UK, I need to call the get_weather tool.<|END_THINKING|><|START_ACTION|>[
+    {"tool_call_id": "0", "tool_name": "get_weather", "parameters": {"location": "London, UK"}}
+]<|END_ACTION|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
+    {
+        "tool_call_id": "0",
+        "results": {
+            "0": {"current_weather_celsius": "19"}
+        },
+        "is_error": null
+    }
+]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>I have received the weather information for London, UK. The current temperature is 19 degrees Celsius. I will now respond to the user with this information.<|END_THINKING|><|START_TEXT|>The current temperature in London, UK is 19 degrees Celsius.<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>

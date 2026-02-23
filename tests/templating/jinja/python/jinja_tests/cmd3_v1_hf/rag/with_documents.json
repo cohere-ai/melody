@@ -1,0 +1,30 @@
+{
+    "messages": [
+        {
+            "role": "user",
+            "content": "What were sales like on December 1st?"
+        },
+        {
+            "role": "assistant",
+            "content": "On december 1st, we made $1000 and sold 10 units"
+          },
+        {
+            "role": "user",
+            "content": "What was the website traffic like on that day?"
+        }
+    ],
+    "documents": [
+        {
+            "title": "Sales Summary",
+            "snippet": "December 1st: $1000, 10 units sold"
+        },
+        {
+            "title": "Sales Summary",
+            "snippet": "December 2st: $500"
+        },
+        {
+            "title": "Website Traffic Summary",
+            "snippet": "December 1st: 10000 users"
+        }
+    ]
+}

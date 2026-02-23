@@ -1,0 +1,65 @@
+{
+	"conversation": [
+    {
+      "role": "user",
+      "content": "What is the weather on December 1st"
+    },
+    {
+		  "role": "assistant",
+      "content": "I will use the get_weather tool to find the weather in Toronto, ON",
+      "tool_calls": [
+        {
+          "id": "get_weather_123456",
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "arguments": {"location":  "Toronto, ON"}
+          }
+        }
+      ]
+	  },
+    {
+      "role": "tool",
+      "tool_call_id": "get_weather_123456",
+      "content": "1c"
+    },
+    {
+      "role": "assistant",
+      "content": "It was 1c on December 1st in Toronto, ON"
+    },
+    {
+      "role": "user",
+      "content": "what about the 2nd?"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description" : "gets the weather of a given location",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type" : "str",
+              "description": "the location to get weather, example: San Fransisco, CA"
+            }
+          },
+          "required": ["location"]
+        }
+      }
+    }
+  ],
+	"documents": [
+    {
+      "date": "December 1st",
+      "location": "Toronto, ON"
+    },
+    {
+      "date": "December 2st",
+      "location": "New York, NY"
+    }
+  ],
+  "enable_citations": true
+}

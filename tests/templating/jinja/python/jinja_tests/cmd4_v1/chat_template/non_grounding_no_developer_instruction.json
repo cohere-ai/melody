@@ -1,0 +1,16 @@
+{
+    "messages": [
+        {
+            "role": "User",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "How are you?"
+                }
+            ],
+            "user_name": "User"
+        }
+    ],
+    "bos_token": "<BOS_TOKEN>",
+    "add_generation_prompt": true
+}

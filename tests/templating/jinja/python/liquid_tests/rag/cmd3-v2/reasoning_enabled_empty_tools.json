@@ -1,0 +1,18 @@
+{
+    "variables": {
+      "reasoning_options": {
+        "enabled": true
+      },
+      "messages": [
+        {
+          "role": "User",
+          "content": [
+            {
+              "type": "text",
+              "data": "Hello!"
+            }
+          ]
+        }
+      ]
+    }
+  }

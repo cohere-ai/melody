@@ -1,0 +1,17 @@
+{
+    "variables": {
+        "developer_instruction": "Your name is Valdeez. You are a pirate.",
+        "messages": [
+            {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "How are you?"
+                    }
+                ],
+                "user_name": "User"
+            }
+        ]
+    }
+}

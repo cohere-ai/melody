@@ -1,0 +1,18 @@
+{
+    "variables": {
+        "messages": [
+            {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "Hi"
+                    }
+                ],
+                "user_name": "User"
+            }
+        ],
+        "safety_mode": "CONTEXTUAL",
+        "json_mode": true
+    }
+}

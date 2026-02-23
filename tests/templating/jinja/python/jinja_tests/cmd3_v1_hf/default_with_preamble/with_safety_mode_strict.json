@@ -1,0 +1,9 @@
+{
+    "safety_mode": "strict",
+	"messages": [
+        {
+            "role": "user",
+            "content": "Hi"
+        }
+	]
+}

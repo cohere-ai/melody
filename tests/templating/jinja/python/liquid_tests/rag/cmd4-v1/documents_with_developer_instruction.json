@@ -1,0 +1,21 @@
+{
+    "variables": {
+        "developer_instruction": "This is a developer instruction",
+        "messages": [
+            {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "Summarize this pdf"
+                    }
+                ],
+                "user_name": "User"
+            }
+        ],
+         "documents": [
+             "{ \"content\": \"pdf chunk 1\" }",
+             "{ \"content\": \"pdf chunk 2\" }"
+        ]
+    }
+}

@@ -1,0 +1,55 @@
+{
+    "variables": {
+      "safety_mode": "CONTEXTUAL",
+      "skip_thinking": true,
+      "messages": [
+        {
+          "role": "User",
+           "content": [
+                {
+                    "type": "text",
+                    "data": "How many r's are there in strawberry?"
+                }
+            ]
+        },
+        {
+            "role": "Chatbot",
+            "content": [
+                {
+                    "type": "thinking",
+                    "data": "Hmm let me think"
+                },
+                {
+                    "type": "text",
+                    "data": "There are 3 r's in strawberry."
+                }
+            ]
+        },
+        {
+            "role": "User",
+            "content": [
+                {
+                    "type": "text",
+                    "data": "Thanks!"
+                }
+            ]
+        }
+      ],
+      "available_tools": [
+        {
+          "name": "GetReminders",
+          "definition": {
+            "description": "Get a list of reminders.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {}, \"required\": []}"
+          }
+        },
+        {
+          "name": "DeleteReminder",
+          "definition": {
+            "description": "Delete a reminder.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {\"reminder_id\": {\"type\": \"string\"}}, \"required\": [\"reminder_id\"]}"
+          }
+        }
+      ]
+    }
+  }

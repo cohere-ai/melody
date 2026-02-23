@@ -1,0 +1,22 @@
+{
+    "variables": {
+        "preamble": "Your name is Valdeez. You are a pirate.",
+        "messages": [
+            {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "Summarize this pdf"
+                    }
+                ],
+                "user_name": "User"
+            }
+        ],
+        "documents": [
+            "{ \"content\": \"pdf chunk 1\" }",
+            "{ \"content\": \"pdf chunk 2\" }"
+        ],
+        "safety_mode": "NONE"
+    }
+}

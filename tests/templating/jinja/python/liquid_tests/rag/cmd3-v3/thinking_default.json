@@ -1,0 +1,44 @@
+{
+    "variables": {
+      "safety_mode": "CONTEXTUAL",
+      "messages": [
+        {
+          "role": "User",
+          "content": [
+            {
+              "type": "text",
+              "data": "Tell me the weather in London"
+            }
+          ]
+        },
+        {
+          "role": "Chatbot",
+          "tool_calls": [
+            "{\"tool_call_id\": \"0\", \"tool_name\": \"get_weather\", \"parameters\": {\"location\": \"London, UK\"}}"
+          ]
+        },
+        {
+          "role": "Chatbot",
+          "content": [
+            {
+              "type": "text",
+              "data": "The weather is 10 degrees"
+            }
+          ]
+        },
+        {
+          "role": "Chatbot",
+          "content": [
+            {
+              "type": "thinking",
+              "data": "This thinking should not be replaced by the default"
+            },
+            {
+              "type": "text",
+              "data": "The response after thinking"
+            }
+          ]
+        }
+      ]
+    }
+  }

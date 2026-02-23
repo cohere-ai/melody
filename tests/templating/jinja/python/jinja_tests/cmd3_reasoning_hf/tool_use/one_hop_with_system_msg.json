@@ -1,0 +1,65 @@
+
+{
+    "messages": [
+        {
+            "role": "system",
+            "content": "This is a developer preamble"
+        },
+        {
+            "role": "user",
+            "content": "Can you provide a sales summary for 29th September 2023, and also give me some details about the products in the 'Electronics' category, for example their prices and stock levels?"
+        },
+        {
+            "role": "assistant",
+            "tool_plan": "I will first search for the sales summary for 29th September 2023. Then, I will search for the products in the 'Electronics' category, including their prices and stock levels.",
+            "tool_calls": [
+              {
+                "id": "query_daily_sales_report_2ygywn57zc6g",
+                "type": "function",
+                "function": {
+                  "name": "query_daily_sales_report",
+                  "arguments": {"day": "2023-09-29"}
+                }
+              },
+              {
+                "id": "query_product_catalog_0k0zcz8g14qh",
+                "type": "function",
+                "function": {
+                  "name": "query_product_catalog",
+                  "arguments": {"category": "Electronics"}
+                }
+              }
+            ]
+          },
+        {
+            "role": "tool",
+            "tool_call_id": "query_daily_sales_report_2ygywn57zc6g",
+            "content": {"output": "Total Sales Amount: 10000, Total Units Sold: 250"}
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "query_product_catalog_0k0zcz8g14qh",
+            "content": {"output": "Product 1: iPhone 13, Price: $999, Stock Level: 100\nProduct 2: Samsung Galaxy S21, Price: $899, Stock Level: 50"}
+        }
+    ],
+    "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description" : "gets the weather of a given location",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "location": {
+                  "type" : "string",
+                  "description": "the location to get weather, example: San Fransisco, CA"
+                }
+              },
+              "required": ["location"]
+            }
+          }
+        }
+    ],
+    "add_generation_prompt": true
+}
