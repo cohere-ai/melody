@@ -380,6 +380,14 @@ pub(crate) fn messages_to_template(
                             .documents
                             .push(escape_special_tokens(&rendered_obj, special_token_map));
                     }
+                } else if content_item.content_type == ContentType::Image {
+                    if let Some(ref obj) = content_item.image {
+                        let img_obj = json!({"image_content": obj.template_placeholder.clone()});
+                        let rendered_obj = add_spaces_to_json_encoding(&to_string(&img_obj)?);
+                        m.tool_results[tool_result_idx]
+                            .documents
+                            .push(rendered_obj);
+                    }
                 } else {
                     return Err(MelodyError::TemplateValidation(format!(
                         "tool message[{i}].content[{j}] invalid content type"
