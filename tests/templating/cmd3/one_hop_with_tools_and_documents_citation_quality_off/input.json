@@ -46,6 +46,10 @@
         {
           "type": "document",
           "document": {"reminder_id": "20-d9ca", "task": "call your mom", "due_date": "2023-09-17 23:59:59", "status": "pending"}
+        },
+        {
+          "type": "image",
+          "image": {"template_placeholder": "<IMG_DATA>"}
         }
       ]
     }

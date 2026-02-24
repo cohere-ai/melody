@@ -1,7 +1,7 @@
 import json
 import os
 from enum import Enum
-from os.path import basename, dirname, isfile, join
+from os.path import basename, dirname, isdir, join
 from typing import Any
 
 import jinja2
@@ -120,9 +120,11 @@ def test_render_template(template_path: str, engine: Engine) -> None:
     test_files = [
         f
         for f in os.listdir(test_dir)
-        if isfile(join(test_dir, f)) and f.endswith(".json")
+        # check not isdir instead of isfile so invalid symlinks are caught
+        if not isdir(join(test_dir, f)) and f.endswith(".json")
     ]
 
+    print(f"Running {len(test_files)} tests for {template_path}")
     errors = []
     for test_file in test_files:
         test_data = read_test_data(f"{test_dir}/{test_file}")
