@@ -100,6 +100,8 @@ typedef struct {
     const CMessage* messages;
     size_t messages_len;
     const char* template;
+    const char* template_jinja;
+    bool use_jinja;
     const char* dev_instruction;
     const char* const* documents_json;
     size_t documents_len;
@@ -123,6 +125,8 @@ typedef struct {
     const CMessage* messages;
     size_t messages_len;
     const char* template;
+    const char* template_jinja;
+    bool use_jinja;
     const char* dev_instruction;
     const char* platform_instruction;
     const char* const* documents_json;

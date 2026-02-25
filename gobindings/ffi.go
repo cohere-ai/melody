@@ -622,6 +622,8 @@ type Message struct {
 type RenderCmd3Options struct {
 	Messages                 []Message            `json:"messages"`
 	Template                 string               `json:"template"`
+	TemplateJinja            string               `json:"template_jinja"`
+	UseJinja                 bool                 `json:"use_jinja"`
 	DevInstruction           *string              `json:"dev_instruction,omitempty"`
 	Documents                []orderedjson.Object `json:"documents,omitempty"` // JSON objects
 	AvailableTools           []Tool               `json:"available_tools,omitempty"`
@@ -639,6 +641,8 @@ type RenderCmd3Options struct {
 type RenderCmd4Options struct {
 	Messages                 []Message            `json:"messages"`
 	Template                 string               `json:"template"`
+	TemplateJinja            string               `json:"template_jinja"`
+	UseJinja                 bool                 `json:"use_jinja"`
 	DevInstruction           *string              `json:"dev_instruction,omitempty"`
 	PlatformInstruction      *string              `json:"platform_instruction,omitempty"`
 	Documents                []orderedjson.Object `json:"documents,omitempty"`
@@ -926,6 +930,8 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 		messages:                        cMsgs,
 		messages_len:                    cMsgsLen,
 		template:                        a.CString(opts.Template),
+		template_jinja:                  a.CString(opts.TemplateJinja),
+		use_jinja:                       C.bool(opts.UseJinja),
 		documents_json:                  cDocs,
 		documents_len:                   cDocsLen,
 		available_tools:                 cTools,
@@ -991,6 +997,8 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		messages:                        cMsgs,
 		messages_len:                    cMsgsLen,
 		template:                        a.CString(opts.Template),
+		template_jinja:                  a.CString(opts.TemplateJinja),
+		use_jinja:                       C.bool(opts.UseJinja),
 		documents_json:                  cDocs,
 		documents_len:                   cDocsLen,
 		available_tools:                 cTools,

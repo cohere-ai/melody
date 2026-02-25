@@ -1059,6 +1059,10 @@ pub struct CRenderCmd3Options {
     pub messages_len: usize,
     /// Template as a null-terminated C string
     pub template: *const c_char,
+    /// Jinja template as a null-terminated C string
+    pub template_jinja: *const c_char,
+    /// Whether to use the jinja template
+    pub use_jinja: bool,
     /// Developer instruction as a null-terminated C string
     pub dev_instruction: *const c_char,
     /// Pointer to array of document JSON strings
@@ -1104,6 +1108,10 @@ pub struct CRenderCmd4Options {
     pub messages_len: usize,
     /// Template as a null-terminated C string
     pub template: *const c_char,
+    /// Jinja template as a null-terminated C string
+    pub template_jinja: *const c_char,
+    /// Whether to use the jinja template
+    pub use_jinja: bool,
     /// Developer instruction as a null-terminated C string
     pub dev_instruction: *const c_char,
     /// Platform instruction as a null-terminated C string
@@ -1430,14 +1438,20 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
     };
 
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
-    if template.is_empty() {
-        rs_opts
-    } else {
-        RenderCmd3Options {
+    let template_jinja = unsafe { CStr::from_ptr(opts.template_jinja).to_str().unwrap() };
+    if !template_jinja.is_empty() && opts.use_jinja {
+        return RenderCmd3Options {
+            template_jinja,
+            ..rs_opts
+        }
+    }
+    if !template.is_empty() && !opts.use_jinja {
+        return RenderCmd3Options {
             template,
             ..rs_opts
         }
     }
+    rs_opts
 }
 
 unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Options<'a> {
@@ -1501,17 +1515,24 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
+        use_jinja: opts.use_jinja,
         ..Default::default()
     };
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
-    if template.is_empty() {
-        rs_opts
-    } else {
-        RenderCmd4Options {
+    let template_jinja = unsafe { CStr::from_ptr(opts.template_jinja).to_str().unwrap() };
+    if !template_jinja.is_empty() && opts.use_jinja {
+        return RenderCmd4Options {
+            template_jinja,
+            ..rs_opts
+        }
+    }
+    if !template.is_empty() && !opts.use_jinja {
+        return RenderCmd4Options {
             template,
             ..rs_opts
         }
     }
+    rs_opts
 }
 
 // ============================================================================
