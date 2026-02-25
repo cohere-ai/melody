@@ -1444,13 +1444,13 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
         return RenderCmd3Options {
             template_jinja,
             ..rs_opts
-        }
+        };
     }
     if !template.is_empty() && !opts.use_jinja {
         return RenderCmd3Options {
             template,
             ..rs_opts
-        }
+        };
     }
     rs_opts
 }
@@ -1525,13 +1525,13 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         return RenderCmd4Options {
             template_jinja,
             ..rs_opts
-        }
+        };
     }
     if !template.is_empty() && !opts.use_jinja {
         return RenderCmd4Options {
             template,
             ..rs_opts
-        }
+        };
     }
     rs_opts
 }
