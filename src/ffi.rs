@@ -1434,6 +1434,7 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
+        use_jinja: opts.use_jinja,
         ..Default::default()
     };
 
