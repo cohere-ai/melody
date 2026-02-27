@@ -1,5 +1,6 @@
 {
-  "skip_preamble": true,
+  "platform_instruction": "",
+  "dev_instruction": "",
   "messages": [
     {
       "role": "User",
