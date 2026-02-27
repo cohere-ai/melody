@@ -35,6 +35,3 @@ tkzrs = ["tokenizers", "libc"]
 
 [lints.clippy]
 pedantic = "warn"
-
-[profile.release]
-debug = true
