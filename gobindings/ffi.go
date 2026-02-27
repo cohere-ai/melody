@@ -766,7 +766,7 @@ func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
 			arr[i].image = img
 		}
 		// document_json (optional)
-		if c.Document.Len() > 0 {
+		if c.Type == ContentDocument {
 			arr[i].document_json = jsonCString(a, c.Document)
 		}
 	}
