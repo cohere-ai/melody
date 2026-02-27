@@ -1057,6 +1057,8 @@ pub struct CRenderCmd3Options {
     pub messages: *const CMessage,
     /// Number of messages
     pub messages_len: usize,
+    /// Optional template ID to use instead of template string
+    pub template_id: *const c_char,
     /// Template as a null-terminated C string
     pub template: *const c_char,
     /// Jinja template as a null-terminated C string
@@ -1106,6 +1108,8 @@ pub struct CRenderCmd4Options {
     pub messages: *const CMessage,
     /// Number of messages
     pub messages_len: usize,
+    /// Optional template ID to use instead of template string
+    pub template_id: *const c_char,
     /// Template as a null-terminated C string
     pub template: *const c_char,
     /// Jinja template as a null-terminated C string
@@ -1434,6 +1438,7 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
+        template_id: unsafe { cstr_opt(opts.template_id) },
         use_jinja: opts.use_jinja,
         ..Default::default()
     };
@@ -1516,6 +1521,7 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         json_mode: opts.json_mode,
         additional_template_fields,
         escaped_special_tokens,
+        template_id: unsafe { cstr_opt(opts.template_id) },
         use_jinja: opts.use_jinja,
         ..Default::default()
     };

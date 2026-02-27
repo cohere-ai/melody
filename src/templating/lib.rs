@@ -17,6 +17,8 @@ use std::collections::BTreeMap;
 pub struct RenderCmd3Options<'a> {
     /// Messages to include in the rendered prompt.
     pub messages: Vec<Message>,
+    /// Optional template ID to use instead of template string
+    pub template_id: Option<String>,
     /// Template string to use for rendering.
     pub template: &'a str,
     /// Jinja template string
@@ -62,6 +64,7 @@ impl Default for RenderCmd3Options<'_> {
     fn default() -> Self {
         Self {
             messages: Vec::new(),
+            template_id: None,
             template: CMD3V1_TEMPLATE,
             template_jinja: CMD3V1_JINJA_TEMPLATE,
             use_jinja: false,
@@ -88,6 +91,8 @@ impl Default for RenderCmd3Options<'_> {
 pub struct RenderCmd4Options<'a> {
     /// Messages to include in the rendered prompt.
     pub messages: Vec<Message>,
+    /// Optional template ID to use instead of template string
+    pub template_id: Option<String>,
     /// Template string to use for rendering.
     pub template: &'a str,
     /// Jinja template string
@@ -122,6 +127,7 @@ impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
             messages: Vec::new(),
+            template_id: None,
             template: CMD4V1_TEMPLATE,
             template_jinja: CMD4V1_JINJA_TEMPLATE,
             use_jinja: false,

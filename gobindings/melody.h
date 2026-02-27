@@ -99,6 +99,7 @@ typedef struct {
 typedef struct {
     const CMessage* messages;
     size_t messages_len;
+    const char* template_id;
     const char* template;
     const char* template_jinja;
     bool use_jinja;
@@ -124,6 +125,7 @@ typedef struct {
 typedef struct {
     const CMessage* messages;
     size_t messages_len;
+    const char* template_id;
     const char* template;
     const char* template_jinja;
     bool use_jinja;
