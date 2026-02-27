@@ -1,0 +1,17 @@
+{
+    "variables": {
+        "platform_instruction_override": "This system turn takes precedence.",
+        "messages": [
+            {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "How are you?"
+                    }
+                ],
+                "user_name": "User"
+            }
+        ]
+    }
+}

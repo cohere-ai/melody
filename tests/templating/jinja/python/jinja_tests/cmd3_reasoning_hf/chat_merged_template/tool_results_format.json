@@ -1,0 +1,50 @@
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "whats the weather in toronto"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "type": "function",
+          "id": "call_123",
+          "function": {
+            "name": "get_weather",
+            "arguments": "{\"city\": \"toronto\"}"
+          }
+        },
+        {
+          "type": "function",
+          "id": "call_456",
+          "function": {
+            "name": "get_weather",
+            "arguments": "{\"city\": \"london\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_123",
+      "content": [
+        { "type": "text", "text": "Toronto today 5 degrees" },
+        { "type": "text", "text": "Toronto yesterday 3 degrees" },
+        { "type": "document", "document":  { "data": {"week": "Toronto avg is 6 degrees"} } }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_456",
+      "content": "the weather in london is 10 degrees"
+    }
+  ],
+  "add_generation_prompt": true
+}

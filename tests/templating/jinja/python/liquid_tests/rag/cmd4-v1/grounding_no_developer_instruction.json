@@ -1,0 +1,17 @@
+{
+    "variables": {
+        "messages": [
+            {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "How are you?"
+                    }
+                ],
+                "user_name": "User"
+            }
+        ],
+        "grounding": "enabled"
+    }
+}

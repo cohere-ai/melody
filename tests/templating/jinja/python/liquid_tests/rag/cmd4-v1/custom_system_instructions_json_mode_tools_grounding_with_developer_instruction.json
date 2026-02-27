@@ -1,0 +1,36 @@
+{
+    "variables": {
+        "messages": [
+            {
+               "role": "User",
+               "content": [
+                    {
+                        "type": "text",
+                        "data": "Hi"
+                    }
+                ],
+                "user_name": "User"
+            }
+        ],
+        "platform_instruction_override": "This system turn takes precedence.",
+        "developer_instruction": "This is a developer instruction",
+        "json_mode": true,
+        "grounding": "enabled",
+        "available_tools": [
+            {
+                "name": "get_weather",
+                "definition": {
+                     "description": "gets the weather of a given location",
+                     "json_schema": "{\"type\": \"object\", \"properties\": {\"location\": {\"type\": \"string\", \"description\": \"the location to get the weather, example: San Francisco.\"}}, \"required\": [\"location\"]}"
+                }
+            },
+            {
+                "name": "get_capital_city",
+                "definition": {
+                    "description": "gets the capital city of a given country",
+                    "json_schema": "{\"type\": \"object\", \"properties\": {\"country\": {\"type\": \"string\", \"description\": \"the country to get the capital city for\"}}, \"required\": [\"country\"]}"
+                }
+            }
+        ]
+    }
+}

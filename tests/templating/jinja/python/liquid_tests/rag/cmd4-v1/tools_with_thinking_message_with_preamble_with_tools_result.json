@@ -1,0 +1,70 @@
+{
+    "variables": {
+        "developer_instruction": "Your name is Valdeez. You are a pirate.",
+        "messages": [
+             {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "What is the weather going to be like in London, UK today?"
+                    }
+                ],
+                "user_name": "User"
+            },
+            {
+                "role": "Chatbot",
+                "content": [
+                    {
+                        "type": "thinking",
+                        "data": "To get the current weather information for London, UK, I need to call the get_weather tool."
+                    }
+                ],
+                "tool_calls": [
+                   "{\"tool_call_id\": \"0\", \"tool_name\": \"get_weather\", \"parameters\": {\"location\": \"London, UK\"}}"
+                ]
+            },
+            {
+                "role": "Tool",
+                 "tool_results": [
+                    {
+                        "tool_call_id": "0",
+                        "documents": [
+                            "{\"current_weather_celsius\": \"19\"}"
+                        ],
+                        "is_error": null
+                    }
+                ]
+            },
+            {
+                "role": "Chatbot",
+                "content": [
+                    {
+                        "type": "thinking",
+                        "data": "I have received the weather information for London, UK. The current temperature is 19 degrees Celsius. I will now respond to the user with this information."
+                    },
+                    {
+                        "type": "text",
+                        "data": "The current temperature in London, UK is 19 degrees Celsius."
+                    }
+                ]
+            }
+        ],
+        "available_tools": [
+            {
+                "name": "get_weather",
+                "definition": {
+                     "description": "gets the weather of a given location",
+                     "json_schema": "{\"type\": \"object\", \"properties\": {\"location\": {\"type\": \"string\", \"description\": \"the location to get the weather, example: San Francisco.\"}}, \"required\": [\"location\"]}"
+                }
+            },
+            {
+                "name": "get_capital_city",
+                "definition": {
+                    "description": "gets the capital city of a given country",
+                    "json_schema": "{\"type\": \"object\", \"properties\": {\"country\": {\"type\": \"string\", \"description\": \"the country to get the capital city for\"}}, \"required\": [\"country\"]}"
+                }
+            }
+        ]
+    }
+}

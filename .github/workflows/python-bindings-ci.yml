@@ -30,7 +30,7 @@ jobs:
           source .venv/bin/activate
           pip install cohere_melody --find-links dist --force-reinstall
           pip install pytest
-          pytest
+          pytest --ignore=tests/templating/jinja/python
 
   py-format:
     runs-on: ubuntu-latest

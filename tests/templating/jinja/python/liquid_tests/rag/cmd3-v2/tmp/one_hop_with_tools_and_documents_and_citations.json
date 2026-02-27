@@ -1,0 +1,159 @@
+{
+    "variables": {
+      "safety_mode": "CONTEXTUAL",
+      "citation_mode": "OFF",
+      "messages": [
+        {
+          "role": "User",
+          "content": [
+            {
+              "type": "text",
+              "data": "Can you check if I have any reminders for the week?"
+            }
+          ]
+        },
+        {
+          "role": "Chatbot",
+          "content": [
+            {
+              "type": "text",
+              "data":  "I will use the GetReminders tool to check if the user has any reminders."
+            }
+          ],
+          "tool_calls": [
+            "{\"tool_call_id\": \"0\", \"tool_name\": \"GetReminders\", \"parameters\": {}}"
+          ]
+        },
+        {
+          "role": "Tool",
+          "tool_results": [
+            {
+              "tool_call_id": 1,
+              "documents": [
+                "{\"reminder_id\": \"59-80bc\", \"task\": \"Buy groceries\", \"due_date\": \"2023-09-11 23:59:59\", \"status\": \"pending\"}",
+                "{\"reminder_id\": \"14-579a\", \"task\": \"Call Amy\", \"due_date\": \"2023-09-11 23:59:59\", \"status\": \"pending\"}",
+                "{\"reminder_id\": \"5b-dd80\", \"task\": \"finish your report\", \"due_date\": \"2023-09-15 23:59:59\", \"status\": \"pending\"}",
+                "{\"reminder_id\": \"20-d9ca\", \"task\": \"call your mom\", \"due_date\": \"2023-09-17 23:59:59\", \"status\": \"pending\"}"
+              ]
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "hello, what is the weather"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "I will use the get_weather tool"
+            }
+          ],
+          "tool_calls": [
+            {
+              "id": "tool_call_1",
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"location\": \"Toronto\"}"
+              }
+            },
+            {
+              "id": "tool_call_2",
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"location\": \"London\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "tool_call_1",
+          "content": [
+            {
+              "type": "text",
+              "text": "10 degrees"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "tool_call_2",
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"degrees\": 25}"
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "What is the weather in London?"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "First, I need to understand the user's request. They are asking for the weather in London.\n\nLooking at the available tools, there's a 'get_weather' tool that requires a 'location' parameter. Since the user specified London, I should use this tool with the location set to London.\n\nI'll check the previous tool calls and results. Indeed, there was a tool call for London (tool_call_id=1) which returned 25 degrees. This information is current and directly answers the user's query.\n\nNo further tool calls are needed since the required data is already available."
+            },
+            {
+              "type": "text",
+              "text": "The weather in London is 25 degrees."
+            }
+          ],
+          "citations": [
+            {
+              "start": 25,
+              "end": 36,
+              "text": "25 degrees.",
+              "sources": [
+                {
+                  "type": "tool",
+                  "id": "tool_call_2:0",
+                  "tool_output": {
+                    "degrees": "25"
+                  }
+                }
+              ],
+              "type": "TEXT_CONTENT",
+              "content_index": 1
+            }
+          ]
+        }
+      ],
+      "documents": [
+        "{ pdf chunk 1 }",
+        "{ pdf chunk 2 }"
+      ],
+      "available_tools": [
+        {
+          "name": "GetReminders",
+          "definition": {
+            "description": "Get a list of reminders.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {}, \"required\": []}"
+          }
+        },
+        {
+          "name": "DeleteReminder",
+          "definition": {
+            "description": "Delete a reminder.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {\"reminder_id\": {\"type\": \"string\"}}, \"required\": [\"reminder_id\"]}"
+          }
+        }
+      ]
+    }
+  }

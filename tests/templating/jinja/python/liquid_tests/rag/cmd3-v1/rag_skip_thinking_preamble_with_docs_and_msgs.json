@@ -1,0 +1,61 @@
+{
+    "variables": {
+      "safety_mode": "CONTEXTUAL",
+      "skip_thinking": true,
+      "messages": [
+        {
+          "role": "User",
+          "content": [
+            {
+              "type": "text",
+              "data": "Summarize the documents for me. Then, check my reminders to see if I've set aside time to read them."
+            }
+          ]
+        },
+        {
+            "role": "Chatbot",
+            "content": [
+              {
+                "type": "text",
+                "data":  "The documents can be summarised as xyz. I will now check the reminders using GetReminders."
+              }
+            ],
+            "tool_calls": [
+                "{\"tool_call_id\": \"0\", \"tool_name\": \"GetReminders\", \"parameters\": {}}"
+            ]
+        },
+        {
+            "role": "tool",
+            "tool_results": [
+              {
+                "tool_call_id": 0,
+                "documents": [
+                  "{\"reminder_name\": \"birthday\", \"reminder_description\": \"great birthday party planned in paris\"}",
+                  "{\"reminder_name\": \"new year\", \"reminder_description\": \"preparing for 2025!\"}"
+                ]
+              }
+            ]
+        }
+      ],
+      "documents": [
+          "{ \"content\": \"pdf chunk 1\" }",
+          "{ \"content\": \"pdf chunk 2\" }"
+      ],
+      "available_tools": [
+        {
+          "name": "GetReminders",
+          "definition": {
+            "description": "Get a list of reminders.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {}, \"required\": []}"
+          }
+        },
+        {
+          "name": "DeleteReminder",
+          "definition": {
+            "description": "Delete a reminder.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {\"reminder_id\": {\"type\": \"string\"}}, \"required\": [\"reminder_id\"]}"
+          }
+        }
+      ]
+    }
+  }

@@ -1,0 +1,26 @@
+{
+    "variables": {
+        "messages": [
+            {
+                "role": "System",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "System message 1"
+                    }
+                ]
+            },
+            {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "How are you?"
+                    }
+                ]
+            }
+        ],
+        "safety_mode": "CONTEXTUAL",
+        "skip_preamble": true
+    }
+}

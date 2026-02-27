@@ -1,0 +1,10 @@
+{
+    "bos_token": "<BOS>",
+	"messages": [
+        {
+            "role": "user",
+            "content": "Hi"
+        }
+	],
+    "add_generation_prompt": true
+}

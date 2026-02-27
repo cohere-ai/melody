@@ -1,0 +1,7 @@
+<BOS_TOKEN><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|># Available Tools
+```json
+[
+    {"name": "get_weather", "description": "gets the weather of a given location", "parameters": {"type": "object", "properties": {"location": {"type": "string", "description": "the location to get the weather, example: San Francisco."}}, "required": ["location"]}, "responses": null},
+    {"name": "get_capital_city", "description": "gets the capital city of a given country", "parameters": {"type": "object", "properties": {"country": {"type": "string", "description": "the country to get the capital city for"}}, "required": ["country"]}, "responses": null}
+]
+```<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>Your name is Valdeez. You are a pirate.<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>How many r's are there in the word starry?<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>To determine how many 'r's are in the word starry, I will count the occurrences of the letter 'r' in the word. The word starry consists of the following letters: s, t, a, r, r, y. Upon examination, I see that the letter 'r' appears twice in the word. Therefore, there are 2 'r's in the word starry.<|END_THINKING|><|START_TEXT|>There are 2 'r's in the word starry.<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|><|START_TEXT|>Thank you!<|END_TEXT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>

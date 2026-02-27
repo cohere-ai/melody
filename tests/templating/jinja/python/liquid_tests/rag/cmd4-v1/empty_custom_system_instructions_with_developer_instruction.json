@@ -1,0 +1,18 @@
+{
+    "variables": {
+        "developer_instruction": "This is a developer instruction",
+        "messages": [
+            {
+                "role": "User",
+                "content": [
+                    {
+                        "type": "text",
+                        "data": "How are you?"
+                    }
+                ],
+                "user_name": "User"
+            }
+        ],
+        "platform_instruction_override": ""
+    }
+}

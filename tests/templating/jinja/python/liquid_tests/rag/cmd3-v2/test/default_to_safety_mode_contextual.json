@@ -1,0 +1,31 @@
+{
+    "variables": {
+      "messages": [
+        {
+          "role": "User",
+          "content": [
+            {
+              "type": "text",
+              "data": "Can you check if I have any reminders for the week?"
+            }
+          ]
+        }
+      ],
+      "available_tools": [
+        {
+          "name": "GetReminders",
+          "definition": {
+            "description": "Get a list of reminders.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {}, \"required\": []}"
+          }
+        },
+        {
+          "name": "DeleteReminder",
+          "definition": {
+            "description": "Delete a reminder.",
+            "json_schema": "{\"type\": \"object\", \"properties\": {\"reminder_id\": {\"type\": \"string\"}}, \"required\": [\"reminder_id\"]}"
+          }
+        }
+      ]
+    }
+  }

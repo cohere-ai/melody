@@ -1,0 +1,9 @@
+{
+    "bos_token": "<BOS>",
+	"messages": [
+        {
+            "role": "user",
+            "content": "Hi"
+        }
+	]
+}

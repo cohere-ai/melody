@@ -1,0 +1,70 @@
+name: python jinja CI
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  merge_group: {}
+
+permissions:
+  contents: read
+
+env:
+  branch_name: ${{ github.head_ref || github.ref_name }} # https://stackoverflow.com/a/71158878
+
+jobs:
+   jinja-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # only run tests if there are differences in go files or model config files.
+      - name: Check for modified files
+        run: |
+          PATHS=(
+            ':src/templating/templates/**'
+            ':tests/templating/jinja/python/**'
+            ':*.jinja'
+            ':*.py'
+            ':.github/workflows/python-jinja-tests.yml'
+          )
+          git fetch origin main
+          if [ "${branch_name}" == "main" ] && ! git diff --quiet HEAD~1 HEAD -- "${PATHS[@]}"; then
+            echo "on main branch with relevant files changed, running jinja tests"
+            echo "run_jinja_tests=true" >> $GITHUB_ENV
+          elif git diff --quiet origin/main -- "${PATHS[@]}"; then
+            echo "no relevant files modified!"
+          else
+            echo "relevant files modified, running jinja tests"
+            echo "run_jinja_tests=true" >> $GITHUB_ENV
+          fi
+
+      - name: Install Python
+        if: env.run_jinja_tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+          cache: pip
+          cache-dependency-path: tests/templating/jinja/python/requirements.txt
+
+      - name: Install dependencies
+        if: env.run_jinja_tests
+        run: pip install -r requirements.txt
+        working-directory: tests/templating/jinja/python
+
+      - name: Lint
+        if: env.run_jinja_tests
+        run: |
+          ruff format --check
+          ruff check
+          mypy
+        working-directory: tests/templating/jinja/python
+
+      - name: Run Jinja tests
+        if: env.run_jinja_tests
+        run: pytest --color=yes
+        working-directory: tests/templating/jinja/python
