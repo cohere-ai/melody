@@ -9,6 +9,7 @@ use crate::templating::util::{
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 /// Options for cmd3 rendering.
 #[derive(Debug, Clone, Deserialize)]
@@ -56,7 +57,7 @@ static CMD3_JINJA_TEMPLATE_BASE: &str =
     include_str!("templates/jinja/cmd3/chat_merged_template.jinja");
 static CMD3V1_JINJA_TEMPLATE: &str =
     include_str!("templates/jinja/cmd3/chat_merged_template_v1.jinja");
-#[allow(dead_code)]
+static CMD3V2_JINJA_TEMPLATE: &str = CMD3_JINJA_TEMPLATE_BASE;
 static CMD3V3_JINJA_TEMPLATE: &str =
     include_str!("templates/jinja/cmd3/chat_merged_template_default_thinking.jinja");
 
@@ -145,6 +146,58 @@ impl Default for RenderCmd4Options<'_> {
     }
 }
 
+enum CMD3JinjaTemplates {
+    CMD3V1,
+    CMD3V2,
+    CMD3V3,
+}
+
+impl FromStr for CMD3JinjaTemplates {
+    type Err = MelodyError;
+
+    fn from_str(o: &str) -> Result<Self, Self::Err> {
+        match o {
+            "cmd3-v1" => Ok(Self::CMD3V1),
+            "cmd3-v2" => Ok(Self::CMD3V2),
+            "cmd3-v3" => Ok(Self::CMD3V3),
+            _ => Err(MelodyError::TemplateValidation(format!("unknown template id: {o}"))),
+        }
+    }
+}
+
+impl CMD3JinjaTemplates {
+    fn get_template(&self) -> &str {
+        match *self {
+            CMD3JinjaTemplates::CMD3V1 => CMD3V1_JINJA_TEMPLATE,
+            CMD3JinjaTemplates::CMD3V2 => CMD3V2_JINJA_TEMPLATE,
+            CMD3JinjaTemplates::CMD3V3 => CMD3V3_JINJA_TEMPLATE,
+        }
+    }
+}
+
+enum CMD4JinjaTemplates {
+    CMD4V1,
+}
+
+impl CMD4JinjaTemplates {
+    fn get_template(&self) -> &str {
+        match *self {
+            CMD4JinjaTemplates::CMD4V1 => CMD4V1_JINJA_TEMPLATE,
+        }
+    }
+}
+
+impl FromStr for CMD4JinjaTemplates {
+    type Err = MelodyError;
+
+    fn from_str(o: &str) -> Result<Self, Self::Err> {
+        match o {
+            "cmd4-v1" => Ok(Self::CMD4V1),
+            _ => Err(MelodyError::TemplateValidation(format!("unknown template id: {o}"))),
+        }
+    }
+}
+
 /// Renders a CMD3 format prompt from the given options.
 ///
 /// # Errors
@@ -228,8 +281,15 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         add_jinja_substitutions_common(&mut substitutions, opts.json_mode, &opts.json_schema);
         add_jinja_substitutions_cmd3(&mut substitutions, opts);
 
+        let mut active_template = opts.template_jinja;
+        let template_enum: CMD3JinjaTemplates;
+        if let Some(template_id) = opts.template_id.as_ref() {
+            template_enum = CMD3JinjaTemplates::from_str(&template_id)?;
+            active_template = template_enum.get_template();
+        }
+
         let template_name = "chat_template.jinja";
-        let mut env = get_minijinja_env(template_name, opts.template_jinja)?;
+        let mut env = get_minijinja_env(template_name, active_template)?;
         env.add_template("chat_merged_template.jinja", CMD3_JINJA_TEMPLATE_BASE)?;
         let template = env.get_template(template_name)?;
         let template_str = template.render(&substitutions)?;
@@ -310,8 +370,15 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
         add_jinja_substitutions_common(&mut substitutions, opts.json_mode, &opts.json_schema);
         add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
+        let mut active_template = opts.template_jinja;
+        let template_enum: CMD4JinjaTemplates;
+        if let Some(template_id) = opts.template_id.as_ref() {
+            template_enum = CMD4JinjaTemplates::from_str(&template_id)?;
+            active_template = template_enum.get_template();
+        }
+
         let template_name = "chat_template.jinja";
-        let env = get_minijinja_env(template_name, opts.template_jinja)?;
+        let env = get_minijinja_env(template_name, active_template)?;
         let template = env.get_template(template_name)?;
         let template_str = template.render(&substitutions)?;
 
