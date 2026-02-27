@@ -160,7 +160,9 @@ impl FromStr for CMD3JinjaTemplates {
             "cmd3-v1" => Ok(Self::CMD3V1),
             "cmd3-v2" => Ok(Self::CMD3V2),
             "cmd3-v3" => Ok(Self::CMD3V3),
-            _ => Err(MelodyError::TemplateValidation(format!("unknown template id: {o}"))),
+            _ => Err(MelodyError::TemplateValidation(format!(
+                "unknown template id: {o}"
+            ))),
         }
     }
 }
@@ -193,7 +195,9 @@ impl FromStr for CMD4JinjaTemplates {
     fn from_str(o: &str) -> Result<Self, Self::Err> {
         match o {
             "cmd4-v1" => Ok(Self::CMD4V1),
-            _ => Err(MelodyError::TemplateValidation(format!("unknown template id: {o}"))),
+            _ => Err(MelodyError::TemplateValidation(format!(
+                "unknown template id: {o}"
+            ))),
         }
     }
 }
@@ -284,7 +288,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         let mut active_template = opts.template_jinja;
         let template_enum: CMD3JinjaTemplates;
         if let Some(template_id) = opts.template_id.as_ref() {
-            template_enum = CMD3JinjaTemplates::from_str(&template_id)?;
+            template_enum = CMD3JinjaTemplates::from_str(template_id)?;
             active_template = template_enum.get_template();
         }
 
@@ -373,7 +377,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
         let mut active_template = opts.template_jinja;
         let template_enum: CMD4JinjaTemplates;
         if let Some(template_id) = opts.template_id.as_ref() {
-            template_enum = CMD4JinjaTemplates::from_str(&template_id)?;
+            template_enum = CMD4JinjaTemplates::from_str(template_id)?;
             active_template = template_enum.get_template();
         }
 
