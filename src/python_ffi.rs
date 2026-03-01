@@ -149,6 +149,13 @@ impl PyFilterOptions {
         }
     }
 
+    /// Disable tool call parsing by removing the action tokens.
+    fn no_tools(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().no_tools(),
+        }
+    }
+
     /// Remove a special token from the token map.
     fn remove_token(&self, token: &str) -> Self {
         PyFilterOptions {
