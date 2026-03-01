@@ -287,7 +287,7 @@ impl PyFilter {
     /// with fully accumulated tool calls.
     #[allow(clippy::needless_pass_by_value)] // PyO3 requires owned Vec for Python interop
     fn process_full(&mut self, token_strings: Vec<String>) -> AggregatedUnaryResult {
-        let mut all_outputs = Vec::new();
+        let mut all_outputs = Vec::with_capacity(token_strings.len());
         for token_str in &token_strings {
             all_outputs.extend(
                 self.inner

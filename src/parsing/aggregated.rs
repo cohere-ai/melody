@@ -3,6 +3,8 @@
 //! These types pre-separate content, reasoning, tool call deltas, and citations
 //! on the Rust side, so callers don't need to loop over raw `FilterOutput` vectors.
 
+use std::collections::HashMap;
+
 use crate::parsing::types::{FilterCitation, FilterOutput};
 
 #[cfg(feature = "python_ffi")]
@@ -117,14 +119,13 @@ pub fn aggregate_stream(outputs: Vec<FilterOutput>) -> AggregatedStreamResult {
 
 /// Aggregate a sequence of `FilterOutput`s into a full result with complete tool calls.
 ///
-/// Consumes the outputs vec. Tool call deltas are accumulated into complete calls:
-/// an `id` creates a new entry, `name` and arguments are appended to the entry at
-/// the matching index.
+/// Consumes the outputs vec. Tool call deltas are accumulated into complete calls
+/// using a `HashMap` keyed by index, so deltas may arrive in any order.
 #[must_use]
 pub fn aggregate_unary(all_outputs: Vec<FilterOutput>) -> AggregatedUnaryResult {
     let mut content: Option<String> = None;
     let mut reasoning: Option<String> = None;
-    let mut tool_calls: Vec<AccumulatedToolCall> = Vec::new();
+    let mut tool_call_map: HashMap<usize, AccumulatedToolCall> = HashMap::new();
     let mut citations = Vec::new();
 
     for mut o in all_outputs {
@@ -140,24 +141,24 @@ pub fn aggregate_unary(all_outputs: Vec<FilterOutput>) -> AggregatedUnaryResult 
             citations.append(&mut o.citations);
         }
         if let Some(tc) = o.tool_call_delta {
-            if !tc.id.is_empty() {
-                tool_calls.push(AccumulatedToolCall {
+            let call = tool_call_map.entry(tc.index).or_insert_with(|| {
+                AccumulatedToolCall {
                     index: tc.index,
-                    id: tc.id,
-                    name: String::new(),
-                    arguments: String::new(),
-                });
+                    ..Default::default()
+                }
+            });
+            if !tc.id.is_empty() {
+                call.id = tc.id;
             }
-            if !tc.name.is_empty()
-                && let Some(call) = tool_calls.get_mut(tc.index)
-            {
+            if !tc.name.is_empty() {
                 call.name = tc.name;
             }
-            if let Some(call) = tool_calls.get_mut(tc.index) {
-                call.arguments.push_str(&tc.raw_param_delta);
-            }
+            call.arguments.push_str(&tc.raw_param_delta);
         }
     }
+
+    let mut tool_calls: Vec<AccumulatedToolCall> = tool_call_map.into_values().collect();
+    tool_calls.sort_by_key(|tc| tc.index);
 
     AggregatedUnaryResult {
         content,
