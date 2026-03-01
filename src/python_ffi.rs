@@ -2,7 +2,11 @@
 //!
 //! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4` for templating.
 
-use crate::parsing::types::{FilterCitation, FilterOutput, FilterToolCallDelta, TokenIDsWithLogProb};
+use crate::parsing::aggregated::{
+    AccumulatedToolCall, AggregatedUnaryResult, AggregatedStreamResult, AggregatedToolCallDelta,
+    aggregate_unary, aggregate_stream,
+};
+use crate::parsing::types::{FilterOutput, TokenIDsWithLogProb};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use crate::templating::{
     RenderCmd3Options, RenderCmd4Options, render_cmd3 as rust_render_cmd3,
@@ -13,173 +17,6 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pythonize::depythonize;
 use serde_json::Value;
-
-// ---------------------------------------------------------------------------
-// Aggregated output types
-// ---------------------------------------------------------------------------
-
-/// Aggregated result of a streaming `write_decoded` call.
-/// Pre-separates content, reasoning, and tool call deltas.
-#[pyclass(get_all)]
-#[derive(Debug, Clone, Default)]
-struct AggregatedStreamResult {
-    /// Non-reasoning text content (`None` if no text was produced).
-    content: Option<String>,
-    /// Reasoning/thinking text content (`None` if no reasoning was produced).
-    reasoning: Option<String>,
-    /// Tool call deltas produced in this chunk.
-    tool_call_deltas: Vec<AggregatedToolCallDelta>,
-    /// Citations produced in this chunk.
-    citations: Vec<FilterCitation>,
-}
-
-/// A tool call delta with fields structured for the `OpenAI` API format.
-#[pyclass(get_all)]
-#[derive(Debug, Clone, Default)]
-struct AggregatedToolCallDelta {
-    /// Tool call index (0-based).
-    index: usize,
-    /// Tool call identifier.
-    id: String,
-    /// Tool name.
-    name: String,
-    /// Raw JSON parameter text delta.
-    arguments: String,
-}
-
-/// A fully accumulated tool call (for unary/non-streaming responses).
-#[pyclass(get_all)]
-#[derive(Debug, Clone, Default)]
-struct AccumulatedToolCall {
-    /// Tool call index (0-based).
-    index: usize,
-    /// Tool call identifier.
-    id: String,
-    /// Tool name.
-    name: String,
-    /// Complete JSON arguments string.
-    arguments: String,
-}
-
-/// Aggregated result of a full (unary) parse of model output.
-#[pyclass(get_all)]
-#[derive(Debug, Clone, Default)]
-struct AggregatedFullResult {
-    /// Non-reasoning text content.
-    content: Option<String>,
-    /// Reasoning/thinking text content.
-    reasoning: Option<String>,
-    /// Fully accumulated tool calls.
-    tool_calls: Vec<AccumulatedToolCall>,
-    /// All citations.
-    citations: Vec<FilterCitation>,
-}
-
-// ---------------------------------------------------------------------------
-// Aggregation logic
-// ---------------------------------------------------------------------------
-
-fn push_text(target: &mut Option<String>, text: &mut String) {
-    match target {
-        Some(s) => s.push_str(text),
-        None => {
-            *target = Some(std::mem::take(text));
-        }
-    }
-}
-
-fn push_tool_call_delta(
-    deltas: &mut Vec<AggregatedToolCallDelta>,
-    tc: FilterToolCallDelta,
-) {
-    deltas.push(AggregatedToolCallDelta {
-        index: tc.index,
-        id: tc.id,
-        name: tc.name,
-        arguments: tc.raw_param_delta,
-    });
-}
-
-fn aggregate_stream(outputs: Vec<FilterOutput>) -> AggregatedStreamResult {
-    let mut content: Option<String> = None;
-    let mut reasoning: Option<String> = None;
-    let mut tool_call_deltas = Vec::new();
-    let mut citations = Vec::new();
-
-    for mut o in outputs {
-        if !o.text.is_empty() {
-            let target = if o.is_reasoning {
-                &mut reasoning
-            } else {
-                &mut content
-            };
-            push_text(target, &mut o.text);
-        }
-        if !o.citations.is_empty() {
-            citations.append(&mut o.citations);
-        }
-        if let Some(tc) = o.tool_call_delta {
-            push_tool_call_delta(&mut tool_call_deltas, tc);
-        }
-    }
-
-    AggregatedStreamResult {
-        content,
-        reasoning,
-        tool_call_deltas,
-        citations,
-    }
-}
-
-fn aggregate_full(all_outputs: Vec<FilterOutput>) -> AggregatedFullResult {
-    let mut content: Option<String> = None;
-    let mut reasoning: Option<String> = None;
-    let mut tool_calls: Vec<AccumulatedToolCall> = Vec::new();
-    let mut citations = Vec::new();
-
-    for mut o in all_outputs {
-        if !o.text.is_empty() {
-            let target = if o.is_reasoning {
-                &mut reasoning
-            } else {
-                &mut content
-            };
-            push_text(target, &mut o.text);
-        }
-        if !o.citations.is_empty() {
-            citations.append(&mut o.citations);
-        }
-        if let Some(tc) = o.tool_call_delta {
-            if !tc.id.is_empty() {
-                tool_calls.push(AccumulatedToolCall {
-                    index: tc.index,
-                    id: tc.id,
-                    name: String::new(),
-                    arguments: String::new(),
-                });
-            }
-            if !tc.name.is_empty()
-                && let Some(call) = tool_calls.get_mut(tc.index)
-            {
-                call.name = tc.name;
-            }
-            if let Some(call) = tool_calls.get_mut(tc.index) {
-                call.arguments.push_str(&tc.raw_param_delta);
-            }
-        }
-    }
-
-    AggregatedFullResult {
-        content,
-        reasoning,
-        tool_calls,
-        citations,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// PyO3 bindings
-// ---------------------------------------------------------------------------
 
 /// A Python dict extracted as a JSON value.
 struct PyDictValue(Value);
@@ -442,7 +279,7 @@ impl PyFilter {
     /// filter, flushes partials, and returns a single aggregated result
     /// with fully accumulated tool calls.
     #[allow(clippy::needless_pass_by_value)] // PyO3 requires owned Vec for Python interop
-    fn process_full(&mut self, token_strings: Vec<String>) -> AggregatedFullResult {
+    fn process_full(&mut self, token_strings: Vec<String>) -> AggregatedUnaryResult {
         let mut all_outputs = Vec::new();
         for token_str in &token_strings {
             all_outputs.extend(
@@ -451,7 +288,7 @@ impl PyFilter {
             );
         }
         all_outputs.extend(self.inner.flush_partials());
-        aggregate_full(all_outputs)
+        aggregate_unary(all_outputs)
     }
 
     /// Flush and aggregate any remaining buffered outputs.
@@ -542,7 +379,7 @@ fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<AggregatedStreamResult>()?;
     m.add_class::<AggregatedToolCallDelta>()?;
     m.add_class::<AccumulatedToolCall>()?;
-    m.add_class::<AggregatedFullResult>()?;
+    m.add_class::<AggregatedUnaryResult>()?;
     m.add_function(wrap_pyfunction!(render_cmd3, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
     Ok(())
@@ -624,255 +461,5 @@ mod tests {
         let opts: RenderCmd3Options = serde_path_to_error::deserialize(&value).unwrap();
         let result = rust_render_cmd3(&opts).unwrap();
         assert!(result.contains("search"));
-    }
-
-    // -- aggregation tests --
-
-    #[test]
-    fn test_aggregate_stream_empty() {
-        let result = aggregate_stream(vec![]);
-        assert!(result.content.is_none());
-        assert!(result.reasoning.is_none());
-        assert!(result.tool_call_deltas.is_empty());
-    }
-
-    #[test]
-    fn test_aggregate_stream_content_only() {
-        let outputs = vec![
-            FilterOutput {
-                text: "hello ".into(),
-                ..Default::default()
-            },
-            FilterOutput {
-                text: "world".into(),
-                ..Default::default()
-            },
-        ];
-        let result = aggregate_stream(outputs);
-        assert_eq!(result.content, Some("hello world".into()));
-        assert!(result.reasoning.is_none());
-        assert!(result.tool_call_deltas.is_empty());
-    }
-
-    #[test]
-    fn test_aggregate_stream_reasoning_only() {
-        let outputs = vec![
-            FilterOutput {
-                text: "step 1".into(),
-                is_reasoning: true,
-                ..Default::default()
-            },
-            FilterOutput {
-                text: " step 2".into(),
-                is_reasoning: true,
-                ..Default::default()
-            },
-        ];
-        let result = aggregate_stream(outputs);
-        assert!(result.content.is_none());
-        assert_eq!(result.reasoning, Some("step 1 step 2".into()));
-    }
-
-    #[test]
-    fn test_aggregate_stream_mixed() {
-        let outputs = vec![
-            FilterOutput {
-                text: "thinking...".into(),
-                is_reasoning: true,
-                ..Default::default()
-            },
-            FilterOutput {
-                text: "hello".into(),
-                is_reasoning: false,
-                ..Default::default()
-            },
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 0,
-                    id: "call_0".into(),
-                    name: "search".into(),
-                    raw_param_delta: r#"{"q":"test"}"#.into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        ];
-
-        let result = aggregate_stream(outputs);
-        assert_eq!(result.reasoning, Some("thinking...".into()));
-        assert_eq!(result.content, Some("hello".into()));
-        assert_eq!(result.tool_call_deltas.len(), 1);
-        assert_eq!(result.tool_call_deltas[0].id, "call_0");
-        assert_eq!(result.tool_call_deltas[0].arguments, r#"{"q":"test"}"#);
-    }
-
-    #[test]
-    fn test_aggregate_stream_with_citations() {
-        let outputs = vec![FilterOutput {
-            text: "cited text".into(),
-            citations: vec![FilterCitation {
-                start_index: 0,
-                end_index: 10,
-                text: "cited text".into(),
-                sources: vec![],
-                is_thinking: false,
-            }],
-            ..Default::default()
-        }];
-        let result = aggregate_stream(outputs);
-        assert_eq!(result.citations.len(), 1);
-        assert_eq!(result.citations[0].start_index, 0);
-    }
-
-    #[test]
-    fn test_aggregate_stream_no_text_fields() {
-        let outputs = vec![FilterOutput {
-            text: String::new(),
-            ..Default::default()
-        }];
-        let result = aggregate_stream(outputs);
-        assert!(result.content.is_none());
-        assert!(result.reasoning.is_none());
-    }
-
-    #[test]
-    fn test_aggregate_full_empty() {
-        let result = aggregate_full(vec![]);
-        assert!(result.content.is_none());
-        assert!(result.reasoning.is_none());
-        assert!(result.tool_calls.is_empty());
-        assert!(result.citations.is_empty());
-    }
-
-    #[test]
-    fn test_aggregate_full_tool_calls() {
-        let outputs = vec![
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 0,
-                    id: "0".into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 0,
-                    name: "search".into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 0,
-                    raw_param_delta: r#"{"q": "#.into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 0,
-                    raw_param_delta: r#""hello"}"#.into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            FilterOutput {
-                text: "Response text".into(),
-                ..Default::default()
-            },
-        ];
-
-        let result = aggregate_full(outputs);
-        assert_eq!(result.tool_calls.len(), 1);
-        assert_eq!(result.tool_calls[0].id, "0");
-        assert_eq!(result.tool_calls[0].name, "search");
-        assert_eq!(result.tool_calls[0].arguments, r#"{"q": "hello"}"#);
-        assert_eq!(result.content, Some("Response text".into()));
-    }
-
-    #[test]
-    fn test_aggregate_full_multiple_tool_calls() {
-        let outputs = vec![
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 0,
-                    id: "call_0".into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 0,
-                    name: "search".into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 1,
-                    id: "call_1".into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 1,
-                    name: "read".into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 0,
-                    raw_param_delta: r#"{"q":"a"}"#.into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-            FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: 1,
-                    raw_param_delta: r#"{"file":"b"}"#.into(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        ];
-
-        let result = aggregate_full(outputs);
-        assert_eq!(result.tool_calls.len(), 2);
-        assert_eq!(result.tool_calls[0].id, "call_0");
-        assert_eq!(result.tool_calls[0].name, "search");
-        assert_eq!(result.tool_calls[0].arguments, r#"{"q":"a"}"#);
-        assert_eq!(result.tool_calls[1].id, "call_1");
-        assert_eq!(result.tool_calls[1].name, "read");
-        assert_eq!(result.tool_calls[1].arguments, r#"{"file":"b"}"#);
-    }
-
-    #[test]
-    fn test_aggregate_full_reasoning_and_content() {
-        let outputs = vec![
-            FilterOutput {
-                text: "thinking".into(),
-                is_reasoning: true,
-                ..Default::default()
-            },
-            FilterOutput {
-                text: "answer".into(),
-                is_reasoning: false,
-                ..Default::default()
-            },
-        ];
-        let result = aggregate_full(outputs);
-        assert_eq!(result.reasoning, Some("thinking".into()));
-        assert_eq!(result.content, Some("answer".into()));
-        assert!(result.tool_calls.is_empty());
     }
 }

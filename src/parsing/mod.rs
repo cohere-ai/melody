@@ -4,6 +4,8 @@
 //! from Cohere models with support for citations, tool calls, and various output formats.
 
 mod action_filter;
+/// Aggregated output types for efficient interop.
+pub mod aggregated;
 mod citations_filter;
 mod filter;
 mod options;
