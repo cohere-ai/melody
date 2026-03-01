@@ -3,8 +3,8 @@
 //! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4` for templating.
 
 use crate::parsing::aggregated::{
-    AccumulatedToolCall, AggregatedUnaryResult, AggregatedStreamResult, AggregatedToolCallDelta,
-    aggregate_unary, aggregate_stream,
+    AccumulatedToolCall, AggregatedStreamResult, AggregatedToolCallDelta, AggregatedUnaryResult,
+    aggregate_stream, aggregate_unary,
 };
 use crate::parsing::types::{FilterOutput, TokenIDsWithLogProb};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
