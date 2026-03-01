@@ -141,12 +141,12 @@ pub fn aggregate_unary(all_outputs: Vec<FilterOutput>) -> AggregatedUnaryResult 
             citations.append(&mut o.citations);
         }
         if let Some(tc) = o.tool_call_delta {
-            let call = tool_call_map.entry(tc.index).or_insert_with(|| {
-                AccumulatedToolCall {
+            let call = tool_call_map
+                .entry(tc.index)
+                .or_insert_with(|| AccumulatedToolCall {
                     index: tc.index,
                     ..Default::default()
-                }
-            });
+                });
             if !tc.id.is_empty() {
                 call.id = tc.id;
             }
