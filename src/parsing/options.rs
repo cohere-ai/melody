@@ -166,6 +166,10 @@ impl FilterOptions {
             .insert("<|START_ACTION|>".to_string(), FilterMode::ToolAction);
         self.special_token_map
             .insert("<|END_ACTION|>".to_string(), FilterMode::Ignore);
+        self.special_token_map
+            .insert("<|START_RESPONSE|>".to_string(), FilterMode::GroundedAnswer);
+        self.special_token_map
+            .insert("<|END_RESPONSE|>".to_string(), FilterMode::Ignore);
         self
     }
 
