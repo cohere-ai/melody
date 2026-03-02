@@ -14,32 +14,18 @@ use pyo3::prelude::*;
 /// Pre-separates content, reasoning, and tool call deltas.
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 #[derive(Debug, Clone, Default)]
-pub struct AggregatedStreamResult {
+pub struct AggregatedResult {
     /// Non-reasoning text content (`None` if no text was produced).
     pub content: Option<String>,
     /// Reasoning/thinking text content (`None` if no reasoning was produced).
     pub reasoning: Option<String>,
     /// Tool call deltas produced in this chunk.
-    pub tool_call_deltas: Vec<AggregatedToolCallDelta>,
+    pub tool_calls: Vec<AccumulatedToolCall>,
     /// Citations produced in this chunk.
     pub citations: Vec<FilterCitation>,
 }
 
-/// A tool call delta with fields structured for the `OpenAI` API format.
-#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
-#[derive(Debug, Clone, Default)]
-pub struct AggregatedToolCallDelta {
-    /// Tool call index (0-based).
-    pub index: usize,
-    /// Tool call identifier.
-    pub id: String,
-    /// Tool name.
-    pub name: String,
-    /// Raw JSON parameter text delta.
-    pub arguments: String,
-}
-
-/// A fully accumulated tool call (for unary/non-streaming responses).
+/// A fully accumulated tool call
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 #[derive(Debug, Clone, Default)]
 pub struct AccumulatedToolCall {
@@ -51,20 +37,6 @@ pub struct AccumulatedToolCall {
     pub name: String,
     /// Complete JSON arguments string.
     pub arguments: String,
-}
-
-/// Aggregated result of a full (unary) parse of model output.
-#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
-#[derive(Debug, Clone, Default)]
-pub struct AggregatedUnaryResult {
-    /// Non-reasoning text content.
-    pub content: Option<String>,
-    /// Reasoning/thinking text content.
-    pub reasoning: Option<String>,
-    /// Fully accumulated tool calls.
-    pub tool_calls: Vec<AccumulatedToolCall>,
-    /// All citations.
-    pub citations: Vec<FilterCitation>,
 }
 
 fn push_text(target: &mut Option<String>, text: &mut String) {
@@ -81,10 +53,10 @@ fn push_text(target: &mut Option<String>, text: &mut String) {
 /// Consumes the outputs vec to avoid cloning strings — moves text
 /// and tool call data directly into the aggregated result.
 #[must_use]
-pub fn aggregate_stream(outputs: Vec<FilterOutput>) -> AggregatedStreamResult {
+pub fn aggregate_stream(outputs: Vec<FilterOutput>) -> AggregatedResult {
     let mut content: Option<String> = None;
     let mut reasoning: Option<String> = None;
-    let mut tool_call_deltas = Vec::new();
+    let mut tool_calls = Vec::new();
     let mut citations = Vec::new();
 
     for mut o in outputs {
@@ -100,7 +72,7 @@ pub fn aggregate_stream(outputs: Vec<FilterOutput>) -> AggregatedStreamResult {
             citations.append(&mut o.citations);
         }
         if let Some(tc) = o.tool_call_delta {
-            tool_call_deltas.push(AggregatedToolCallDelta {
+            tool_calls.push(AccumulatedToolCall {
                 index: tc.index,
                 id: tc.id,
                 name: tc.name,
@@ -109,10 +81,10 @@ pub fn aggregate_stream(outputs: Vec<FilterOutput>) -> AggregatedStreamResult {
         }
     }
 
-    AggregatedStreamResult {
+    AggregatedResult {
         content,
         reasoning,
-        tool_call_deltas,
+        tool_calls,
         citations,
     }
 }
@@ -122,7 +94,7 @@ pub fn aggregate_stream(outputs: Vec<FilterOutput>) -> AggregatedStreamResult {
 /// Consumes the outputs vec. Tool call deltas are accumulated into complete calls
 /// using a `HashMap` keyed by index, so deltas may arrive in any order.
 #[must_use]
-pub fn aggregate_unary(all_outputs: Vec<FilterOutput>) -> AggregatedUnaryResult {
+pub fn aggregate_unary(all_outputs: Vec<FilterOutput>) -> AggregatedResult {
     let mut content: Option<String> = None;
     let mut reasoning: Option<String> = None;
     let mut tool_call_map: HashMap<usize, AccumulatedToolCall> = HashMap::new();
@@ -160,7 +132,7 @@ pub fn aggregate_unary(all_outputs: Vec<FilterOutput>) -> AggregatedUnaryResult 
     let mut tool_calls: Vec<AccumulatedToolCall> = tool_call_map.into_values().collect();
     tool_calls.sort_by_key(|tc| tc.index);
 
-    AggregatedUnaryResult {
+    AggregatedResult {
         content,
         reasoning,
         tool_calls,
@@ -178,7 +150,7 @@ mod tests {
         let result = aggregate_stream(vec![]);
         assert!(result.content.is_none());
         assert!(result.reasoning.is_none());
-        assert!(result.tool_call_deltas.is_empty());
+        assert!(result.tool_calls.is_empty());
     }
 
     #[test]
@@ -196,7 +168,7 @@ mod tests {
         let result = aggregate_stream(outputs);
         assert_eq!(result.content, Some("hello world".into()));
         assert!(result.reasoning.is_none());
-        assert!(result.tool_call_deltas.is_empty());
+        assert!(result.tool_calls.is_empty());
     }
 
     #[test]
@@ -246,9 +218,9 @@ mod tests {
         let result = aggregate_stream(outputs);
         assert_eq!(result.reasoning, Some("thinking...".into()));
         assert_eq!(result.content, Some("hello".into()));
-        assert_eq!(result.tool_call_deltas.len(), 1);
-        assert_eq!(result.tool_call_deltas[0].id, "call_0");
-        assert_eq!(result.tool_call_deltas[0].arguments, r#"{"q":"test"}"#);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_0");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"q":"test"}"#);
     }
 
     #[test]

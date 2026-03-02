@@ -3,8 +3,7 @@
 //! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4` for templating.
 
 use crate::parsing::aggregated::{
-    AccumulatedToolCall, AggregatedStreamResult, AggregatedToolCallDelta, AggregatedUnaryResult,
-    aggregate_stream, aggregate_unary,
+    AccumulatedToolCall, AggregatedResult, aggregate_stream, aggregate_unary,
 };
 use crate::parsing::types::{FilterOutput, TokenIDsWithLogProb};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
@@ -272,7 +271,7 @@ impl PyFilter {
     ///
     /// Replaces the pattern of calling `write_decoded()` then looping
     /// over `FilterOutput`s in Python to separate content, reasoning, and tool calls.
-    fn write_decoded_aggregated(&mut self, decoded_token: &str) -> AggregatedStreamResult {
+    fn write_decoded_aggregated(&mut self, decoded_token: &str) -> AggregatedResult {
         let outputs = self
             .inner
             .write_decoded(decoded_token, TokenIDsWithLogProb::new());
@@ -286,7 +285,7 @@ impl PyFilter {
     /// filter, flushes partials, and returns a single aggregated result
     /// with fully accumulated tool calls.
     #[allow(clippy::needless_pass_by_value)] // PyO3 requires owned Vec for Python interop
-    fn process_full(&mut self, token_strings: Vec<String>) -> AggregatedUnaryResult {
+    fn process_full(&mut self, token_strings: Vec<String>) -> AggregatedResult {
         let mut all_outputs = Vec::with_capacity(token_strings.len());
         for token_str in &token_strings {
             all_outputs.extend(
@@ -299,7 +298,7 @@ impl PyFilter {
     }
 
     /// Flush and aggregate any remaining buffered outputs.
-    fn flush_aggregated(&mut self) -> AggregatedStreamResult {
+    fn flush_aggregated(&mut self) -> AggregatedResult {
         let outputs = self.inner.flush_partials();
         aggregate_stream(outputs)
     }
@@ -383,10 +382,8 @@ fn render_cmd4(config: PyDictValue) -> PyResult<String> {
 fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOptions>()?;
     m.add_class::<PyFilter>()?;
-    m.add_class::<AggregatedStreamResult>()?;
-    m.add_class::<AggregatedToolCallDelta>()?;
     m.add_class::<AccumulatedToolCall>()?;
-    m.add_class::<AggregatedUnaryResult>()?;
+    m.add_class::<AggregatedResult>()?;
     m.add_function(wrap_pyfunction!(render_cmd3, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
     Ok(())
