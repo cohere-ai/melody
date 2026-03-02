@@ -91,7 +91,11 @@
             {%- set last_was_text.value = false -%}
             {%- endif -%}
             {%- if content.type|lower == "image" -%}
+                {%- if content.data -%}
+{{ content.data }}
+                {%- else -%}
 <|IMG_PATCH|>
+                {%- endif -%}
             {%- endif -%}
         {%- endfor %}
         {%- set last_was_text = false -%}
@@ -104,7 +108,6 @@
 {{ msg.content[0].thinking }}
     {%- endif %}
 {%- endmacro %}
-{%- if messages and messages[0]['role']|lower == 'system' %}{%- set developer_preamble = messages[0] %}{% endif %}
 {%- set json_object = true if response_format and response_format.type == "json_object" else false %}
 {%- set json_schema = (response_format.json_schema or response_format.schema) if response_format %}
 {%- set json_mode = json_object or json_schema %}
@@ -113,7 +116,10 @@
 {%- set tool_ids_seen = namespace(value=[]) %}
 {%- set regen_tool_call_ids = regen_tool_call_ids if regen_tool_call_ids is not undefined else true -%}
 {%- set sent_documents = namespace(value=false) -%}
-{%- if not skip_preamble -%}
+{%- if skip_preamble -%}
+{% if developer_preamble %}<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(developer_preamble) }}<|END_OF_TURN_TOKEN|>{% endif %}
+{%- else -%}
+{%- if messages and messages[0]['role']|lower == 'system' %}{%- set developer_preamble = messages[0] %}{% endif %}
 <|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|># System Preamble
 {% if safety_mode != "NONE" %}
     {%- if safety_mode|upper == 'STRICT' %}
@@ -259,7 +265,7 @@ Your output should adhere to the following json schema:
                     <|START_THINKING|>{{message.tool_plan}}<|END_THINKING|>
                 {%- elif message.thinking or (message.content and message.content[0].thinking) -%}
                     <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
-                {%- elif thinking_default_val and skip_thinking != true -%}
+                {%- elif thinking_default_val and not skip_thinking -%}
                     <|START_THINKING|>{{ thinking_default_val }}<|END_THINKING|>
                 {%- endif %}
             {%- endif %}<|START_ACTION|>[
@@ -273,7 +279,7 @@ Your output should adhere to the following json schema:
         {%- else -%}
             {% if (message.thinking or (message.content and message.content[0].thinking)) and not skip_thinking -%}
                 <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
-            {%- elif thinking_default_val and skip_thinking != true -%}
+            {%- elif thinking_default_val and not skip_thinking -%}
                 <|START_THINKING|>{{ thinking_default_val }}<|END_THINKING|>
             {%- endif -%}
             <|START_RESPONSE|>{{ print_msg(message) }}<|END_RESPONSE|><|END_OF_TURN_TOKEN|>

@@ -99,7 +99,11 @@
                 {%- set last_was_text.value = false -%}
             {%- endif -%}
             {%- if content.type|lower == "image" -%}
+                {%- if content.data -%}
+{{ content.data }}
+                {%- else -%}
 <|IMG_PATCH|>
+                {%- endif -%}
             {%- endif -%}
         {%- endfor %}
     {%- endif %}
@@ -111,7 +115,7 @@
 {{ msg.content[0].thinking }}
     {%- endif %}
 {%- endmacro %}
-{%- if messages and messages[0]['role']|lower == 'system' %}{%- set developer_preamble = messages[0] %}{% endif %}
+{%- if messages and messages[0]['role']|lower == 'system' %}{%- set developer_instruction = messages[0] %}{% endif %}
 {%- set json_object = true if response_format and response_format.type == "json_object" else false %}
 {%- set json_schema = (response_format.json_schema or response_format.schema) if response_format %}
 {%- set json_mode = json_object or json_schema %}
