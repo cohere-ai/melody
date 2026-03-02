@@ -1,1 +1,21 @@
-<BOS_TOKEN><|START_OF_TURN_TOKEN|><|USER_TOKEN|>Here is an unescaped token: <|token|>. This should be escaped: \<\|something\|\>.<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>
+<BOS_TOKEN><|START_OF_TURN_TOKEN|><|USER_TOKEN|>Here is an unescaped token: <|token|>. This should be escaped: \<\|something\|\>.<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>I will look through the document to address the users needs.<|END_THINKING|><|START_ACTION|>[
+    {"tool_call_id": "0", "tool_name": "direct-injected-document", "parameters": {}}
+]<|END_ACTION|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
+    {
+        "tool_call_id": "0",
+        "results": {
+            "0": {"content": "A special token: \\<\\|something\\|\\>."}
+        },
+        "is_error": null
+    }
+]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>I will use the GetReminders tool to check if the user has any reminders.<|END_THINKING|><|START_ACTION|>[
+    {"tool_call_id": "1", "tool_name": "GetReminders", "parameters": {}}
+]<|END_ACTION|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
+    {
+        "tool_call_id": "1",
+        "results": {
+            "0": {"reminder_id": "59-80bc", "task": "Buy \\<\\|something\\|\\> groceries"}
+        },
+        "is_error": null
+    }
+]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>

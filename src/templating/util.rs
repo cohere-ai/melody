@@ -204,6 +204,40 @@ fn tools_to_template_jinja(tools: &[Tool]) -> Vec<Map<String, Value>> {
     template_tools
 }
 
+fn escape_value_special_tokens(item: Value, special_token_map: &BTreeMap<String, String>) -> Value {
+    match item {
+        Value::String(s) => Value::String(escape_special_tokens(&s, special_token_map)),
+        Value::Object(o) => Value::Object(escape_document_special_tokens(&o, special_token_map)),
+        Value::Array(arr) => Value::Array(escape_array_special_tokens(&arr, special_token_map)),
+        _ => item,
+    }
+}
+
+fn escape_array_special_tokens(
+    arr: &[Value],
+    special_token_map: &BTreeMap<String, String>,
+) -> Vec<Value> {
+    arr.iter()
+        .map(|item| escape_value_special_tokens(item.clone(), special_token_map))
+        .collect()
+}
+
+// Iterates recursively over the object and escapes any string values containing the special tokens.
+fn escape_document_special_tokens(
+    document: &Map<String, Value>,
+    special_token_map: &BTreeMap<String, String>,
+) -> Map<String, Value> {
+    document
+        .iter()
+        .map(|(k, v)| {
+            (
+                escape_special_tokens(k, special_token_map),
+                escape_value_special_tokens(v.clone(), special_token_map),
+            )
+        })
+        .collect()
+}
+
 pub(crate) fn docs_to_template(
     documents: &[Map<String, Value>],
     special_token_map: &BTreeMap<String, String>,
@@ -211,28 +245,22 @@ pub(crate) fn docs_to_template(
     documents
         .iter()
         .map(|d| -> Result<_, MelodyError> {
-            let escaped = &escape_special_tokens(&to_string(d)?, special_token_map);
-            Ok(Value::String(add_spaces_to_json_encoding(escaped)))
+            let escaped = &escape_document_special_tokens(d, special_token_map);
+            Ok(Value::String(add_spaces_to_json_encoding(to_string(&escaped)?.as_str())))
         })
         .collect::<Result<Vec<_>, _>>()
 }
 
-// Goes through docs, converts them to json strings, escapes them, then loads them back as json objects.
-// This is done because the jinja template is intended to work outside of melody, where the user would
-// pass the documents as an object instead of escaped strings (which the function for the liquid template
-// returns). So we do this slightly roundabout way of escaping, otherwise would need to explore the nested
-// documents structure and escape each field.
+
 fn docs_to_template_jinja(
     documents: &[Map<String, Value>],
     special_token_map: &BTreeMap<String, String>,
-) -> Result<Vec<Value>, MelodyError> {
+) -> Vec<Value> {
     documents
         .iter()
-        .map(|d| -> Result<_, MelodyError> {
-            let escaped = &escape_special_tokens(&to_string(d)?, special_token_map);
-            Ok(serde_json::from_str(escaped.as_str())?)
-        })
-        .collect::<Result<Vec<_>, _>>()
+        .map(|d| -> Value {
+            Value::Object(escape_document_special_tokens(d, special_token_map))
+        }).collect()
 }
 
 fn build_text_with_citation(text: &String, citation_inserts: &mut [CitationInsertInfo]) -> String {
@@ -367,18 +395,20 @@ pub(crate) fn messages_to_template(
                 if content_item.content_type == ContentType::Text {
                     if let Some(ref text) = content_item.text {
                         let mut obj: Map<String, Value> = Map::new();
-                        obj.insert("content".to_string(), Value::String(text.clone()));
+                        let escaped_text = escape_special_tokens(text, special_token_map);
+                        obj.insert("content".to_string(), Value::String(escaped_text));
                         let rendered_obj = add_spaces_to_json_encoding(&to_string(&obj)?);
                         m.tool_results[tool_result_idx]
                             .documents
-                            .push(escape_special_tokens(&rendered_obj, special_token_map));
+                            .push(rendered_obj);
                     }
                 } else if content_item.content_type == ContentType::Document {
                     if let Some(ref obj) = content_item.document {
-                        let rendered_obj = add_spaces_to_json_encoding(&to_string(obj)?);
+                        let escaped_object = escape_document_special_tokens(obj, special_token_map);
+                        let rendered_obj = add_spaces_to_json_encoding(&to_string(&escaped_object)?);
                         m.tool_results[tool_result_idx]
                             .documents
-                            .push(escape_special_tokens(&rendered_obj, special_token_map));
+                            .push(rendered_obj);
                     }
                 } else if content_item.content_type == ContentType::Image {
                     if let Some(ref obj) = content_item.image {
@@ -416,16 +446,6 @@ pub(crate) fn messages_to_template(
                                 .to_string(),
                         ));
                     }
-                    let data = if let Some(ref obj) = content_item.document {
-                        let serialized = serde_json::to_string(obj)?;
-                        add_spaces_to_json_encoding(&serialized)
-                    } else {
-                        "{}".to_string()
-                    };
-                    template_msg_content.push(TemplateContent {
-                        content_type: "text".to_string(),
-                        data: escape_special_tokens(&data, special_token_map),
-                    });
                 }
                 ContentType::Text => {
                     let data = if msg.role == Role::System {
@@ -718,7 +738,7 @@ pub(crate) fn get_jinja_vars(
 ) -> Result<(Vec<Value>, Vec<Map<String, Value>>, Vec<Value>), MelodyError> {
     let messages = convert_messages_for_jinja(messages)?;
     let template_tools = tools_to_template_jinja(tools);
-    let docs = docs_to_template_jinja(documents, special_token_map)?;
+    let docs = docs_to_template_jinja(documents, special_token_map);
     Ok((messages, template_tools, docs))
 }
 
@@ -792,4 +812,52 @@ pub(crate) fn add_jinja_substitutions_cmd4(
         .as_ref()
         .is_some_and(|x| *x == Grounding::Enabled);
     substitutions.insert("enable_citations".to_string(), Value::Bool(grounding));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_escape_document_special_tokens_basic() {
+        let mut special_token_map = BTreeMap::new();
+        special_token_map.insert("a".to_string(), "o".to_string());
+
+        let mut map = Map::new();
+        map.insert("foofaa".to_string(), Value::String("borbar".to_string()));
+
+        let escaped = escape_document_special_tokens(&map, &special_token_map);
+
+        assert_eq!(escaped.get("foofoo").unwrap(), "borbor");
+    }
+
+    #[test]
+    fn test_escape_document_special_tokens_nested() {
+        let mut special_token_map = BTreeMap::new();
+        special_token_map.insert("a".to_string(), "o".to_string());
+
+        let inner_inner_arr = vec![
+            Value::String("foofaa".to_string()),
+            Value::Object({
+                let mut m = Map::new();
+                m.insert("inner_inner_key_aaa".to_string(), Value::String("inner_inner_value_aaa".to_string()));
+                m
+            }),
+        ];
+
+        let mut inner = Map::new();
+        inner.insert("inner_key_aaa".to_string(), Value::Array(inner_inner_arr));
+
+        let mut map = Map::new();
+        map.insert("outer_key".to_string(), Value::Array(vec![
+            Value::String("zoozaa".to_string()),
+            Value::Object(inner),
+        ]));
+
+
+        let escaped = escape_document_special_tokens(&map, &special_token_map);
+        let result = to_string(&escaped).unwrap();
+        let expected = r#"{"outer_key":["zoozoo",{"inner_key_ooo":["foofoo",{"inner_inner_key_ooo":"inner_inner_volue_ooo"}]}]}"#;
+        assert_eq!(result, expected);
+    }
 }
