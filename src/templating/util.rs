@@ -666,7 +666,9 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                             "Invalid tool document format during jinja conversion".to_string(),
                         ))?;
                         // Escape any invalid single backslashes in the string
-                        let doc_str_json_escaped = single_backslash_re.replace_all(doc_str, "\\\\$1").to_string();
+                        let doc_str_json_escaped = single_backslash_re
+                            .replace_all(doc_str, "\\\\$1")
+                            .to_string();
                         let doc_obj = serde_json::from_str(&doc_str_json_escaped)?;
                         msg_ref
                             .get_mut("content")
