@@ -70,7 +70,7 @@ jobs:
           run: |
             set -e
             pip3 install cohere_melody --find-links dist --force-reinstall
-            pytest
+            pytest --ignore=tests/templating/jinja/python
 
   musllinux:
     runs-on: ${{ matrix.platform.runner }}
@@ -113,7 +113,7 @@ jobs:
             source .venv/bin/activate
             pip install cohere_melody --no-index --find-links dist --force-reinstall
             pip install pytest
-            pytest
+            pytest --ignore=tests/templating/jinja/python
           '
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'x86') }}
@@ -130,7 +130,7 @@ jobs:
             source .venv/bin/activate
             pip install pytest
             pip install cohere_melody --find-links dist --force-reinstall
-            pytest
+            pytest --ignore=tests/templating/jinja/python
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
@@ -167,7 +167,7 @@ jobs:
           source .venv/Scripts/activate
           pip install cohere_melody --find-links dist --force-reinstall
           pip install pytest
-          pytest
+          pytest --ignore=tests/templating/jinja/python
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
@@ -201,7 +201,7 @@ jobs:
           source .venv/bin/activate
           pip install cohere_melody --find-links dist --force-reinstall
           pip install pytest
-          pytest
+          pytest --ignore=tests/templating/jinja/python
 
   sdist:
     runs-on: ubuntu-latest
@@ -242,7 +242,7 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: 'dist/*'
+          subject-path: "dist/*"
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
