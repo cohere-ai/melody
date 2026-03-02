@@ -78,7 +78,9 @@
 {%- endif -%}
 {%- endmacro %}
 {%- macro print_msg(msg) %}
-    {%- if msg.content is string -%}
+    {%- if msg is string -%}
+<|START_TEXT|>{{ msg }}<|END_TEXT|>
+    {%- elif msg.content is string -%}
 <|START_TEXT|>{{ msg.content }}<|END_TEXT|>
     {%- else %}
         {%- set last_was_text = namespace(value=false) %}
@@ -115,7 +117,7 @@
 {{ msg.content[0].thinking }}
     {%- endif %}
 {%- endmacro %}
-{%- if messages and messages[0]['role']|lower == 'system' %}{%- set developer_instruction = messages[0] %}{% endif %}
+{%- if messages and messages[0]['role']|lower == 'system' %}{%- set developer_instruction = messages[0] %}{%- set render_developer_instruction = true %}{% endif %}
 {%- set json_object = true if response_format and response_format.type == "json_object" else false %}
 {%- set json_schema = (response_format.json_schema or response_format.schema) if response_format %}
 {%- set json_mode = json_object or json_schema %}
@@ -193,11 +195,11 @@ Your output should adhere to the following json schema:
 <|END_OF_TURN_TOKEN|>
 {%- endif %}
 {%- if render_developer_instruction -%}
-<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>{{ developer_instruction }}<|END_TEXT|><|END_OF_TURN_TOKEN|>
+<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(developer_instruction) }}<|END_OF_TURN_TOKEN|>
 {%- endif %}
 {%- for message in messages %}
     {%- set msg_role_downcased = message.role | lower %}
-    {%- if msg_role_downcased == 'system' and (not (loop.first and developer_preamble) or skip_preamble) -%}
+    {%- if msg_role_downcased == 'system' and (not (loop.first and developer_instruction)) -%}
 <|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
     {%- elif msg_role_downcased == 'user' -%}
 <|START_OF_TURN_TOKEN|><|USER_TOKEN|>{{ print_msg(message) }}<|END_OF_TURN_TOKEN|>{%- if documents and not sent_documents.value %}{%- set sent_documents.value = true %}{% set tool_idx.value = tool_idx.value + 1 %}{{ document_turn(documents) }}{% endif %}
