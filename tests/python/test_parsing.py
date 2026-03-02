@@ -35,9 +35,7 @@ class TestPyFilterWriteDecoded:
         result = cmd3_filter.write_decoded("<|START_THINKING|>Thinking...")
         assert result.reasoning is not None
 
-        result = cmd3_filter.write_decoded(
-            "<|END_THINKING|><|START_RESPONSE|>Response"
-        )
+        result = cmd3_filter.write_decoded("<|END_THINKING|><|START_RESPONSE|>Response")
         assert result.content is not None
         assert "Response" in result.content
 

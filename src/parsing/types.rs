@@ -7,63 +7,6 @@
 use pyo3::prelude::*;
 use serde::Deserialize;
 
-/// Token IDs paired with their log probabilities.
-///
-/// This structure is used to track both the token identifiers and their associated
-/// log probability scores from the language model. Log probabilities are useful for
-/// understanding model confidence and implementing features like token filtering.
-///
-/// # Examples
-///
-/// ```rust
-/// use cohere_melody::parsing::types::TokenIDsWithLogProb;
-///
-/// let mut logprobs = TokenIDsWithLogProb::new();
-/// assert!(logprobs.token_ids.is_empty());
-///
-/// let other = TokenIDsWithLogProb {
-///     token_ids: vec![1, 2, 3],
-///     logprobs: vec![-0.1, -0.2, -0.3],
-/// };
-/// logprobs.append(other);
-/// assert_eq!(logprobs.token_ids.len(), 3);
-/// ```
-#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct TokenIDsWithLogProb {
-    /// Token IDs from the model's vocabulary
-    pub token_ids: Vec<u32>,
-    /// Log probability scores for each token (same length as `token_ids`)
-    pub logprobs: Vec<f32>,
-}
-
-impl TokenIDsWithLogProb {
-    /// Creates a new empty `TokenIDsWithLogProb` instance.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use cohere_melody::parsing::types::TokenIDsWithLogProb;
-    ///
-    /// let logprobs = TokenIDsWithLogProb::new();
-    /// assert!(logprobs.token_ids.is_empty());
-    /// assert!(logprobs.logprobs.is_empty());
-    /// ```
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            token_ids: Vec::new(),
-            logprobs: Vec::new(),
-        }
-    }
-
-    /// Appends another `TokenIDsWithLogProb` to this one, extending both vectors.
-    pub fn append(&mut self, other: TokenIDsWithLogProb) {
-        self.token_ids.extend(other.token_ids);
-        self.logprobs.extend(other.logprobs);
-    }
-}
-
 /// A parsed output chunk from the streaming filter.
 ///
 /// This is the primary output structure returned when processing tokens. Each call to
@@ -97,8 +40,6 @@ impl TokenIDsWithLogProb {
 pub struct FilterOutput {
     /// Plain text content extracted from the token stream
     pub text: String,
-    /// Token IDs and log probabilities for this output chunk
-    pub logprobs: TokenIDsWithLogProb,
     /// Incremental search query delta (if in search query mode)
     pub search_query: Option<FilterSearchQueryDelta>,
     /// Citations parsed from this chunk (may be empty)

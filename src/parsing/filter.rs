@@ -7,7 +7,7 @@ use crate::parsing::action_filter::FilterAction;
 use crate::parsing::options::FilterOptions;
 use crate::parsing::types::{
     AccumulatedToolCall, FilterAggregatedResult, FilterMode, FilterOutput, FilterSearchQueryDelta,
-    SearchQueryDelta, TokenIDsWithLogProb,
+    SearchQueryDelta,
 };
 use std::collections::HashMap;
 
@@ -143,11 +143,9 @@ pub struct FilterImpl {
     // Chunking configuration
     pub(crate) chunk_size: usize,
     pub(crate) num_tokens_in_chunk: usize,
-    pub(crate) chunk_log_probs: TokenIDsWithLogProb,
 
     // Buffering state
     pub(crate) buf: Vec<u8>,
-    pub(crate) partial_special_token_log_prob: TokenIDsWithLogProb,
     pub(crate) mode: FilterMode,
     pub(crate) done: bool,
 }
@@ -174,9 +172,7 @@ impl FilterImpl {
             cmd3_citations: false,
             chunk_size: 1,
             num_tokens_in_chunk: 0,
-            chunk_log_probs: TokenIDsWithLogProb::new(),
             buf: Vec::new(),
-            partial_special_token_log_prob: TokenIDsWithLogProb::new(),
             mode: FilterMode::PlainText,
             done: false,
         }
@@ -214,11 +210,7 @@ impl FilterImpl {
         self
     }
 
-    pub(crate) fn write_text(
-        &mut self,
-        text: &[u8],
-        logprobs: TokenIDsWithLogProb,
-    ) -> Vec<FilterOutput> {
+    pub(crate) fn write_text(&mut self, text: &[u8]) -> Vec<FilterOutput> {
         if self.done {
             return Vec::new();
         }
@@ -229,7 +221,6 @@ impl FilterImpl {
         // If is a partial special token, we need to wait for the next token.
         let (special_token_idx, found_seq) = find_partial(&str, &mut self.special_token_map.keys());
         if special_token_idx != usize::MAX && found_seq.is_empty() {
-            self.partial_special_token_log_prob = logprobs;
             return Vec::new();
         }
 
@@ -251,16 +242,7 @@ impl FilterImpl {
                 // Before the special token, process the buffer with the old mode
                 let pre_special_token = &str[..special_token_idx];
                 if !pre_special_token.is_empty() {
-                    // Take ownership temporarily to avoid clone
-                    let partial_log_prob = std::mem::take(&mut self.partial_special_token_log_prob);
-                    let (o, _) = self.handle_token(
-                        self.mode,
-                        pre_special_token.as_bytes(),
-                        false,
-                        &partial_log_prob,
-                    );
-                    // restore
-                    self.partial_special_token_log_prob = partial_log_prob;
+                    let (o, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), false);
                     out.extend(o);
                 }
 
@@ -276,22 +258,15 @@ impl FilterImpl {
         // Process buffer by mode
         if !self.buf.is_empty() {
             self.num_tokens_in_chunk += 1;
-            self.chunk_log_probs.append(logprobs);
 
             if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
                 return out;
             }
 
-            let (o, remove) = self.handle_token(
-                self.mode,
-                &self.buf.clone(),
-                false,
-                &self.chunk_log_probs.clone(),
-            );
+            let (o, remove) = self.handle_token(self.mode, &self.buf.clone(), false);
             out.extend(o);
             self.buf.drain(..remove);
             self.num_tokens_in_chunk = 0;
-            self.chunk_log_probs = TokenIDsWithLogProb::new();
         }
 
         out
@@ -302,7 +277,6 @@ impl FilterImpl {
         mode: FilterMode,
         bstr: &[u8],
         after_last_token: bool,
-        token_log_probs: &TokenIDsWithLogProb,
     ) -> (Vec<FilterOutput>, usize) {
         match mode {
             FilterMode::InclusiveStop | FilterMode::ExclusiveStop => {
@@ -315,17 +289,17 @@ impl FilterImpl {
                 self.parse_actions(&s)
             }
             FilterMode::GroundedAnswer | FilterMode::ToolReason => {
-                self.process_grounded_text(bstr, after_last_token, mode, Some(token_log_probs))
+                self.process_grounded_text(bstr, after_last_token, mode)
             }
             FilterMode::SearchQuery => self.process_search_query(bstr),
             FilterMode::Answer => {
                 if self.stream_non_grounded_answer {
-                    self.process_text(bstr, Some(token_log_probs))
+                    self.process_text(bstr)
                 } else {
                     (Vec::new(), bstr.len())
                 }
             }
-            FilterMode::PlainText => self.process_text(bstr, Some(token_log_probs)),
+            FilterMode::PlainText => self.process_text(bstr),
         }
     }
 
@@ -459,11 +433,7 @@ impl FilterImpl {
         (out, bstr.len() - rem_right)
     }
 
-    pub(crate) fn process_text(
-        &mut self,
-        bstr: &[u8],
-        token_log_probs: Option<&TokenIDsWithLogProb>,
-    ) -> (Vec<FilterOutput>, usize) {
+    pub(crate) fn process_text(&mut self, bstr: &[u8]) -> (Vec<FilterOutput>, usize) {
         if !Self::utf8_valid_or_limit(bstr) {
             return (Vec::new(), 0);
         }
@@ -473,14 +443,10 @@ impl FilterImpl {
         let mut out = Vec::new();
 
         if !send.is_empty() {
-            let mut output = FilterOutput {
+            out.push(FilterOutput {
                 text: send,
                 ..Default::default()
-            };
-            if let Some(probs) = token_log_probs {
-                output.logprobs = probs.clone();
-            }
-            out.push(output);
+            });
         }
 
         (out, bstr.len() - rem_right)
@@ -513,7 +479,7 @@ impl FilterImpl {
     pub fn process_full(&mut self, token_strings: &[String]) -> FilterAggregatedResult {
         let mut all_outputs = Vec::with_capacity(token_strings.len());
         for token_str in token_strings {
-            all_outputs.extend(self.write_text(token_str.as_bytes(), TokenIDsWithLogProb::new()));
+            all_outputs.extend(self.write_text(token_str.as_bytes()));
         }
         self.done = true;
         if !self.buf.is_empty()
@@ -521,8 +487,7 @@ impl FilterImpl {
             && self.mode != FilterMode::ExclusiveStop
         {
             let buf_copy = std::mem::take(&mut self.buf);
-            let log_prob_copy = std::mem::take(&mut self.partial_special_token_log_prob);
-            let (o, _) = self.handle_token(self.mode, &buf_copy, true, &log_prob_copy);
+            let (o, _) = self.handle_token(self.mode, &buf_copy, true);
             all_outputs.extend(o);
         }
         aggregate(all_outputs)
@@ -531,7 +496,7 @@ impl FilterImpl {
 
 impl Filter for FilterImpl {
     fn write_decoded(&mut self, decoded_token: &str) -> FilterAggregatedResult {
-        let outputs = self.write_text(decoded_token.as_bytes(), TokenIDsWithLogProb::new());
+        let outputs = self.write_text(decoded_token.as_bytes());
         aggregate(outputs)
     }
 
@@ -542,8 +507,7 @@ impl Filter for FilterImpl {
             && self.mode != FilterMode::ExclusiveStop
         {
             let buf_copy = std::mem::take(&mut self.buf);
-            let log_prob_copy = std::mem::take(&mut self.partial_special_token_log_prob);
-            let (o, _remove) = self.handle_token(self.mode, &buf_copy, true, &log_prob_copy);
+            let (o, _remove) = self.handle_token(self.mode, &buf_copy, true);
             return aggregate(o);
         }
         FilterAggregatedResult::default()

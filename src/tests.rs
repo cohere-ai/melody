@@ -51,30 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_citation_still_has_logprobs() {
-        let mut filter = FilterImpl::new();
-        filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = None;
-
-        let input = "<co: 0></co: 0>";
-        let logprobs = TokenIDsWithLogProb {
-            token_ids: vec![1, 2, 3],
-            logprobs: vec![0.1, 0.2, 0.3],
-        };
-        let (outputs, _remove) = filter.process_grounded_text(
-            input.as_bytes(),
-            true,
-            FilterMode::GroundedAnswer,
-            Some(&logprobs),
-        );
-
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0].text, "");
-        assert_eq!(outputs[0].logprobs.token_ids, vec![1, 2, 3]);
-        assert_eq!(outputs[0].logprobs.logprobs, vec![0.1, 0.2, 0.3]);
-    }
-
-    #[test]
     fn test_citations_multiple() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
@@ -156,24 +132,6 @@ mod tests {
     }
 
     #[test]
-    fn test_process_text_with_logprobs() {
-        let mut filter = FilterImpl::new();
-
-        let text = "hello world";
-        let logprobs = TokenIDsWithLogProb {
-            token_ids: vec![1, 2, 3],
-            logprobs: vec![0.1, 0.2, 0.3],
-        };
-
-        let (outputs, _) = filter.process_text(text.as_bytes(), Some(&logprobs));
-
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0].text, "hello world");
-        assert_eq!(outputs[0].logprobs.token_ids, vec![1, 2, 3]);
-        assert_eq!(outputs[0].logprobs.logprobs, vec![0.1, 0.2, 0.3]);
-    }
-
-    #[test]
     fn test_process_search_query() {
         let mut filter = FilterImpl::new();
         filter.curr_search_query_idx = 0;
@@ -204,24 +162,6 @@ mod tests {
         let outputs = filter.handle_exclusive_stop("hello<|END|>", 5);
         assert_eq!(outputs.len(), 1);
         assert_eq!(outputs[0].text, "hello");
-    }
-
-    #[test]
-    fn test_token_ids_with_log_prob_append() {
-        let mut logprobs1 = TokenIDsWithLogProb {
-            token_ids: vec![1, 2],
-            logprobs: vec![0.1, 0.2],
-        };
-
-        let logprobs2 = TokenIDsWithLogProb {
-            token_ids: vec![3, 4],
-            logprobs: vec![0.3, 0.4],
-        };
-
-        logprobs1.append(logprobs2);
-
-        assert_eq!(logprobs1.token_ids, vec![1, 2, 3, 4]);
-        assert_eq!(logprobs1.logprobs, vec![0.1, 0.2, 0.3, 0.4]);
     }
 
     static TOKENIZER: std::sync::LazyLock<Tokenizer> = std::sync::LazyLock::new(|| {
