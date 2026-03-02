@@ -260,6 +260,47 @@ pub struct Source {
     pub tool_result_indices: Vec<usize>,
 }
 
+/// Aggregated result from filter processing, separating content, reasoning,
+/// tool calls, citations, and search queries.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
+#[derive(Debug, Clone, Default)]
+pub struct FilterAggregatedResult {
+    /// Non-reasoning text content, if any.
+    pub content: Option<String>,
+    /// Reasoning/thinking text content, if any.
+    pub reasoning: Option<String>,
+    /// Tool call deltas (streaming) or accumulated tool calls (unary).
+    pub tool_calls: Vec<AccumulatedToolCall>,
+    /// Citations extracted from the text.
+    pub citations: Vec<FilterCitation>,
+    /// Search query deltas extracted from the stream.
+    pub search_queries: Vec<SearchQueryDelta>,
+}
+
+/// A tool call accumulated from one or more deltas.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
+#[derive(Debug, Clone, Default)]
+pub struct AccumulatedToolCall {
+    /// Index of this tool call in the sequence.
+    pub index: usize,
+    /// Tool call ID.
+    pub id: String,
+    /// Tool name.
+    pub name: String,
+    /// JSON-encoded arguments string.
+    pub arguments: String,
+}
+
+/// A search query delta extracted from the stream.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
+#[derive(Debug, Clone, Default)]
+pub struct SearchQueryDelta {
+    /// Index of this search query.
+    pub index: usize,
+    /// Search query text.
+    pub text: String,
+}
+
 /// Parsing mode for the filter state machine.
 ///
 /// The filter uses a state machine that transitions between different modes based on

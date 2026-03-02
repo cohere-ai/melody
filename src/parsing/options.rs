@@ -512,7 +512,7 @@ impl FilterOptions {
 /// let options = FilterOptions::new().cmd3();
 /// let mut filter = new_filter(options);
 ///
-/// let outputs = filter.write_decoded("Hello", Default::default());
+/// let outputs = filter.write_decoded("Hello");
 /// ```
 #[must_use]
 pub fn new_filter(options: FilterOptions) -> FilterImpl {

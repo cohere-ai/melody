@@ -16,50 +16,54 @@ textChunks := []string{
 f := melody.NewFilter(melody.HandleMultiHopCmd3(), melody.StreamToolActions())
 
 // Process tokens synchronously
-out := []melody.FilterOutput{}
+var fullContent, fullReasoning string
+var allCitations []melody.FilterCitation
 for _, chunk := range textChunks {
-    outputs, err := f.WriteDecoded(chunk, nil)
+    result, err := f.WriteDecoded(chunk)
     if err != nil {
         panic(err)
     }
-    out = append(out, outputs...)
+    if result == nil {
+        continue
+    }
+    if result.Content != nil {
+        fullContent += *result.Content
+    }
+    if result.Reasoning != nil {
+        fullReasoning += *result.Reasoning
+    }
+    allCitations = append(allCitations, result.Citations...)
 }
 
 // Flush any remaining partial outputs
-remaining, err := f.FlushPartials()
+flushResult, err := f.FlushPartials()
 if err != nil {
     panic(err)
 }
-out = append(out, remaining...)
+if flushResult != nil {
+    if flushResult.Content != nil {
+        fullContent += *flushResult.Content
+    }
+    if flushResult.Reasoning != nil {
+        fullReasoning += *flushResult.Reasoning
+    }
+    allCitations = append(allCitations, flushResult.Citations...)
+}
 
 /*
 Expected output:
-[]melody.FilterOutput{
-    {IsReasoning: true, Text: "This"},
-    {IsReasoning: true, Text: " is"},
-    {IsReasoning: true, Text: " a"},
-    {IsReasoning: true, Text: " rainbow"},
-    {IsReasoning: true, Text: " "},
-    {IsReasoning: true, Text: "emoji"},
-    {IsReasoning: true, Text: ":"},
-    {IsReasoning: true, Text: " 🌈"},
-    {Citations: []melody.FilterCitation{{
-        StartIndex: 18,
-        EndIndex:   26,
-        Text:       "emoji: 🌈",
-        Sources:    []melody.Source{{ToolCallIndex: 0, ToolResultIndices: []int{1}}},
-        IsThinking: true,
-    }}},
-    {Text: "foo"},
-    {Text: " "},
-    {Text: "bar"},
-    {Citations: []melody.FilterCitation{{
-        StartIndex: 4,
-        EndIndex:   7,
-        Text:       "bar",
-        Sources:    []melody.Source{{ToolCallIndex: 0, ToolResultIndices: []int{1, 2}}, {ToolCallIndex: 1, ToolResultIndices: []int{3, 4}}},
-        IsThinking: false,
-    }}},
+fullContent = "foo bar"
+fullReasoning = "This is a rainbow emoji: 🌈"
+allCitations = []melody.FilterCitation{
+    {StartIndex: 18, EndIndex: 26, Text: "emoji: 🌈",
+     Sources: []melody.Source{{ToolCallIndex: 0, ToolResultIndices: []uint{1}}},
+     IsThinking: true},
+    {StartIndex: 4, EndIndex: 7, Text: "bar",
+     Sources: []melody.Source{
+         {ToolCallIndex: 0, ToolResultIndices: []uint{1, 2}},
+         {ToolCallIndex: 1, ToolResultIndices: []uint{3, 4}},
+     },
+     IsThinking: false},
 }
 */
 ```

@@ -24,7 +24,7 @@ Repository = "https://github.com/cohere-ai/melody"
 [tool.maturin]
 features = ["pyo3/extension-module", "python_ffi"]
 module-name = "cohere_melody"
-include=["cohere_melody_vllm/parser.py"]
+include=["cohere_melody.pyi", "cohere_melody_vllm/parser.py"]
 
 [tool.uv]
 managed = false

@@ -12,7 +12,7 @@
 //! # Ownership Rules
 //!
 //! - Pointers returned by `_new` functions: **Caller owns**, must call `_free`
-//! - `CFilterOutputResult` returned by `write_decoded` and `flush_partials`: **Caller owns**, must call `melody_result_free`
+//! - `CAggregatedResultResponse` returned by `write_decoded` and `flush_partials`: **Caller owns**, must call `melody_aggregated_result_free`
 //! - Pointers passed as arguments: **Caller retains ownership**, must remain valid for call duration
 //!
 //! # Thread Safety
@@ -21,7 +21,8 @@
 //! thread at a time, or protected by external synchronization.
 //!
 
-use crate::parsing::types::{FilterCitation, FilterOutput, Source, TokenIDsWithLogProb};
+use crate::parsing::FilterAggregatedResult;
+use crate::parsing::types::{FilterCitation, Source};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
@@ -44,11 +45,10 @@ use std::slice;
 // IMPORTANT: Panics that cross FFI boundaries cause undefined behavior.
 // All extern "C" functions must catch panics and convert them to error returns.
 
-/// Catches panics and returns a `CFilterOutputResult` with an error if one occurs.
-/// Use this for FFI functions that return filter results.
-fn catch_panic_filter_result<F>(f: F) -> *mut CFilterOutputResult
+/// Catches panics and returns a `CAggregatedResultResponse` with an error if one occurs.
+fn catch_panic_aggregated_result<F>(f: F) -> *mut CAggregatedResultResponse
 where
-    F: FnOnce() -> *mut CFilterOutputResult + panic::UnwindSafe,
+    F: FnOnce() -> *mut CAggregatedResultResponse + panic::UnwindSafe,
 {
     match panic::catch_unwind(f) {
         Ok(result) => result,
@@ -65,7 +65,7 @@ where
                     CString::new("Rust panic: error message contained null bytes").unwrap()
                 })
                 .into_raw();
-            Box::into_raw(Box::new(CFilterOutputResult {
+            Box::into_raw(Box::new(CAggregatedResultResponse {
                 result: std::ptr::null_mut(),
                 error: err,
             }))
@@ -117,50 +117,47 @@ pub struct CFilterOptions {
     _private: [u8; 0],
 }
 
-/// C-compatible representation of `FilterOutput`
+/// C-compatible representation of `AggregatedResult`
 #[repr(C)]
-pub struct CFilterOutput {
-    /// Null-terminated C string containing the output text
-    pub text: *mut c_char,
-    /// Length of the text in bytes (excluding null terminator)
-    pub text_len: usize,
-
-    /// Array of token IDs
-    pub token_ids: *mut u32,
-    /// Number of token IDs
-    pub token_ids_len: usize,
-    /// Array of log probabilities (parallel to `token_ids`)
-    pub logprobs: *mut f32,
-    /// Number of log probabilities
-    pub logprobs_len: usize,
-
-    /// Index of the search query (-1 if None)
-    pub search_query_index: i32,
-    /// Null-terminated C string containing the search query text
-    pub search_query_text: *mut c_char,
-
+pub struct CAggregatedResult {
+    /// Content text (null if none)
+    pub content: *mut c_char,
+    /// Reasoning text (null if none)
+    pub reasoning: *mut c_char,
+    /// Array of tool calls
+    pub tool_calls: *mut CAccumulatedToolCall,
+    /// Number of tool calls
+    pub tool_calls_len: usize,
     /// Array of citations
     pub citations: *mut CFilterCitation,
     /// Number of citations
     pub citations_len: usize,
+    /// Array of search query deltas
+    pub search_queries: *mut CSearchQueryDelta,
+    /// Number of search queries
+    pub search_queries_len: usize,
+}
 
-    /// Index of the tool call (-1 if None)
-    pub tool_call_index: i32,
-    /// Null-terminated C string containing the tool call ID
-    pub tool_call_id: *mut c_char,
-    /// Null-terminated C string containing the tool call name
-    pub tool_call_name: *mut c_char,
-    /// Null-terminated C string containing the parameter name
-    pub tool_call_param_name: *mut c_char,
-    /// Null-terminated C string containing the parameter value delta
-    pub tool_call_param_value_delta: *mut c_char,
-    /// Null-terminated C string containing the raw parameter delta
-    pub tool_call_raw_param_delta: *mut c_char,
+/// C-compatible representation of `AccumulatedToolCall`
+#[repr(C)]
+pub struct CAccumulatedToolCall {
+    /// Index of this tool call
+    pub index: usize,
+    /// Tool call ID
+    pub id: *mut c_char,
+    /// Tool name
+    pub name: *mut c_char,
+    /// Tool call arguments (JSON string)
+    pub arguments: *mut c_char,
+}
 
-    /// Whether this is post-answer content
-    pub is_post_answer: bool,
-    /// Whether this is reasoning/thinking content
-    pub is_reasoning: bool,
+/// C-compatible representation of `SearchQueryDelta`
+#[repr(C)]
+pub struct CSearchQueryDelta {
+    /// Index of this search query
+    pub index: usize,
+    /// Search query text
+    pub text: *mut c_char,
 }
 
 /// C-compatible representation of `FilterCitation`
@@ -191,20 +188,11 @@ pub struct CSource {
     pub tool_result_indices_len: usize,
 }
 
-/// C-compatible representation of an array of `FilterOutput`
+/// Struct for returning either a `CAggregatedResult` or an error (mutually exclusive, one is always null)
 #[repr(C)]
-pub struct CFilterOutputArray {
-    /// Array of filter outputs
-    pub outputs: *mut CFilterOutput,
-    /// Number of outputs in the array
-    pub len: usize,
-}
-
-/// Struct for returning either a `CFilterOutputArray` result or an error (mutually exclusive, one is always null)
-#[repr(C)]
-pub struct CFilterOutputResult {
-    /// Pointer to the filter output array result (null if error)
-    pub result: *mut CFilterOutputArray,
+pub struct CAggregatedResultResponse {
+    /// Pointer to the aggregated result (null if error)
+    pub result: *mut CAggregatedResult,
     /// Null-terminated C string containing the error (null if success)
     pub error: *mut c_char,
 }
@@ -513,48 +501,27 @@ pub unsafe extern "C" fn melody_filter_free(filter: *mut CFilter) {
 /// # Safety
 /// - `filter` must be a valid pointer returned from `melody_filter_new`
 /// - `decoded_token` must be a valid null-terminated C string
-/// - The returned `CFilterOutputResult` must be freed with `melody_result_free`
+/// - The returned `CAggregatedResultResponse` must be freed with `melody_aggregated_result_free`
 ///
 /// # Returns
-/// Returns null if inputs are invalid. Returns a `CFilterOutputResult` with an error if a panic occurs.
+/// Returns null if inputs are invalid.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_filter_write_decoded(
     filter: *mut CFilter,
     decoded_token: *const c_char,
-    token_ids: *const u32,
-    token_ids_len: usize,
-    logprobs: *const f32,
-    logprobs_len: usize,
-) -> *mut CFilterOutputResult {
+) -> *mut CAggregatedResultResponse {
     if filter.is_null() || decoded_token.is_null() {
         return std::ptr::null_mut();
     }
 
-    catch_panic_filter_result(AssertUnwindSafe(|| unsafe {
+    catch_panic_aggregated_result(AssertUnwindSafe(|| unsafe {
         let filter = &mut *(filter.cast::<FilterImpl>());
         let token_str = CStr::from_ptr(decoded_token).to_string_lossy();
 
-        let token_ids_vec = if !token_ids.is_null() && token_ids_len > 0 {
-            slice::from_raw_parts(token_ids, token_ids_len).to_vec()
-        } else {
-            Vec::new()
-        };
-
-        let logprobs_vec = if !logprobs.is_null() && logprobs_len > 0 {
-            slice::from_raw_parts(logprobs, logprobs_len).to_vec()
-        } else {
-            Vec::new()
-        };
-
-        let log_prob = TokenIDsWithLogProb {
-            token_ids: token_ids_vec,
-            logprobs: logprobs_vec,
-        };
-
-        let outputs = filter.write_decoded(&token_str, log_prob);
-        let result = convert_outputs_to_c(outputs);
-        Box::into_raw(Box::new(CFilterOutputResult {
-            result,
+        let result = filter.write_decoded(&token_str);
+        let c_result = convert_aggregated_to_c(result);
+        Box::into_raw(Box::new(CAggregatedResultResponse {
+            result: c_result,
             error: std::ptr::null_mut(),
         }))
     }))
@@ -564,168 +531,98 @@ pub unsafe extern "C" fn melody_filter_write_decoded(
 ///
 /// # Safety
 /// - `filter` must be a valid pointer returned from `melody_filter_new`
-/// - The returned `CFilterOutputResult` must be freed with `melody_result_free`
+/// - The returned `CAggregatedResultResponse` must be freed with `melody_aggregated_result_free`
 ///
 /// # Returns
-/// Returns null if filter is null. Returns a `CFilterOutputResult` with an error if a panic occurs.
+/// Returns null if filter is null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_filter_flush_partials(
     filter: *mut CFilter,
-) -> *mut CFilterOutputResult {
+) -> *mut CAggregatedResultResponse {
     if filter.is_null() {
         return std::ptr::null_mut();
     }
 
-    catch_panic_filter_result(AssertUnwindSafe(|| unsafe {
+    catch_panic_aggregated_result(AssertUnwindSafe(|| unsafe {
         let filter = &mut *(filter.cast::<FilterImpl>());
-        let outputs = filter.flush_partials();
-        let result = convert_outputs_to_c(outputs);
-        Box::into_raw(Box::new(CFilterOutputResult {
-            result,
+        let result = filter.flush_partials();
+        let c_result = convert_aggregated_to_c(result);
+        Box::into_raw(Box::new(CAggregatedResultResponse {
+            result: c_result,
             error: std::ptr::null_mut(),
         }))
     }))
 }
 
-/// Helper function to convert Rust `FilterOutput` to C representation
+/// Converts an `AggregatedResult` to its C representation.
 ///
 /// # Safety
-/// The returned pointer must be freed appropriately.
-unsafe fn convert_outputs_to_c(outputs: Vec<FilterOutput>) -> *mut CFilterOutputArray {
-    unsafe {
-        let c_outputs: Vec<CFilterOutput> = outputs
+/// The returned pointer must be freed with `melody_aggregated_result_free`.
+unsafe fn convert_aggregated_to_c(result: FilterAggregatedResult) -> *mut CAggregatedResult {
+    let content = result.content.map_or(std::ptr::null_mut(), |s| {
+        CString::new(s).unwrap().into_raw()
+    });
+
+    let reasoning = result.reasoning.map_or(std::ptr::null_mut(), |s| {
+        CString::new(s).unwrap().into_raw()
+    });
+
+    let tool_calls_len = result.tool_calls.len();
+    let tool_calls = if tool_calls_len > 0 {
+        let c_tcs: Vec<CAccumulatedToolCall> = result
+            .tool_calls
             .into_iter()
-            .map(|output| convert_output_to_c(output))
+            .map(|tc| CAccumulatedToolCall {
+                index: tc.index,
+                id: CString::new(tc.id).unwrap().into_raw(),
+                name: CString::new(tc.name).unwrap().into_raw(),
+                arguments: CString::new(tc.arguments).unwrap().into_raw(),
+            })
             .collect();
+        Box::into_raw(c_tcs.into_boxed_slice()).cast::<CAccumulatedToolCall>()
+    } else {
+        std::ptr::null_mut()
+    };
 
-        let len = c_outputs.len();
-        let ptr = if len > 0 {
-            let boxed = c_outputs.into_boxed_slice();
-            Box::into_raw(boxed).cast::<CFilterOutput>()
-        } else {
-            std::ptr::null_mut()
-        };
-
-        Box::into_raw(Box::new(CFilterOutputArray { outputs: ptr, len }))
-    }
-}
-
-/// Converts a single `FilterOutput` to its C representation.
-///
-/// # Safety
-/// The returned struct contains heap-allocated pointers that must be freed.
-#[allow(clippy::too_many_lines)]
-unsafe fn convert_output_to_c(output: FilterOutput) -> CFilterOutput {
-    unsafe {
-        let text = if output.text.is_empty() {
-            std::ptr::null_mut()
-        } else {
-            CString::new(output.text).unwrap().into_raw()
-        };
-
-        let token_ids_len = output.logprobs.token_ids.len();
-        let token_ids = if token_ids_len > 0 {
-            let boxed = output.logprobs.token_ids.into_boxed_slice();
-            Box::into_raw(boxed).cast::<u32>()
-        } else {
-            std::ptr::null_mut()
-        };
-
-        let logprobs_len = output.logprobs.logprobs.len();
-        let logprobs = if logprobs_len > 0 {
-            let boxed = output.logprobs.logprobs.into_boxed_slice();
-            Box::into_raw(boxed).cast::<f32>()
-        } else {
-            std::ptr::null_mut()
-        };
-
-        let (search_query_index, search_query_text) = if let Some(sq) = output.search_query {
-            #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-            let index = sq.index.min(i32::MAX as usize) as i32;
-            (index, CString::new(sq.text).unwrap().into_raw())
-        } else {
-            (-1, std::ptr::null_mut())
-        };
-
-        let citations_len = output.citations.len();
-        let citations = if citations_len > 0 {
-            let c_citations: Vec<CFilterCitation> = output
+    let citations_len = result.citations.len();
+    let citations = if citations_len > 0 {
+        unsafe {
+            let c_citations: Vec<CFilterCitation> = result
                 .citations
                 .into_iter()
                 .map(|c| convert_citation_to_c(c))
                 .collect();
-            let boxed = c_citations.into_boxed_slice();
-            Box::into_raw(boxed).cast::<CFilterCitation>()
-        } else {
-            std::ptr::null_mut()
-        };
-
-        let (
-            tool_call_index,
-            tool_call_id,
-            tool_call_name,
-            tool_call_param_name,
-            tool_call_param_value_delta,
-            tool_call_raw_param_delta,
-        ) = if let Some(tc) = output.tool_call_delta {
-            let param_name = if let Some(param) = tc.param_delta {
-                (
-                    CString::new(param.name).unwrap().into_raw(),
-                    CString::new(param.value_delta).unwrap().into_raw(),
-                )
-            } else {
-                (std::ptr::null_mut(), std::ptr::null_mut())
-            };
-
-            (
-                {
-                    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-                    {
-                        tc.index.min(i32::MAX as usize) as i32
-                    }
-                },
-                CString::new(tc.id).unwrap().into_raw(),
-                CString::new(tc.name).unwrap().into_raw(),
-                param_name.0,
-                param_name.1,
-                CString::new(tc.raw_param_delta).unwrap().into_raw(),
-            )
-        } else {
-            (
-                -1,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            )
-        };
-
-        CFilterOutput {
-            text,
-            text_len: if text.is_null() {
-                0
-            } else {
-                CStr::from_ptr(text).to_bytes().len()
-            },
-            token_ids,
-            token_ids_len,
-            logprobs,
-            logprobs_len,
-            search_query_index,
-            search_query_text,
-            citations,
-            citations_len,
-            tool_call_index,
-            tool_call_id,
-            tool_call_name,
-            tool_call_param_name,
-            tool_call_param_value_delta,
-            tool_call_raw_param_delta,
-            is_post_answer: output.is_post_answer,
-            is_reasoning: output.is_reasoning,
+            Box::into_raw(c_citations.into_boxed_slice()).cast::<CFilterCitation>()
         }
-    }
+    } else {
+        std::ptr::null_mut()
+    };
+
+    let search_queries_len = result.search_queries.len();
+    let search_queries = if search_queries_len > 0 {
+        let c_sqs: Vec<CSearchQueryDelta> = result
+            .search_queries
+            .into_iter()
+            .map(|sq| CSearchQueryDelta {
+                index: sq.index,
+                text: CString::new(sq.text).unwrap().into_raw(),
+            })
+            .collect();
+        Box::into_raw(c_sqs.into_boxed_slice()).cast::<CSearchQueryDelta>()
+    } else {
+        std::ptr::null_mut()
+    };
+
+    Box::into_raw(Box::new(CAggregatedResult {
+        content,
+        reasoning,
+        tool_calls,
+        tool_calls_len,
+        citations,
+        citations_len,
+        search_queries,
+        search_queries_len,
+    }))
 }
 
 /// Converts a single `FilterCitation` to its C representation.
@@ -772,114 +669,78 @@ unsafe fn convert_citation_to_c(citation: FilterCitation) -> CFilterCitation {
     }
 }
 
-/// Frees a `CFilterOutputResult` struct and its contents
+/// Frees a `CAggregatedResultResponse` struct and all nested allocations
 ///
 /// # Safety
-/// `res` must be a valid pointer returned from `melody_filter_write_decoded`
+/// `res` must be a valid pointer returned from `melody_filter_write_decoded` or `melody_filter_flush_partials`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_result_free(res: *mut CFilterOutputResult) {
+pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResultResponse) {
     if res.is_null() {
         return;
     }
 
     unsafe {
         let res_box = Box::from_raw(res);
-        if !res_box.result.is_null() {
-            melody_filter_output_array_free(res_box.result);
-        }
         if !res_box.error.is_null() {
             let _ = CString::from_raw(res_box.error);
         }
-    }
-}
-
-/// Frees a `CFilterOutputArray`
-///
-/// # Safety
-/// `arr` must be a valid pointer returned from `melody_filter_write_decoded` or `melody_filter_flush_partials`
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_output_array_free(arr: *mut CFilterOutputArray) {
-    if arr.is_null() {
-        return;
-    }
-
-    unsafe {
-        let arr_box = Box::from_raw(arr);
-
-        if !arr_box.outputs.is_null() && arr_box.len > 0 {
-            let outputs = Vec::from_raw_parts(arr_box.outputs, arr_box.len, arr_box.len);
-
-            for output in outputs {
-                // Free all strings
-                if !output.text.is_null() {
-                    let _ = CString::from_raw(output.text);
+        if !res_box.result.is_null() {
+            let r = Box::from_raw(res_box.result);
+            if !r.content.is_null() {
+                let _ = CString::from_raw(r.content);
+            }
+            if !r.reasoning.is_null() {
+                let _ = CString::from_raw(r.reasoning);
+            }
+            if !r.tool_calls.is_null() && r.tool_calls_len > 0 {
+                let tcs = Vec::from_raw_parts(r.tool_calls, r.tool_calls_len, r.tool_calls_len);
+                for tc in tcs {
+                    if !tc.id.is_null() {
+                        let _ = CString::from_raw(tc.id);
+                    }
+                    if !tc.name.is_null() {
+                        let _ = CString::from_raw(tc.name);
+                    }
+                    if !tc.arguments.is_null() {
+                        let _ = CString::from_raw(tc.arguments);
+                    }
                 }
-                if !output.search_query_text.is_null() {
-                    let _ = CString::from_raw(output.search_query_text);
-                }
-                if !output.tool_call_id.is_null() {
-                    let _ = CString::from_raw(output.tool_call_id);
-                }
-                if !output.tool_call_name.is_null() {
-                    let _ = CString::from_raw(output.tool_call_name);
-                }
-                if !output.tool_call_param_name.is_null() {
-                    let _ = CString::from_raw(output.tool_call_param_name);
-                }
-                if !output.tool_call_param_value_delta.is_null() {
-                    let _ = CString::from_raw(output.tool_call_param_value_delta);
-                }
-                if !output.tool_call_raw_param_delta.is_null() {
-                    let _ = CString::from_raw(output.tool_call_raw_param_delta);
-                }
-
-                // Free token_ids and logprobs
-                if !output.token_ids.is_null() && output.token_ids_len > 0 {
-                    let _ = Vec::from_raw_parts(
-                        output.token_ids,
-                        output.token_ids_len,
-                        output.token_ids_len,
-                    );
-                }
-                if !output.logprobs.is_null() && output.logprobs_len > 0 {
-                    let _ = Vec::from_raw_parts(
-                        output.logprobs,
-                        output.logprobs_len,
-                        output.logprobs_len,
-                    );
-                }
-
-                // Free citations
-                if !output.citations.is_null() && output.citations_len > 0 {
-                    let citations = Vec::from_raw_parts(
-                        output.citations,
-                        output.citations_len,
-                        output.citations_len,
-                    );
-                    for citation in citations {
-                        if !citation.text.is_null() {
-                            let _ = CString::from_raw(citation.text);
-                        }
-
-                        // Free sources
-                        if !citation.sources.is_null() && citation.sources_len > 0 {
-                            let sources = Vec::from_raw_parts(
-                                citation.sources,
-                                citation.sources_len,
-                                citation.sources_len,
-                            );
-                            for source in sources {
-                                if !source.tool_result_indices.is_null()
-                                    && source.tool_result_indices_len > 0
-                                {
-                                    let _ = Vec::from_raw_parts(
-                                        source.tool_result_indices,
-                                        source.tool_result_indices_len,
-                                        source.tool_result_indices_len,
-                                    );
-                                }
+            }
+            if !r.citations.is_null() && r.citations_len > 0 {
+                let citations = Vec::from_raw_parts(r.citations, r.citations_len, r.citations_len);
+                for citation in citations {
+                    if !citation.text.is_null() {
+                        let _ = CString::from_raw(citation.text);
+                    }
+                    if !citation.sources.is_null() && citation.sources_len > 0 {
+                        let sources = Vec::from_raw_parts(
+                            citation.sources,
+                            citation.sources_len,
+                            citation.sources_len,
+                        );
+                        for source in sources {
+                            if !source.tool_result_indices.is_null()
+                                && source.tool_result_indices_len > 0
+                            {
+                                let _ = Vec::from_raw_parts(
+                                    source.tool_result_indices,
+                                    source.tool_result_indices_len,
+                                    source.tool_result_indices_len,
+                                );
                             }
                         }
+                    }
+                }
+            }
+            if !r.search_queries.is_null() && r.search_queries_len > 0 {
+                let sqs = Vec::from_raw_parts(
+                    r.search_queries,
+                    r.search_queries_len,
+                    r.search_queries_len,
+                );
+                for sq in sqs {
+                    if !sq.text.is_null() {
+                        let _ = CString::from_raw(sq.text);
                     }
                 }
             }
@@ -1653,8 +1514,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_catch_panic_filter_result_catches_panic() {
-        let result_ptr = catch_panic_filter_result(|| {
+    fn test_catch_panic_aggregated_result_catches_panic() {
+        let result_ptr = catch_panic_aggregated_result(|| {
             panic!("test panic message");
         });
 
@@ -1668,16 +1529,16 @@ mod tests {
             let error_str = CStr::from_ptr(result.error).to_str().unwrap();
             assert!(error_str.contains("test panic message"));
 
-            melody_result_free(result_ptr);
+            melody_aggregated_result_free(result_ptr);
         }
     }
 
     #[test]
-    fn test_catch_panic_filter_result_success() {
-        let result_ptr = catch_panic_filter_result(|| {
-            let outputs = unsafe { convert_outputs_to_c(vec![]) };
-            Box::into_raw(Box::new(CFilterOutputResult {
-                result: outputs,
+    fn test_catch_panic_aggregated_result_success() {
+        let result_ptr = catch_panic_aggregated_result(|| {
+            let c_result = unsafe { convert_aggregated_to_c(FilterAggregatedResult::default()) };
+            Box::into_raw(Box::new(CAggregatedResultResponse {
+                result: c_result,
                 error: std::ptr::null_mut(),
             }))
         });
@@ -1689,7 +1550,7 @@ mod tests {
             assert!(!result.result.is_null());
             assert!(result.error.is_null());
 
-            melody_result_free(result_ptr);
+            melody_aggregated_result_free(result_ptr);
         }
     }
 }

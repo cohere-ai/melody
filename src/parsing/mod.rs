@@ -4,15 +4,13 @@
 //! from Cohere models with support for citations, tool calls, and various output formats.
 
 mod action_filter;
-
-pub mod aggregated;
 mod citations_filter;
 mod filter;
 mod options;
 mod param_filter;
 
-/// Type definitions for filter outputs, citations, and tool calls.
 pub mod types;
 
 pub use filter::*;
 pub use options::*;
+pub use types::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};

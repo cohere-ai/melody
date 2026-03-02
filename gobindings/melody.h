@@ -159,35 +159,32 @@ typedef struct CFilter CFilter;
 typedef struct CFilterOptions CFilterOptions;
 
 typedef struct {
+    size_t index;
+    char* id;
+    char* name;
+    char* arguments;
+} CAccumulatedToolCall;
+
+typedef struct {
+    size_t index;
     char* text;
-    size_t text_len;
-    uint32_t* token_ids;
-    size_t token_ids_len;
-    float* logprobs;
-    size_t logprobs_len;
-    int32_t search_query_index;
-    char* search_query_text;
+} CSearchQueryDelta;
+
+typedef struct {
+    char* content;
+    char* reasoning;
+    CAccumulatedToolCall* tool_calls;
+    size_t tool_calls_len;
     CFilterCitation* citations;
     size_t citations_len;
-    int32_t tool_call_index;
-    char* tool_call_id;
-    char* tool_call_name;
-    char* tool_call_param_name;
-    char* tool_call_param_value_delta;
-    char* tool_call_raw_param_delta;
-    bool is_post_answer;
-    bool is_reasoning;
-} CFilterOutput;
+    CSearchQueryDelta* search_queries;
+    size_t search_queries_len;
+} CAggregatedResult;
 
 typedef struct {
-    CFilterOutput* outputs;
-    size_t len;
-} CFilterOutputArray;
-
-typedef struct {
-    CFilterOutputArray* result; // null if error
-    char* error;                // null if success
-} CFilterOutputResult;
+    CAggregatedResult* result; // null if error
+    char* error;               // null if success
+} CAggregatedResultResponse;
 
 // FilterOptions functions
 extern CFilterOptions* melody_filter_options_new();
@@ -210,7 +207,6 @@ extern void melody_filter_options_remove_token(CFilterOptions* options, const ch
 // Filter functions
 extern CFilter* melody_filter_new(const CFilterOptions* options);
 extern void melody_filter_free(CFilter* filter);
-extern CFilterOutputResult* melody_filter_write_decoded(CFilter* filter, const char* decoded_token, const uint32_t* token_ids, size_t token_ids_len, const float* logprobs, size_t logprobs_len);
-extern CFilterOutputResult* melody_filter_flush_partials(CFilter* filter);
-extern void melody_result_free(CFilterOutputResult* res);
-extern void melody_filter_output_array_free(CFilterOutputArray* arr);
+extern CAggregatedResultResponse* melody_filter_write_decoded(CFilter* filter, const char* decoded_token);
+extern CAggregatedResultResponse* melody_filter_flush_partials(CFilter* filter);
+extern void melody_aggregated_result_free(CAggregatedResultResponse* res);

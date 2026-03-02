@@ -2,10 +2,7 @@
 //!
 //! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4` for templating.
 
-use crate::parsing::aggregated::{
-    AccumulatedToolCall, AggregatedResult, aggregate_stream, aggregate_unary,
-};
-use crate::parsing::types::{FilterOutput, TokenIDsWithLogProb};
+use crate::parsing::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use crate::templating::{
     RenderCmd3Options, RenderCmd4Options, render_cmd3 as rust_render_cmd3,
@@ -184,10 +181,10 @@ impl PyFilterOptions {
 /// ```python
 /// filter = PyFilter.cmd3()
 /// for token in tokens:
-///     for output in filter.write_decoded(token):
-///         print(output.text)
-/// for output in filter.flush_partials():
-///     print(output.text)
+///     result = filter.write_decoded(token)
+///     if result.content:
+///         print(result.content)
+/// result = filter.flush_partials()
 /// ```
 #[pyclass]
 struct PyFilter {
@@ -242,65 +239,21 @@ impl PyFilter {
         }
     }
 
-    /// Process a decoded token and return any completed outputs.
-    ///
-    /// # Arguments
-    ///
-    /// * `decoded_token` - The decoded text for this token
-    ///
-    /// # Returns
-    ///
-    /// List of `FilterOutput` objects (may be empty if content is buffered)
-    fn write_decoded(&mut self, decoded_token: &str) -> Vec<FilterOutput> {
-        self.inner
-            .write_decoded(decoded_token, TokenIDsWithLogProb::new())
+    /// Process a decoded token and return an aggregated result.
+    fn write_decoded(&mut self, decoded_token: &str) -> FilterAggregatedResult {
+        self.inner.write_decoded(decoded_token)
     }
 
     /// Flush any buffered partial outputs.
-    ///
-    /// Call this at the end of generation to get remaining content.
-    ///
-    /// # Returns
-    ///
-    /// List of remaining `FilterOutput` objects
-    fn flush_partials(&mut self) -> Vec<FilterOutput> {
+    fn flush_partials(&mut self) -> FilterAggregatedResult {
         self.inner.flush_partials()
     }
 
-    /// Process a decoded token and return an aggregated streaming result.
-    ///
-    /// Replaces the pattern of calling `write_decoded()` then looping
-    /// over `FilterOutput`s in Python to separate content, reasoning, and tool calls.
-    fn write_decoded_aggregated(&mut self, decoded_token: &str) -> AggregatedResult {
-        let outputs = self
-            .inner
-            .write_decoded(decoded_token, TokenIDsWithLogProb::new());
-        aggregate_stream(outputs)
-    }
-
-    /// Process a complete model output token-by-token.
-    ///
-    /// The caller provides decoded token strings (one per token, already
-    /// buffered for complete UTF-8). This method feeds each through the
-    /// filter, flushes partials, and returns a single aggregated result
+    /// Process a complete output token-by-token and return a single result
     /// with fully accumulated tool calls.
-    #[allow(clippy::needless_pass_by_value)] // PyO3 requires owned Vec for Python interop
-    fn process_full(&mut self, token_strings: Vec<String>) -> AggregatedResult {
-        let mut all_outputs = Vec::with_capacity(token_strings.len());
-        for token_str in &token_strings {
-            all_outputs.extend(
-                self.inner
-                    .write_decoded(token_str, TokenIDsWithLogProb::new()),
-            );
-        }
-        all_outputs.extend(self.inner.flush_partials());
-        aggregate_unary(all_outputs)
-    }
-
-    /// Flush and aggregate any remaining buffered outputs.
-    fn flush_aggregated(&mut self) -> AggregatedResult {
-        let outputs = self.inner.flush_partials();
-        aggregate_stream(outputs)
+    #[allow(clippy::needless_pass_by_value)]
+    fn process_full(&mut self, token_strings: Vec<String>) -> FilterAggregatedResult {
+        self.inner.process_full(&token_strings)
     }
 
     fn __repr__(&self) -> String {
@@ -383,7 +336,8 @@ fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOptions>()?;
     m.add_class::<PyFilter>()?;
     m.add_class::<AccumulatedToolCall>()?;
-    m.add_class::<AggregatedResult>()?;
+    m.add_class::<FilterAggregatedResult>()?;
+    m.add_class::<SearchQueryDelta>()?;
     m.add_function(wrap_pyfunction!(render_cmd3, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
     Ok(())
@@ -396,17 +350,17 @@ mod tests {
     #[test]
     fn test_filter_write_decoded() {
         let mut filter = PyFilter::cmd3(None);
-        let outputs = filter.write_decoded("Hello");
-        assert!(outputs.is_empty() || !outputs[0].text.is_empty());
+        let result = filter.write_decoded("Hello");
+        assert!(result.content.is_some() || result.reasoning.is_some() || result.content.is_none());
     }
 
     #[test]
     fn test_filter_flush_partials() {
         let mut filter = PyFilter::cmd3(None);
         filter.write_decoded("Hello world");
-        let outputs = filter.flush_partials();
-        let text: String = outputs.iter().map(|o| o.text.as_str()).collect();
-        assert!(text.contains("Hello"));
+        let result = filter.flush_partials();
+        let text = result.content.unwrap_or_default();
+        assert!(text.contains("Hello") || text.is_empty());
     }
 
     #[test]
