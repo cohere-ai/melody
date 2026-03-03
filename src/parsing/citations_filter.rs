@@ -41,11 +41,11 @@ impl FilterImpl {
             return (Vec::new(), 0);
         }
 
-        let send = String::from_utf8_lossy(bstr);
-        let (send, rem_right) = self.trim_space(&send);
+        let lossy = String::from_utf8_lossy(bstr);
+        let (send, rem_right) = self.trim_space(&lossy);
         let remove = bstr.len() - send.len() - rem_right;
 
-        let (mut res_out, remove_cit) = self.parse_citations(&send, mode);
+        let (mut res_out, remove_cit) = self.parse_citations(send, mode);
 
         if res_out.is_none()
             || (res_out.as_ref().unwrap().text.is_empty()
@@ -55,7 +55,7 @@ impl FilterImpl {
                 return (Vec::new(), remove + remove_cit);
             }
             res_out = Some(FilterOutput {
-                text: send.clone(),
+                text: send.to_string(),
                 ..Default::default()
             });
         }

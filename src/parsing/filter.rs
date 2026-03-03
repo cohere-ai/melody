@@ -263,9 +263,10 @@ impl FilterImpl {
                 return out;
             }
 
-            let (o, remove) = self.handle_token(self.mode, &self.buf.clone(), false);
+            let buf = std::mem::take(&mut self.buf);
+            let (o, remove) = self.handle_token(self.mode, &buf, false);
             out.extend(o);
-            self.buf.drain(..remove);
+            self.buf = buf[remove..].to_vec();
             self.num_tokens_in_chunk = 0;
         }
 
@@ -387,10 +388,10 @@ impl FilterImpl {
         if idx != usize::MAX && !s[..idx].is_empty() {
             let text = if let Some(start_idx) = self.cur_citation_byte_index {
                 let (trimmed, _) = self.trim_space(&s[start_idx..idx]);
-                trimmed
+                trimmed.to_string()
             } else {
                 let (trimmed, _) = self.trim_space(&s[..idx]);
-                trimmed
+                trimmed.to_string()
             };
 
             return vec![FilterOutput {
@@ -423,7 +424,7 @@ impl FilterImpl {
             out.push(FilterOutput {
                 search_query: Some(FilterSearchQueryDelta {
                     index: self.curr_search_query_idx,
-                    text: send,
+                    text: send.to_string(),
                 }),
                 ..Default::default()
             });
@@ -444,7 +445,7 @@ impl FilterImpl {
 
         if !send.is_empty() {
             out.push(FilterOutput {
-                text: send,
+                text: send.to_string(),
                 ..Default::default()
             });
         }
@@ -452,19 +453,18 @@ impl FilterImpl {
         (out, bstr.len() - rem_right)
     }
 
-    // TODO: this can be refactored to avoid all the string allocations
-    pub(crate) fn trim_space(&mut self, s: &str) -> (String, usize) {
-        let mut result = s.to_string();
+    pub(crate) fn trim_space<'a>(&mut self, s: &'a str) -> (&'a str, usize) {
+        let mut result = s;
         let mut rem = 0;
 
         if self.right_trimmed {
-            rem = result.len();
-            result = result.trim_end().to_string();
-            rem -= result.len();
+            let trimmed = result.trim_end();
+            rem = result.len() - trimmed.len();
+            result = trimmed;
         }
 
         if self.left_trimmed {
-            result = result.trim_start().to_string();
+            result = result.trim_start();
             if !result.is_empty() {
                 self.left_trimmed = false;
             }
