@@ -1408,23 +1408,13 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
         .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
         .collect();
 
-    let rs_opts = RenderCmd3Options {
+    let mut rs_opts = RenderCmd3Options {
         messages,
         dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
         documents,
         available_tools: tools,
         safety_mode: if opts.has_safety_mode {
             Some(map_safety_mode(opts.safety_mode))
-        } else {
-            None
-        },
-        citation_quality: if opts.has_citation_quality {
-            Some(map_citation_quality(opts.citation_quality))
-        } else {
-            None
-        },
-        reasoning_type: if opts.has_reasoning_type {
-            Some(map_reasoning_type(opts.reasoning_type))
         } else {
             None
         },
@@ -1437,6 +1427,14 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
         use_jinja: opts.use_jinja,
         ..Default::default()
     };
+
+    if opts.has_citation_quality {
+        rs_opts.citation_quality = Some(map_citation_quality(opts.citation_quality))
+    }
+
+    if opts.has_reasoning_type {
+        rs_opts.reasoning_type = Some(map_reasoning_type(opts.reasoning_type))
+    }
 
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
     let template_jinja = unsafe { CStr::from_ptr(opts.template_jinja).to_str().unwrap() };
@@ -1500,17 +1498,12 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
         .collect();
 
-    let rs_opts = RenderCmd4Options {
+    let mut rs_opts = RenderCmd4Options {
         messages,
         dev_instruction: unsafe { cstr_opt(opts.dev_instruction) },
         platform_instruction: unsafe { cstr_opt(opts.platform_instruction) },
         documents,
         available_tools: tools,
-        grounding: if opts.has_grounding {
-            Some(map_grounding(opts.grounding))
-        } else {
-            None
-        },
         response_prefix: unsafe { cstr_opt(opts.response_prefix) },
         json_schema: unsafe { cstr_opt(opts.json_schema) },
         json_mode: opts.json_mode,
@@ -1519,6 +1512,9 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         use_jinja: opts.use_jinja,
         ..Default::default()
     };
+    if opts.has_grounding {
+        rs_opts.grounding = Some(map_grounding(opts.grounding))
+    }
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
     let template_jinja = unsafe { CStr::from_ptr(opts.template_jinja).to_str().unwrap() };
     if !template_jinja.is_empty() && opts.use_jinja {

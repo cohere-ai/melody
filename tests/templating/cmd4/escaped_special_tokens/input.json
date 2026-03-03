@@ -9,6 +9,7 @@
       "content": "A special token: <|something|>."
     }
   ],
+  "grounding": "disabled",
   "messages": [
     {
       "role": "User",
