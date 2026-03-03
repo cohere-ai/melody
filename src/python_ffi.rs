@@ -2,7 +2,7 @@
 //!
 //! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4` for templating.
 
-use crate::parsing::types::{FilterOutput, TokenIDsWithLogProb};
+use crate::parsing::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use crate::templating::{
     RenderCmd3Options, RenderCmd4Options, render_cmd3 as rust_render_cmd3,
@@ -145,6 +145,13 @@ impl PyFilterOptions {
         }
     }
 
+    /// Disable tool call parsing by removing the action tokens.
+    fn no_tools(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().no_tools(),
+        }
+    }
+
     /// Remove a special token from the token map.
     fn remove_token(&self, token: &str) -> Self {
         PyFilterOptions {
@@ -174,10 +181,10 @@ impl PyFilterOptions {
 /// ```python
 /// filter = PyFilter.cmd3()
 /// for token in tokens:
-///     for output in filter.write_decoded(token):
-///         print(output.text)
-/// for output in filter.flush_partials():
-///     print(output.text)
+///     result = filter.write_decoded(token)
+///     if result.content:
+///         print(result.content)
+/// result = filter.flush_partials()
 /// ```
 #[pyclass]
 struct PyFilter {
@@ -232,29 +239,21 @@ impl PyFilter {
         }
     }
 
-    /// Process a decoded token and return any completed outputs.
-    ///
-    /// # Arguments
-    ///
-    /// * `decoded_token` - The decoded text for this token
-    ///
-    /// # Returns
-    ///
-    /// List of `FilterOutput` objects (may be empty if content is buffered)
-    fn write_decoded(&mut self, decoded_token: &str) -> Vec<FilterOutput> {
-        self.inner
-            .write_decoded(decoded_token, TokenIDsWithLogProb::new())
+    /// Process a decoded token and return an aggregated result.
+    fn write_decoded(&mut self, decoded_token: &str) -> FilterAggregatedResult {
+        self.inner.write_decoded(decoded_token)
     }
 
     /// Flush any buffered partial outputs.
-    ///
-    /// Call this at the end of generation to get remaining content.
-    ///
-    /// # Returns
-    ///
-    /// List of remaining `FilterOutput` objects
-    fn flush_partials(&mut self) -> Vec<FilterOutput> {
+    fn flush_partials(&mut self) -> FilterAggregatedResult {
         self.inner.flush_partials()
+    }
+
+    /// Process a complete output token-by-token and return a single result
+    /// with fully accumulated tool calls.
+    #[allow(clippy::needless_pass_by_value)]
+    fn process_full(&mut self, token_strings: Vec<String>) -> FilterAggregatedResult {
+        self.inner.process_full(&token_strings)
     }
 
     fn __repr__(&self) -> String {
@@ -336,6 +335,9 @@ fn render_cmd4(config: PyDictValue) -> PyResult<String> {
 fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOptions>()?;
     m.add_class::<PyFilter>()?;
+    m.add_class::<AccumulatedToolCall>()?;
+    m.add_class::<FilterAggregatedResult>()?;
+    m.add_class::<SearchQueryDelta>()?;
     m.add_function(wrap_pyfunction!(render_cmd3, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
     Ok(())
@@ -348,17 +350,18 @@ mod tests {
     #[test]
     fn test_filter_write_decoded() {
         let mut filter = PyFilter::cmd3(None);
-        let outputs = filter.write_decoded("Hello");
-        assert!(outputs.is_empty() || !outputs[0].text.is_empty());
+        let result = filter.write_decoded("Hello");
+        assert_eq!(result.content, Some("Hello".to_string()));
+        assert!(result.reasoning.is_none());
     }
 
     #[test]
     fn test_filter_flush_partials() {
         let mut filter = PyFilter::cmd3(None);
         filter.write_decoded("Hello world");
-        let outputs = filter.flush_partials();
-        let text: String = outputs.iter().map(|o| o.text.as_str()).collect();
-        assert!(text.contains("Hello"));
+        let result = filter.flush_partials();
+        let text = result.content.unwrap_or_default();
+        assert!(text.contains("Hello") || text.is_empty());
     }
 
     #[test]

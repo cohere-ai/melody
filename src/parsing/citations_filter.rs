@@ -6,9 +6,7 @@
 //!
 
 use crate::parsing::filter::{FilterImpl, find_partial};
-use crate::parsing::types::{
-    FilterCitation, FilterMode, FilterOutput, Source, TokenIDsWithLogProb,
-};
+use crate::parsing::types::{FilterCitation, FilterMode, FilterOutput, Source};
 
 // Citation marker constants
 const START_FIRST_CIT: &str = "<co: ";
@@ -28,7 +26,6 @@ impl FilterImpl {
     /// * `bstr` - Byte string to process
     /// * `after_last_token` - Whether this is the final flush (affects buffering)
     /// * `mode` - Current filter mode (`GroundedAnswer` or `ToolReason`)
-    /// * `token_log_probs` - Optional log probabilities for these tokens
     ///
     /// # Returns
     ///
@@ -39,17 +36,16 @@ impl FilterImpl {
         bstr: &[u8],
         after_last_token: bool,
         mode: FilterMode,
-        token_log_probs: Option<&TokenIDsWithLogProb>,
     ) -> (Vec<FilterOutput>, usize) {
         if !Self::utf8_valid_or_limit(bstr) {
             return (Vec::new(), 0);
         }
 
-        let send = String::from_utf8_lossy(bstr);
-        let (send, rem_right) = self.trim_space(&send);
+        let lossy = String::from_utf8_lossy(bstr);
+        let (send, rem_right) = self.trim_space(&lossy);
         let remove = bstr.len() - send.len() - rem_right;
 
-        let (mut res_out, remove_cit) = self.parse_citations(&send, mode);
+        let (mut res_out, remove_cit) = self.parse_citations(send, mode);
 
         if res_out.is_none()
             || (res_out.as_ref().unwrap().text.is_empty()
@@ -59,7 +55,7 @@ impl FilterImpl {
                 return (Vec::new(), remove + remove_cit);
             }
             res_out = Some(FilterOutput {
-                text: send.clone(),
+                text: send.to_string(),
                 ..Default::default()
             });
         }
@@ -67,11 +63,6 @@ impl FilterImpl {
         let mut res_out = res_out.unwrap();
         res_out.is_post_answer = self.stream_non_grounded_answer && mode != FilterMode::ToolReason;
         res_out.is_reasoning = mode == FilterMode::ToolReason;
-
-        // TODO revisit how to handle empty citations https://linear.app/cohereai/issue/PTS-8688/melody-align-log-probs-behavior
-        if let Some(probs) = token_log_probs {
-            res_out.logprobs = probs.clone();
-        }
 
         let mut out = Vec::new();
         if self.stream_tool_actions || !res_out.is_reasoning {

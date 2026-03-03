@@ -51,30 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_citation_still_has_logprobs() {
-        let mut filter = FilterImpl::new();
-        filter.stream_non_grounded_answer = true;
-        filter.cur_citation_byte_index = None;
-
-        let input = "<co: 0></co: 0>";
-        let logprobs = TokenIDsWithLogProb {
-            token_ids: vec![1, 2, 3],
-            logprobs: vec![0.1, 0.2, 0.3],
-        };
-        let (outputs, _remove) = filter.process_grounded_text(
-            input.as_bytes(),
-            true,
-            FilterMode::GroundedAnswer,
-            Some(&logprobs),
-        );
-
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0].text, "");
-        assert_eq!(outputs[0].logprobs.token_ids, vec![1, 2, 3]);
-        assert_eq!(outputs[0].logprobs.logprobs, vec![0.1, 0.2, 0.3]);
-    }
-
-    #[test]
     fn test_citations_multiple() {
         let mut filter = FilterImpl::new();
         filter.stream_non_grounded_answer = true;
@@ -156,24 +132,6 @@ mod tests {
     }
 
     #[test]
-    fn test_process_text_with_logprobs() {
-        let mut filter = FilterImpl::new();
-
-        let text = "hello world";
-        let logprobs = TokenIDsWithLogProb {
-            token_ids: vec![1, 2, 3],
-            logprobs: vec![0.1, 0.2, 0.3],
-        };
-
-        let (outputs, _) = filter.process_text(text.as_bytes(), Some(&logprobs));
-
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0].text, "hello world");
-        assert_eq!(outputs[0].logprobs.token_ids, vec![1, 2, 3]);
-        assert_eq!(outputs[0].logprobs.logprobs, vec![0.1, 0.2, 0.3]);
-    }
-
-    #[test]
     fn test_process_search_query() {
         let mut filter = FilterImpl::new();
         filter.curr_search_query_idx = 0;
@@ -206,24 +164,6 @@ mod tests {
         assert_eq!(outputs[0].text, "hello");
     }
 
-    #[test]
-    fn test_token_ids_with_log_prob_append() {
-        let mut logprobs1 = TokenIDsWithLogProb {
-            token_ids: vec![1, 2],
-            logprobs: vec![0.1, 0.2],
-        };
-
-        let logprobs2 = TokenIDsWithLogProb {
-            token_ids: vec![3, 4],
-            logprobs: vec![0.3, 0.4],
-        };
-
-        logprobs1.append(logprobs2);
-
-        assert_eq!(logprobs1.token_ids, vec![1, 2, 3, 4]);
-        assert_eq!(logprobs1.logprobs, vec![0.1, 0.2, 0.3, 0.4]);
-    }
-
     static TOKENIZER: std::sync::LazyLock<Tokenizer> = std::sync::LazyLock::new(|| {
         Tokenizer::from_file(format!(
             "{}/tokenizers/data/multilingual+255k+bos+eos+sptok+fim+agents3.json",
@@ -237,41 +177,26 @@ mod tests {
         name: &'static str,
         input: String,
         options: FilterOptions,
-        // Aggregated result so test cases can be simpler
         want_text: &'static str,
         want_thinking: &'static str,
         want_tool_calls: Vec<FilterToolCallDelta>,
-        want_likelihoods: Vec<f32>,
         want_citations: Vec<FilterCitation>,
-        want_num_outputs: usize,
     }
 
     fn run_filter_test(tt: FilterTestCase) {
-        // for simplicity's sake lets just generate likelihoods in intervals of thousandths
-        let mut test_likelihoods: Vec<f32> = Vec::new();
-        for i in 0..999 {
-            test_likelihoods.push(i as f32 / 1000.0);
-        }
-
         let encoding = TOKENIZER.encode(tt.input, false).unwrap();
         let tokens = encoding.get_ids();
 
-        // Duplicate the test by writing the raw strings instead
         let mut text_chunks: Vec<String> = Vec::new();
         let mut buffer: Vec<u32> = Vec::new();
-        let mut likelihoods_chunks: Vec<TokenIDsWithLogProb> = Vec::new();
-        let mut likelihood_buffer: Vec<f32> = Vec::new();
 
         let mut out_text = String::new();
         let mut out_thinking = String::new();
-        let mut out_likelihoods = Vec::new();
         let mut out_tool_calls: Vec<FilterToolCallDelta> = Vec::new();
         let mut out_citations: Vec<FilterCitation> = Vec::new();
-        let mut num_outputs = 0;
 
-        for (i, &token) in tokens.iter().enumerate() {
+        for &token in tokens {
             buffer.push(token);
-            likelihood_buffer.push(test_likelihoods[i]);
 
             let decoded = TOKENIZER.decode(&buffer, false).unwrap();
 
@@ -280,46 +205,48 @@ mod tests {
             }
 
             text_chunks.push(decoded);
-            likelihoods_chunks.push(TokenIDsWithLogProb {
-                token_ids: buffer.clone(),
-                logprobs: likelihood_buffer.clone(),
-            });
             buffer.clear();
-            likelihood_buffer.clear();
         }
 
         let mut filter = crate::parsing::new_filter(tt.options);
         for (i, chunk) in text_chunks.iter().enumerate() {
-            let mut out = filter.write_decoded(chunk, likelihoods_chunks[i].clone());
+            let mut result = filter.write_decoded(chunk);
             if i == text_chunks.len() - 1 {
-                out.append(&mut filter.flush_partials())
-            }
-            num_outputs += out.len();
-            for o in out.iter() {
-                if o.is_reasoning {
-                    out_thinking.push_str(&o.text);
-                } else {
-                    out_text.push_str(&o.text);
-                }
-                for f in o.logprobs.logprobs.iter() {
-                    out_likelihoods.push(*f)
-                }
-                if let Some(c) = &o.tool_call_delta {
-                    if c.index >= out_tool_calls.len() {
-                        let mut ftcd = FilterToolCallDelta::default();
-                        ftcd.index = c.index;
-                        out_tool_calls.push(ftcd);
+                let flush = filter.flush_partials();
+                if let Some(c) = flush.content {
+                    match result.content.as_mut() {
+                        Some(s) => s.push_str(&c),
+                        None => result.content = Some(c),
                     }
-                    out_tool_calls[c.index].id.push_str(&c.id);
-                    out_tool_calls[c.index].name.push_str(&c.name);
-                    out_tool_calls[c.index]
-                        .raw_param_delta
-                        .push_str(&c.raw_param_delta);
                 }
-                for c in o.citations.iter() {
-                    out_citations.push(c.clone());
+                if let Some(r) = flush.reasoning {
+                    match result.reasoning.as_mut() {
+                        Some(s) => s.push_str(&r),
+                        None => result.reasoning = Some(r),
+                    }
                 }
+                result.tool_calls.extend(flush.tool_calls);
+                result.citations.extend(flush.citations);
             }
+            if let Some(ref c) = result.content {
+                out_text.push_str(c);
+            }
+            if let Some(ref r) = result.reasoning {
+                out_thinking.push_str(r);
+            }
+            for tc in &result.tool_calls {
+                if tc.index >= out_tool_calls.len() {
+                    let mut ftcd = FilterToolCallDelta::default();
+                    ftcd.index = tc.index;
+                    out_tool_calls.push(ftcd);
+                }
+                out_tool_calls[tc.index].id.push_str(&tc.id);
+                out_tool_calls[tc.index].name.push_str(&tc.name);
+                out_tool_calls[tc.index]
+                    .raw_param_delta
+                    .push_str(&tc.arguments);
+            }
+            out_citations.extend(result.citations);
         }
 
         assert_eq!(
@@ -333,11 +260,6 @@ mod tests {
             tt.name
         );
         assert_eq!(
-            out_likelihoods, tt.want_likelihoods,
-            "Test case '{}' (WriteDecoded) failed - likelihoods not equal",
-            tt.name
-        );
-        assert_eq!(
             out_tool_calls, tt.want_tool_calls,
             "Test case '{}' (WriteDecoded) failed - tool_calls not equal",
             tt.name
@@ -345,11 +267,6 @@ mod tests {
         assert_eq!(
             out_citations, tt.want_citations,
             "Test case '{}' (WriteDecoded) failed - citations not equal",
-            tt.name
-        );
-        assert_eq!(
-            num_outputs, tt.want_num_outputs,
-            "Test case '{}' (WriteDecoded) failed - num_outputs not equal",
             tt.name
         );
     }
@@ -361,8 +278,6 @@ mod tests {
             input: "The tallest penguin is the emperor penguin.".to_string(),
             options: FilterOptions::new().with_inclusive_stops(vec!["emperor penguin".to_string()]),
             want_text: "The tallest penguin is the emperor penguin",
-            want_likelihoods: vec![0.001, 0.002, 0.003],
-            want_num_outputs: 4,
             ..Default::default()
         })
     }
@@ -374,8 +289,6 @@ mod tests {
             input: "The tallest penguin is the emperor penguin.".to_string(),
             options: FilterOptions::new().with_exclusive_stops(vec!["emperor penguin".to_string()]),
             want_text: "The tallest penguin is the ",
-            want_likelihoods: vec![0.001, 0.002, 0.003],
-            want_num_outputs: 4,
             ..Default::default()
         })
     }
@@ -387,13 +300,6 @@ mod tests {
             input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>".to_string(),
             options: FilterOptions::new(),
             want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
-            want_likelihoods: vec![
-                0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011,
-                0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023,
-                0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035,
-                0.036, 0.037, 0.038, 0.039, 0.04, 0.041, 0.042, 0.043, 0.044, 0.045,
-            ],
-            want_num_outputs: 44,
             ..Default::default()
         });
     }
@@ -405,13 +311,6 @@ mod tests {
             input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>".to_string(),
             options: FilterOptions::new(),
             want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
-            want_likelihoods: vec![
-                0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011,
-                0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.023,
-                0.024, 0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035,
-                0.036, 0.037, 0.038, 0.039, 0.04, 0.041, 0.042, 0.043, 0.044, 0.045,
-            ],
-            want_num_outputs: 44,
             ..Default::default()
         })
     }
@@ -423,8 +322,6 @@ mod tests {
             input: "\n \tfoo bar baz\t\n ".to_string(),
             options: FilterOptions::new().with_left_trimmed(),
             want_text: "foo bar baz\t\n ",
-            want_likelihoods: vec![0.002, 0.003, 0.004, 0.005],
-            want_num_outputs: 4,
             ..Default::default()
         })
     }
@@ -436,8 +333,6 @@ mod tests {
             input: "\n \tfoo bar baz\t\n ".to_string(),
             options: FilterOptions::new().with_right_trimmed(),
             want_text: "\n \tfoo bar baz",
-            want_likelihoods: vec![0.002, 0.003, 0.004],
-            want_num_outputs: 3,
             ..Default::default()
         })
     }
@@ -450,8 +345,6 @@ mod tests {
                 .to_string(),
             options: FilterOptions::new().cmd3(),
             want_text: "<completion_A> is nice <rating>5</rating>",
-            want_likelihoods: vec![0.005, 0.006, 0.007, 0.009, 0.01, 0.011, 0.012, 0.013, 0.014],
-            want_num_outputs: 9,
             ..Default::default()
         })
     }
@@ -480,8 +373,6 @@ mod tests {
                 ],
                 is_thinking: false,
             }],
-            want_likelihoods: vec![0.001, 0.004, 0.005, 0.024],
-            want_num_outputs: 4,
             ..Default::default()
         })
     }
@@ -522,11 +413,6 @@ mod tests {
                     is_thinking: false,
                 },
             ],
-            want_likelihoods: vec![
-                0.001, 0.002, 0.003, 0.004, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012, 0.02, 0.024, 0.027,
-                0.028, 0.044
-            ],
-            want_num_outputs: 13,
             ..Default::default()
         })
     }
@@ -548,11 +434,6 @@ mod tests {
                 }],
                 is_thinking: false,
             }],
-            want_likelihoods: vec![
-                0.001, 0.004, 0.005, 0.007, 0.008, 0.009, 0.017, 0.018, 0.019, 0.02, 0.021, 0.022, 0.024,
-                0.025, 0.026, 0.027, 0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035,
-            ],
-            want_num_outputs: 24,
             ..Default::default()
         })
     }
@@ -571,11 +452,6 @@ mod tests {
                 param_delta: None,
                 raw_param_delta: "{\"a\": 6, \"b\": 7}".to_string(),
             }],
-            want_likelihoods: vec![
-                0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.013,
-                0.014, 0.016, 0.017,
-            ],
-            want_num_outputs: 29,
             ..Default::default()
         })
     }
@@ -615,11 +491,6 @@ plt.ylabel('Number of Climbers')
                 param_delta: None,
                 raw_param_delta: r#"{"code": "import matplotlib.pyplot as plt\n\n# Data for the mountains and number of climbers\ndata = {'Mount Everest': None}\n# Sort the data by number of climbers\nsorted_data = dict(sorted(data.items(), key=lambda x: x[1], reverse=True))\n# Get the top 10 mountains\ntop_10_mountains = list(sorted_data.keys())[:10]\n# Plot the graph\nplt.figure(figsize=(10, 6))\nplt.bar(top_10_mountains, [data[mountain] for mountain in top_10_mountains])\nplt.xlabel('Mountain')\nplt.ylabel('Number of Climbers')\n            plt.xticks(rotation=45, ha='right')\n            plt.tight_layout()\n            plt.savefig('top_ten_mountains_by_climbers.png')"}"#.to_string(),
             }],
-            want_likelihoods: vec![
-                0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012,
-                0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.02, 0.021,
-            ],
-            want_num_outputs: 226,
             ..Default::default()
         })
     }
@@ -637,7 +508,6 @@ plt.ylabel('Number of Climbers')
                 param_delta: None,
                 raw_param_delta: "{\"a\": 6, \"b\": 7}".to_string(),
             }],
-            want_num_outputs: 14,
             ..Default::default()
         })
     }
@@ -657,7 +527,6 @@ plt.ylabel('Number of Climbers')
                 param_delta: None,
                 raw_param_delta: r##"{"order_id": "#W9284598", "reason": "طلبته بالخطأ"}"##.to_string(),
             }],
-            want_num_outputs: 5,
             ..Default::default()
         })
     }
@@ -685,11 +554,6 @@ plt.ylabel('Number of Climbers')
                     raw_param_delta: "{\"query\": \"Canada\"}".to_string(),
                 },
             ],
-            want_likelihoods: vec![
-                0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012,
-                0.013,
-            ],
-            want_num_outputs: 30,
             ..Default::default()
         })
     }
@@ -717,10 +581,6 @@ plt.ylabel('Number of Climbers')
                     raw_param_delta: "{\"query\": \"Canada\"}".to_string(),
                 },
             ],
-            want_likelihoods: vec![
-                0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01,
-            ],
-            want_num_outputs: 10,
             ..Default::default()
         })
     }
@@ -736,14 +596,6 @@ plt.ylabel('Number of Climbers')
                 .remove_token("<|END_ACTION|>"),
             want_text: "<|START_ACTION|>[{\"tool_call_id\": \"0\", \"tool_name\": \"add\", \"parameters\": {\"a\": 6, \"b\": 7}}]<|END_ACTION|>",
             want_thinking: "I will use the add tool to calculate the sum of 6 and 7.",
-            want_likelihoods: vec![
-                0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.013,
-                0.014, 0.016, 0.017, 0.019, 0.02, 0.021, 0.022, 0.023, 0.024, 0.025, 0.026, 0.027,
-                0.028, 0.029, 0.03, 0.031, 0.032, 0.033, 0.034, 0.035, 0.036, 0.037, 0.038, 0.039,
-                0.04, 0.041, 0.042, 0.043, 0.044, 0.046, 0.047, 0.048, 0.049, 0.05, 0.052, 0.053,
-                0.054, 0.055,
-            ],
-            want_num_outputs: 50,
             ..Default::default()
         })
     }
@@ -756,8 +608,6 @@ plt.ylabel('Number of Climbers')
             options: FilterOptions::new().cmd3(),
             want_text: "Response",
             want_thinking: "Plan",
-            want_likelihoods: vec![0.001, 0.003],
-            want_num_outputs: 2,
             ..Default::default()
         });
     }
@@ -769,8 +619,6 @@ plt.ylabel('Number of Climbers')
             input: "<|START_THINKING|>hello <".to_string(),
             options: FilterOptions::new().cmd3(),
             want_thinking: "hello <",
-            want_likelihoods: vec![0.001, 0.002],
-            want_num_outputs: 2,
             ..Default::default()
         });
     }

@@ -14,38 +14,30 @@ class TestPyFilterWriteDecoded:
 
     def test_plain_text(self, cmd3_filter):
         """Test write_decoded with plain text."""
-        outputs = cmd3_filter.write_decoded("Hello world")
-        # Plain text may be buffered or pass through
-        assert isinstance(outputs, list)
-        assert outputs[0].text == "Hello world"
-        assert outputs[0].is_reasoning is False
+        result = cmd3_filter.write_decoded("Hello world")
+        assert result.content == "Hello world"
+        assert result.reasoning is None
 
     def test_thinking_tags(self, cmd3_filter):
         """Test write_decoded with thinking tags."""
-        outputs = cmd3_filter.write_decoded("<|START_THINKING|>This is a thought")
-        assert len(outputs) > 0
-        assert outputs[0].text == "This is a thought"
-        assert outputs[0].is_reasoning is True
+        result = cmd3_filter.write_decoded("<|START_THINKING|>This is a thought")
+        assert result.reasoning == "This is a thought"
+        assert result.content is None
 
     def test_response_tags(self, cmd3_filter):
         """Test write_decoded with response tags."""
-        outputs = cmd3_filter.write_decoded("<|START_RESPONSE|>Hello")
-        assert len(outputs) > 0
-        assert outputs[0].text == "Hello"
-        assert outputs[0].is_reasoning is False
+        result = cmd3_filter.write_decoded("<|START_RESPONSE|>Hello")
+        assert result.content == "Hello"
+        assert result.reasoning is None
 
     def test_transition_thinking_to_response(self, cmd3_filter):
         """Test transitioning from thinking to response."""
-        thinking_outputs = cmd3_filter.write_decoded("<|START_THINKING|>Thinking...")
-        assert all(o.is_reasoning for o in thinking_outputs)
+        result = cmd3_filter.write_decoded("<|START_THINKING|>Thinking...")
+        assert result.reasoning is not None
 
-        outputs = cmd3_filter.write_decoded(
-            "<|END_THINKING|><|START_RESPONSE|>Response"
-        )
-        # Should have transitioned to response mode with non-reasoning output
-        response_outputs = [o for o in outputs if not o.is_reasoning]
-        assert len(response_outputs) > 0
-        assert "Response" in "".join(o.text for o in response_outputs)
+        result = cmd3_filter.write_decoded("<|END_THINKING|><|START_RESPONSE|>Response")
+        assert result.content is not None
+        assert "Response" in result.content
 
 
 class TestPyFilterFlushPartials:
@@ -54,27 +46,25 @@ class TestPyFilterFlushPartials:
     def test_flush_with_buffered_content(self):
         """Test flush_partials returns buffered content when chunk_size > 1."""
         f = PyFilter.cmd3(chunk_size=10)
-        # Write less than chunk_size characters
-        outputs = f.write_decoded("<|START_RESPONSE|>Hi")
-        # Should be buffered
-        assert len(outputs) == 0 or "".join(o.text for o in outputs) == ""
-        # flush_partials should return buffered content
-        outputs = f.flush_partials()
-        text = "".join(o.text for o in outputs)
-        assert "Hi" in text
+        result = f.write_decoded("<|START_RESPONSE|>Hi")
+        assert result.content is None or result.content == ""
+        result = f.flush_partials()
+        assert result.content is not None
+        assert "Hi" in result.content
 
     def test_flush_empty_filter(self):
-        """Test flush_partials on fresh filter returns empty list."""
+        """Test flush_partials on fresh filter returns default result."""
         f = PyFilter.cmd3()
-        outputs = f.flush_partials()
-        assert outputs == []
+        result = f.flush_partials()
+        assert result.content is None
+        assert result.reasoning is None
 
     def test_flush_after_complete_output(self):
         """Test flush_partials after content already emitted."""
         f = PyFilter.cmd3()
         f.write_decoded("<|START_RESPONSE|>Hello")
-        outputs = f.flush_partials()
-        assert isinstance(outputs, list)
+        result = f.flush_partials()
+        assert result is not None
 
 
 class TestPyFilterStreamingWorkflow:
@@ -87,70 +77,64 @@ class TestPyFilterStreamingWorkflow:
 
         tokens = ["<|START_RESPONSE|>", "Hello", " ", "world", "!"]
         for token in tokens:
-            for o in f.write_decoded(token):
-                all_text.append(o.text)
+            result = f.write_decoded(token)
+            if result.content is not None:
+                all_text.append(result.content)
 
-        for o in f.flush_partials():
-            all_text.append(o.text)
+        result = f.flush_partials()
+        if result.content is not None:
+            all_text.append(result.content)
 
-        result = "".join(all_text)
-        assert "Hello world!" in result
+        full_text = "".join(all_text)
+        assert "Hello world!" in full_text
 
     def test_thinking_then_response_workflow(self):
         """Test workflow with thinking followed by response."""
         f = PyFilter.cmd3()
 
-        # Thinking phase
-        outputs = f.write_decoded("<|START_THINKING|>This is a")
-        assert outputs[0].text == "This is a"
-        assert outputs[0].is_reasoning is True
+        result = f.write_decoded("<|START_THINKING|>This is a")
+        assert result.reasoning == "This is a"
+        assert result.content is None
 
-        outputs = f.write_decoded(" plan.<|END_THINKING|>")
-        assert outputs[0].text == " plan."
-        assert outputs[0].is_reasoning is True
+        result = f.write_decoded(" plan.<|END_THINKING|>")
+        assert result.reasoning == " plan."
 
-        # Response phase
-        outputs = f.write_decoded("<|START_RESPONSE|>This is the final response.")
-        assert outputs[0].text == "This is the final response."
-        assert outputs[0].is_reasoning is False
+        result = f.write_decoded("<|START_RESPONSE|>This is the final response.")
+        assert result.content == "This is the final response."
+        assert result.reasoning is None
 
 
-class TestFilterOutput:
-    """Tests for FilterOutput attributes."""
+class TestAggregatedResult:
+    """Tests for AggregatedResult attributes."""
 
     @pytest.fixture
-    def sample_output(self):
-        """Get a sample FilterOutput from a filter."""
+    def sample_result(self):
+        """Get a sample AggregatedResult from a filter."""
         f = PyFilter.cmd3()
-        outputs = f.write_decoded("<|START_RESPONSE|>Test")
-        outputs.extend(f.flush_partials())
-        return outputs[0] if outputs else None
+        result = f.write_decoded("<|START_RESPONSE|>Test")
+        return result
 
-    def test_has_text_attribute(self, sample_output):
-        """Test that FilterOutput has text attribute."""
-        if sample_output:
-            assert hasattr(sample_output, "text")
-            assert isinstance(sample_output.text, str)
+    def test_has_content_attribute(self, sample_result):
+        """Test that AggregatedResult has content attribute."""
+        assert hasattr(sample_result, "content")
 
-    def test_has_is_reasoning_attribute(self, sample_output):
-        """Test that FilterOutput has is_reasoning attribute."""
-        if sample_output:
-            assert hasattr(sample_output, "is_reasoning")
-            assert isinstance(sample_output.is_reasoning, bool)
+    def test_has_reasoning_attribute(self, sample_result):
+        """Test that AggregatedResult has reasoning attribute."""
+        assert hasattr(sample_result, "reasoning")
 
-    def test_thinking_output_is_reasoning_true(self):
-        """Test that thinking output has is_reasoning=True."""
+    def test_thinking_output_has_reasoning(self):
+        """Test that thinking output has reasoning set."""
         f = PyFilter.cmd3()
-        outputs = f.write_decoded("<|START_THINKING|>Thought")
-        assert len(outputs) > 0
-        assert outputs[0].is_reasoning is True
+        result = f.write_decoded("<|START_THINKING|>Thought")
+        assert result.reasoning is not None
+        assert result.content is None
 
-    def test_response_output_is_reasoning_false(self):
-        """Test that response output has is_reasoning=False."""
+    def test_response_output_has_content(self):
+        """Test that response output has content set."""
         f = PyFilter.cmd3()
-        outputs = f.write_decoded("<|START_RESPONSE|>Response")
-        assert len(outputs) > 0
-        assert outputs[0].is_reasoning is False
+        result = f.write_decoded("<|START_RESPONSE|>Response")
+        assert result.content is not None
+        assert result.reasoning is None
 
 
 class TestPyFilterOptions:
@@ -160,50 +144,46 @@ class TestPyFilterOptions:
         """Test cmd3() builder method."""
         opts = PyFilterOptions().cmd3()
         f = PyFilter(opts)
-        outputs = f.write_decoded("<|START_RESPONSE|>Hello")
-        assert len(outputs) > 0
-        assert outputs[0].text == "Hello"
+        result = f.write_decoded("<|START_RESPONSE|>Hello")
+        assert result.content == "Hello"
 
     def test_cmd4_option(self):
         """Test cmd4() builder method."""
         opts = PyFilterOptions().cmd4()
         f = PyFilter(opts)
-        outputs = f.write_decoded("Hello")
-        assert len(outputs) > 0
-        assert outputs[0].text == "Hello"
+        result = f.write_decoded("Hello")
+        assert result.content == "Hello"
 
     def test_rag_option(self):
         """Test rag() builder method."""
         opts = PyFilterOptions().rag()
         f = PyFilter(opts)
-        outputs = f.write_decoded("Hello")
-        assert isinstance(outputs, list)
+        result = f.write_decoded("Hello")
+        assert result is not None
 
     def test_multi_hop_option(self):
         """Test multi_hop() builder method."""
         opts = PyFilterOptions().multi_hop()
         f = PyFilter(opts)
-        outputs = f.write_decoded("Hello")
-        assert isinstance(outputs, list)
+        result = f.write_decoded("Hello")
+        assert result is not None
 
     def test_search_query_option(self):
         """Test search_query() builder method."""
         opts = PyFilterOptions().search_query()
         f = PyFilter(opts)
-        outputs = f.write_decoded("Hello")
-        assert isinstance(outputs, list)
+        result = f.write_decoded("Hello")
+        assert result is not None
 
     def test_with_chunk_size(self):
         """Test with_chunk_size() builder method."""
         opts = PyFilterOptions().cmd3().with_chunk_size(10)
         f = PyFilter(opts)
-        # With chunk_size=10, small outputs should be buffered
-        outputs = f.write_decoded("<|START_RESPONSE|>Hi")
-        assert len(outputs) == 0
-        # Flush should return buffered content
-        outputs = f.flush_partials()
-        text = "".join(o.text for o in outputs)
-        assert "Hi" in text
+        result = f.write_decoded("<|START_RESPONSE|>Hi")
+        assert result.content is None or result.content == ""
+        result = f.flush_partials()
+        assert result.content is not None
+        assert "Hi" in result.content
 
     def test_chained_options(self):
         """Test chaining multiple builder methods."""
@@ -258,6 +238,5 @@ class TestPyFilterOptions:
         opts1 = PyFilterOptions()
         opts2 = opts1.cmd3()
         opts3 = opts2.with_chunk_size(10)
-        # Original options should be unchanged
         assert opts1 is not opts2
         assert opts2 is not opts3

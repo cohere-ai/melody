@@ -7,63 +7,6 @@
 use pyo3::prelude::*;
 use serde::Deserialize;
 
-/// Token IDs paired with their log probabilities.
-///
-/// This structure is used to track both the token identifiers and their associated
-/// log probability scores from the language model. Log probabilities are useful for
-/// understanding model confidence and implementing features like token filtering.
-///
-/// # Examples
-///
-/// ```rust
-/// use cohere_melody::parsing::types::TokenIDsWithLogProb;
-///
-/// let mut logprobs = TokenIDsWithLogProb::new();
-/// assert!(logprobs.token_ids.is_empty());
-///
-/// let other = TokenIDsWithLogProb {
-///     token_ids: vec![1, 2, 3],
-///     logprobs: vec![-0.1, -0.2, -0.3],
-/// };
-/// logprobs.append(other);
-/// assert_eq!(logprobs.token_ids.len(), 3);
-/// ```
-#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct TokenIDsWithLogProb {
-    /// Token IDs from the model's vocabulary
-    pub token_ids: Vec<u32>,
-    /// Log probability scores for each token (same length as `token_ids`)
-    pub logprobs: Vec<f32>,
-}
-
-impl TokenIDsWithLogProb {
-    /// Creates a new empty `TokenIDsWithLogProb` instance.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use cohere_melody::parsing::types::TokenIDsWithLogProb;
-    ///
-    /// let logprobs = TokenIDsWithLogProb::new();
-    /// assert!(logprobs.token_ids.is_empty());
-    /// assert!(logprobs.logprobs.is_empty());
-    /// ```
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            token_ids: Vec::new(),
-            logprobs: Vec::new(),
-        }
-    }
-
-    /// Appends another `TokenIDsWithLogProb` to this one, extending both vectors.
-    pub fn append(&mut self, other: TokenIDsWithLogProb) {
-        self.token_ids.extend(other.token_ids);
-        self.logprobs.extend(other.logprobs);
-    }
-}
-
 /// A parsed output chunk from the streaming filter.
 ///
 /// This is the primary output structure returned when processing tokens. Each call to
@@ -97,8 +40,6 @@ impl TokenIDsWithLogProb {
 pub struct FilterOutput {
     /// Plain text content extracted from the token stream
     pub text: String,
-    /// Token IDs and log probabilities for this output chunk
-    pub logprobs: TokenIDsWithLogProb,
     /// Incremental search query delta (if in search query mode)
     pub search_query: Option<FilterSearchQueryDelta>,
     /// Citations parsed from this chunk (may be empty)
@@ -258,6 +199,47 @@ pub struct Source {
     pub tool_call_index: usize,
     /// Indices of specific results from this tool call
     pub tool_result_indices: Vec<usize>,
+}
+
+/// Aggregated result from filter processing, separating content, reasoning,
+/// tool calls, citations, and search queries.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
+#[derive(Debug, Clone, Default)]
+pub struct FilterAggregatedResult {
+    /// Non-reasoning text content, if any.
+    pub content: Option<String>,
+    /// Reasoning/thinking text content, if any.
+    pub reasoning: Option<String>,
+    /// Tool call deltas (streaming) or accumulated tool calls (unary).
+    pub tool_calls: Vec<AccumulatedToolCall>,
+    /// Citations extracted from the text.
+    pub citations: Vec<FilterCitation>,
+    /// Search query deltas extracted from the stream.
+    pub search_queries: Vec<SearchQueryDelta>,
+}
+
+/// A tool call accumulated from one or more deltas.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
+#[derive(Debug, Clone, Default)]
+pub struct AccumulatedToolCall {
+    /// Index of this tool call in the sequence.
+    pub index: usize,
+    /// Tool call ID.
+    pub id: String,
+    /// Tool name.
+    pub name: String,
+    /// JSON-encoded arguments string.
+    pub arguments: String,
+}
+
+/// A search query delta extracted from the stream.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
+#[derive(Debug, Clone, Default)]
+pub struct SearchQueryDelta {
+    /// Index of this search query.
+    pub index: usize,
+    /// Search query text.
+    pub text: String,
 }
 
 /// Parsing mode for the filter state machine.

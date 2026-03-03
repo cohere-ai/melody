@@ -37,12 +37,12 @@ func main() {
 	// PARSING
 	// *******
 	filter := melody.NewFilter()
-	fo, err := filter.WriteDecoded("Hello", nil)
+	fo, err := filter.WriteDecoded("Hello")
 	if err != nil {
 		panic(err)
 	}
-	for _, output := range fo {
-		fmt.Println(output.Text)
+	if fo != nil && fo.Content != nil {
+		fmt.Println(*fo.Content)
 	}
 
 	// **********

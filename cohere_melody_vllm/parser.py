@@ -43,32 +43,22 @@ class CohereCommand2ReasoningParser(ReasoningParser):
         delta_token_ids: Sequence[int],
     ) -> Union[DeltaMessage, None]:
 
-        out = self.melody.write_decoded(delta_text)
+        result = self.melody.write_decoded(delta_text)
 
-        content = None
-        reasoning_content = None
-        delta_tool_calls: list[DeltaToolCall] = []
-        for o in out:
-            if o.text is not None:
-                if o.is_reasoning:
-                    reasoning_content = (
-                        "" if reasoning_content is None else reasoning_content
-                    )
-                    reasoning_content += o.text
-                else:
-                    content = "" if content is None else content
-                    content += o.text
-            if o.tool_call_delta is not None:
-                delta_tool_call = DeltaToolCall(
-                    id=o.tool_call_delta.id,
-                    index=o.tool_call_delta.index,
-                    type="function",
-                    function=DeltaFunctionCall(
-                        name=o.tool_call_delta.name,
-                        arguments=o.tool_call_delta.raw_param_delta,
-                    ),
-                )
-                delta_tool_calls.append(delta_tool_call)
+        content = result.content
+        reasoning_content = result.reasoning
+        delta_tool_calls = [
+            DeltaToolCall(
+                id=tc.id,
+                index=tc.index,
+                type="function",
+                function=DeltaFunctionCall(
+                    name=tc.name,
+                    arguments=tc.arguments,
+                ),
+            )
+            for tc in result.tool_calls
+        ]
 
         if content is None and reasoning_content is None and len(delta_tool_calls) == 0:
             return None
@@ -108,17 +98,15 @@ class CohereCommand2ReasoningParser(ReasoningParser):
             if token_str.endswith(REPLACEMENT_CHAR):
                 continue
 
-            out = melody.write_decoded(token_str)
-            for o in out:
-                if o.text is not None:
-                    if o.is_reasoning:
-                        reasoning_content = (
-                            "" if reasoning_content is None else reasoning_content
-                        )
-                        reasoning_content += o.text
-                    else:
-                        content = "" if content is None else content
-                        content += o.text
+            result = melody.write_decoded(token_str)
+            if result.reasoning is not None:
+                reasoning_content = (
+                    "" if reasoning_content is None else reasoning_content
+                )
+                reasoning_content += result.reasoning
+            if result.content is not None:
+                content = "" if content is None else content
+                content += result.content
 
             token_buf = []
         return reasoning_content, content
@@ -141,11 +129,9 @@ class CohereCommand2ReasoningParser(ReasoningParser):
             if token_str.endswith(REPLACEMENT_CHAR):
                 continue
 
-            out = melody.write_decoded(token_str)
-            for o in out:
-                if o.text is not None:
-                    if not o.is_reasoning:
-                        content_ids.extend(token_buf)
+            result = melody.write_decoded(token_str)
+            if result.content is not None:
+                content_ids.extend(token_buf)
 
             token_buf = []
         return content_ids
@@ -181,71 +167,59 @@ class CohereCommand2ToolParser(ToolParser):
         request: ChatCompletionRequest,
     ) -> Union[DeltaMessage, None]:
 
-        out = self.melody.write_decoded(delta_text)
+        result = self.melody.write_decoded(delta_text)
 
-        delta_tool_calls = []
-        for o in out:
-            if o.tool_call_delta is not None:
-                delta_tool_call = DeltaToolCall(
-                    id=o.tool_call_delta.id,
-                    index=o.tool_call_delta.index,
-                    type="function",
-                    function=DeltaFunctionCall(
-                        name=o.tool_call_delta.name,
-                        arguments=o.tool_call_delta.raw_param_delta,
-                    ),
-                )
-                delta_tool_calls.append(delta_tool_call)
+        if not result.tool_calls:
+            return None
 
-        if len(delta_tool_calls) > 0:
-            return DeltaMessage(tool_calls=delta_tool_calls)
+        delta_tool_calls = [
+            DeltaToolCall(
+                id=tc.id,
+                index=tc.index,
+                type="function",
+                function=DeltaFunctionCall(
+                    name=tc.name,
+                    arguments=tc.arguments,
+                ),
+            )
+            for tc in result.tool_calls
+        ]
+
+        return DeltaMessage(tool_calls=delta_tool_calls)
 
     def extract_tool_calls(
         self,
         model_output: str,
         request: ChatCompletionRequest,
     ) -> ExtractedToolCallInformation:
-        tool_calls: list[ToolCall] = []
-        content: str | None = None
+        tokens = self.model_tokenizer.encode(model_output, add_special_tokens=False)
         token_buf = []
-        # tokenize to provide token size string fragments to melody
-        for t in self.model_tokenizer.encode(model_output, add_special_tokens=False):
+        token_strings = []
+        for t in tokens:
             token_buf.append(t)
             token_str = self.model_tokenizer.decode(
                 token_buf, skip_special_tokens=False
             )
-            # buffer tokens that generate incomplete strings
             if token_str.endswith(REPLACEMENT_CHAR):
                 continue
-
-            out = self.melody.write_decoded(token_str)
-            for o in out:
-                if o.text is not None:
-                    content = "" if content is None else content
-                    content += o.text
-                if o.tool_call_delta is not None:
-                    if o.tool_call_delta.id != "":
-                        tool_calls.append(
-                            ToolCall(
-                                id=o.tool_call_delta.id,
-                                type="function",
-                                function=FunctionCall(name="", arguments=""),
-                            )
-                        )
-                    if o.tool_call_delta.name != "":
-                        tool_calls[o.tool_call_delta.index].function.name = (
-                            o.tool_call_delta.name
-                        )
-                    tool_calls[
-                        o.tool_call_delta.index
-                    ].function.arguments += o.tool_call_delta.raw_param_delta
-
+            token_strings.append(token_str)
             token_buf = []
+
+        result = self.melody.process_full(token_strings)
+
+        tool_calls = [
+            ToolCall(
+                id=tc.id,
+                type="function",
+                function=FunctionCall(name=tc.name, arguments=tc.arguments),
+            )
+            for tc in result.tool_calls
+        ]
 
         return ExtractedToolCallInformation(
             tools_called=len(tool_calls) > 0,
             tool_calls=tool_calls,
-            content=content,
+            content=result.content,
         )
 
 

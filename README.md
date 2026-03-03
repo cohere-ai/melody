@@ -34,27 +34,22 @@ let mut filter = parsing::new_filter(options);
 
 // Simulate text
 let citation_text = "Hello <co: 1>world</co: 1>!";
-let logprobs = parsing::types::TokenIDsWithLogProb {
-    token_ids: vec![1, 2, 3],
-    logprobs: vec![0.1, 0.2, 0.3],
-};
 
-// Write text
-let outputs = filter.write_decoded(citation_text, logprobs);
+// Write text — returns an aggregated result
+let result = filter.write_decoded(citation_text);
 
-// Process outputs
-for output in outputs {
-    println!("  Text: {}", output.text);
-    for citation in output.citations {
-        println!(
-            "    Citation: {} (indices {}-{})",
-            citation.text, citation.start_index, citation.end_index
-        );
-    }
+if let Some(text) = &result.content {
+    println!("  Content: {text}");
+}
+for citation in &result.citations {
+    println!(
+        "    Citation: {} (indices {}-{})",
+        citation.text, citation.start_index, citation.end_index
+    );
 }
 
 // Flush remaining tokens
-let final_outputs = filter.flush_partials();
+let final_result = filter.flush_partials();
 ```
 
 ### Templating

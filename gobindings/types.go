@@ -1,41 +1,26 @@
 package gobindings
 
-// TokenIDsWithLogProb pairs tokens with their log probabilities
-type TokenIDsWithLogProb struct {
-	TokenIDs []uint32
-	Logprobs []float32
-}
-
-// FilterOutput represents a partial parsed output from a model generation
-type FilterOutput struct {
-	Text          string
-	Logprobs      TokenIDsWithLogProb
-	SearchQuery   *FilterSearchQueryDelta
+// AggregatedResult is the result of a write_decoded or flush_partials call
+type AggregatedResult struct {
+	Content       *string
+	Reasoning     *string
+	ToolCalls     []AccumulatedToolCall
 	Citations     []FilterCitation
-	ToolCallDelta *FilterToolCallDelta
-	IsPostAnswer  bool
-	IsReasoning   bool
+	SearchQueries []SearchQueryDelta
 }
 
-// FilterSearchQueryDelta represents a change to a search query
-type FilterSearchQueryDelta struct {
+// AccumulatedToolCall represents a tool call (possibly partial in streaming)
+type AccumulatedToolCall struct {
+	Index     uint
+	ID        string
+	Name      string
+	Arguments string
+}
+
+// SearchQueryDelta represents a search query update
+type SearchQueryDelta struct {
 	Index uint
 	Text  string
-}
-
-// FilterToolCallDelta represents a change to a tool call
-type FilterToolCallDelta struct {
-	Index         uint
-	ID            string
-	Name          string
-	ParamDelta    *FilterToolParameter
-	RawParamDelta string
-}
-
-// FilterToolParameter represents a change to a tool parameter
-type FilterToolParameter struct {
-	Name       string
-	ValueDelta string
 }
 
 // FilterCitation represents a citation parsed from a model generation
