@@ -221,7 +221,6 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
     needs: [linux, musllinux, windows, macos, sdist]
     permissions:
       # Used for PyPI trusted publishing (OIDC)
