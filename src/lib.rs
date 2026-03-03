@@ -33,13 +33,13 @@
 //! let mut filter = new_filter(options);
 //!
 //! // Process tokens as they arrive
-//! let outputs = filter.write_decoded("Hello world", Default::default());
-//! for output in outputs {
-//!     println!("Text: {}", output.text);
+//! let result = filter.write_decoded("Hello world");
+//! if let Some(text) = &result.content {
+//!     println!("Content: {text}");
 //! }
 //!
 //! // Flush any remaining partial outputs
-//! let final_outputs = filter.flush_partials();
+//! let final_result = filter.flush_partials();
 //! ```
 //!
 //! # Usage Patterns
@@ -54,8 +54,8 @@
 //!     .with_right_trimmed(); // Trim trailing whitespace
 //! let mut filter = new_filter(options);
 //!
-//! let outputs = filter.write_decoded("  Hello  ", Default::default());
-//! assert_eq!(outputs[0].text, "Hello");
+//! let result = filter.write_decoded("  Hello  ");
+//! assert_eq!(result.content.as_deref(), Some("Hello"));
 //! ```
 //!
 //! ## Citation Parsing (CMD3 Format)
@@ -67,7 +67,7 @@
 //! let mut filter = new_filter(options);
 //!
 //! // The filter will parse citations from the token stream
-//! let outputs = filter.write_decoded("<START_RESPONSE>", Default::default());
+//! let outputs = filter.write_decoded("<START_RESPONSE>");
 //! // Continue feeding tokens...
 //! ```
 //!
@@ -81,7 +81,7 @@
 //!     .stream_tool_actions();
 //! let mut filter = new_filter(options);
 //!
-//! // Tool calls will be extracted and returned in FilterOutput.tool_call_delta
+//! // Tool calls will be extracted and returned in AggregatedResult.tool_calls
 //! ```
 //!
 //! # Architecture
@@ -90,7 +90,7 @@
 //! - `FilterImpl`: Main state machine that processes tokens
 //! - `FilterMode`: Different parsing modes (`PlainText`, `ToolAction`, `GroundedAnswer`, etc.)
 //! - `FilterOptions`: Configuration for the filter behavior
-//! - `FilterOutput`: Structured output containing parsed text, citations, and tool calls
+//! - `AggregatedResult`: Structured output containing parsed content, reasoning, citations, and tool calls
 //!
 //! # Safety
 //!

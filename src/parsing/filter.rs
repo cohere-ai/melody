@@ -1,67 +1,91 @@
 //! Core filtering logic and state machine implementation
 //!
 //! This module contains the main filter implementation that processes streaming tokens
-//! and extracts structured information.
+//! and extracts structured information, as well as aggregation functions for efficient interop.
 
 use crate::parsing::action_filter::FilterAction;
 use crate::parsing::options::FilterOptions;
 use crate::parsing::types::{
-    FilterMode, FilterOutput, FilterSearchQueryDelta, TokenIDsWithLogProb,
+    AccumulatedToolCall, FilterAggregatedResult, FilterMode, FilterOutput, FilterSearchQueryDelta,
+    SearchQueryDelta,
 };
 use std::collections::HashMap;
 
-/// Core trait for streaming token parsers.
-///
-/// This trait defines the interface for processing decoded tokens from the model
-/// and extracting structured outputs. Implementations maintain internal state to handle
-/// partial tokens and mode transitions.
-///
-/// # Examples
-///
-/// ```rust
-/// use cohere_melody::parsing::{Filter, FilterOptions, new_filter};
-/// use cohere_melody::parsing::types::TokenIDsWithLogProb;
-///
-/// let options = FilterOptions::new();
-/// let mut filter = new_filter(options);
-///
-/// // Process tokens one at a time
-/// let outputs = filter.write_decoded("Hello", TokenIDsWithLogProb::new());
-/// let outputs = filter.write_decoded(" world", TokenIDsWithLogProb::new());
-///
-/// // Flush any buffered content at the end
-/// let final_outputs = filter.flush_partials();
-/// ```
+fn push_text(target: &mut Option<String>, text: &mut String) {
+    match target {
+        Some(s) => s.push_str(text),
+        None => {
+            *target = Some(std::mem::take(text));
+        }
+    }
+}
+
+#[must_use]
+pub(crate) fn aggregate(outputs: Vec<FilterOutput>) -> FilterAggregatedResult {
+    let mut content: Option<String> = None;
+    let mut reasoning: Option<String> = None;
+    let mut tool_call_map: HashMap<usize, AccumulatedToolCall> = HashMap::new();
+    let mut citations = Vec::new();
+    let mut search_queries = Vec::new();
+
+    for mut o in outputs {
+        if !o.text.is_empty() {
+            let target = if o.is_reasoning {
+                &mut reasoning
+            } else {
+                &mut content
+            };
+            push_text(target, &mut o.text);
+        }
+        if !o.citations.is_empty() {
+            citations.append(&mut o.citations);
+        }
+        if let Some(tc) = o.tool_call_delta {
+            let call = tool_call_map
+                .entry(tc.index)
+                .or_insert_with(|| AccumulatedToolCall {
+                    index: tc.index,
+                    ..Default::default()
+                });
+            if !tc.id.is_empty() {
+                call.id = tc.id;
+            }
+            if !tc.name.is_empty() {
+                call.name = tc.name;
+            }
+            call.arguments.push_str(&tc.raw_param_delta);
+        }
+        if let Some(sq) = o.search_query {
+            search_queries.push(SearchQueryDelta {
+                index: sq.index,
+                text: sq.text,
+            });
+        }
+    }
+
+    let mut tool_calls: Vec<AccumulatedToolCall> = tool_call_map.into_values().collect();
+    tool_calls.sort_by_key(|tc| tc.index);
+
+    FilterAggregatedResult {
+        content,
+        reasoning,
+        tool_calls,
+        citations,
+        search_queries,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Filter trait and implementation
+// ---------------------------------------------------------------------------
+
+/// Trait for streaming token filters that return aggregated results.
 pub trait Filter {
-    /// Process a decoded token and return any completed outputs.
-    ///
-    /// This method is called for each token string as it's decoded from the model. It may
-    /// return zero or more `FilterOutput` instances depending on what structured
-    /// content is found.
-    ///
-    /// # Arguments
-    ///
-    /// * `decoded_token` - The decoded text for this token
-    /// * `prob` - Token IDs and log probabilities for this token
-    ///
-    /// # Returns
-    ///
-    /// A vector of parsed outputs (may be empty if content is still buffered)
-    fn write_decoded(
-        &mut self,
-        decoded_token: &str,
-        prob: TokenIDsWithLogProb,
-    ) -> Vec<FilterOutput>;
+    /// Process a decoded token and return an aggregated result.
+    fn write_decoded(&mut self, decoded_token: &str) -> FilterAggregatedResult;
 
     /// Flush any buffered partial outputs.
-    ///
-    /// This should be called at the end of generation to output any content that
-    /// was buffered waiting for special tokens or complete structures.
-    ///
-    /// # Returns
-    ///
-    /// Any remaining buffered outputs
-    fn flush_partials(&mut self) -> Vec<FilterOutput>;
+    fn flush_partials(&mut self) -> FilterAggregatedResult;
 }
 
 /// Main implementation of the streaming filter state machine.
@@ -119,11 +143,9 @@ pub struct FilterImpl {
     // Chunking configuration
     pub(crate) chunk_size: usize,
     pub(crate) num_tokens_in_chunk: usize,
-    pub(crate) chunk_log_probs: TokenIDsWithLogProb,
 
     // Buffering state
     pub(crate) buf: Vec<u8>,
-    pub(crate) partial_special_token_log_prob: TokenIDsWithLogProb,
     pub(crate) mode: FilterMode,
     pub(crate) done: bool,
 }
@@ -150,9 +172,7 @@ impl FilterImpl {
             cmd3_citations: false,
             chunk_size: 1,
             num_tokens_in_chunk: 0,
-            chunk_log_probs: TokenIDsWithLogProb::new(),
             buf: Vec::new(),
-            partial_special_token_log_prob: TokenIDsWithLogProb::new(),
             mode: FilterMode::PlainText,
             done: false,
         }
@@ -190,11 +210,7 @@ impl FilterImpl {
         self
     }
 
-    pub(crate) fn write_text(
-        &mut self,
-        text: &[u8],
-        logprobs: TokenIDsWithLogProb,
-    ) -> Vec<FilterOutput> {
+    pub(crate) fn write_text(&mut self, text: &[u8]) -> Vec<FilterOutput> {
         if self.done {
             return Vec::new();
         }
@@ -205,7 +221,6 @@ impl FilterImpl {
         // If is a partial special token, we need to wait for the next token.
         let (special_token_idx, found_seq) = find_partial(&str, &mut self.special_token_map.keys());
         if special_token_idx != usize::MAX && found_seq.is_empty() {
-            self.partial_special_token_log_prob = logprobs;
             return Vec::new();
         }
 
@@ -227,16 +242,7 @@ impl FilterImpl {
                 // Before the special token, process the buffer with the old mode
                 let pre_special_token = &str[..special_token_idx];
                 if !pre_special_token.is_empty() {
-                    // Take ownership temporarily to avoid clone
-                    let partial_log_prob = std::mem::take(&mut self.partial_special_token_log_prob);
-                    let (o, _) = self.handle_token(
-                        self.mode,
-                        pre_special_token.as_bytes(),
-                        false,
-                        &partial_log_prob,
-                    );
-                    // restore
-                    self.partial_special_token_log_prob = partial_log_prob;
+                    let (o, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), false);
                     out.extend(o);
                 }
 
@@ -252,22 +258,16 @@ impl FilterImpl {
         // Process buffer by mode
         if !self.buf.is_empty() {
             self.num_tokens_in_chunk += 1;
-            self.chunk_log_probs.append(logprobs);
 
             if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
                 return out;
             }
 
-            let (o, remove) = self.handle_token(
-                self.mode,
-                &self.buf.clone(),
-                false,
-                &self.chunk_log_probs.clone(),
-            );
+            let buf = std::mem::take(&mut self.buf);
+            let (o, remove) = self.handle_token(self.mode, &buf, false);
             out.extend(o);
-            self.buf.drain(..remove);
+            self.buf = buf[remove..].to_vec();
             self.num_tokens_in_chunk = 0;
-            self.chunk_log_probs = TokenIDsWithLogProb::new();
         }
 
         out
@@ -278,7 +278,6 @@ impl FilterImpl {
         mode: FilterMode,
         bstr: &[u8],
         after_last_token: bool,
-        token_log_probs: &TokenIDsWithLogProb,
     ) -> (Vec<FilterOutput>, usize) {
         match mode {
             FilterMode::InclusiveStop | FilterMode::ExclusiveStop => {
@@ -291,17 +290,17 @@ impl FilterImpl {
                 self.parse_actions(&s)
             }
             FilterMode::GroundedAnswer | FilterMode::ToolReason => {
-                self.process_grounded_text(bstr, after_last_token, mode, Some(token_log_probs))
+                self.process_grounded_text(bstr, after_last_token, mode)
             }
             FilterMode::SearchQuery => self.process_search_query(bstr),
             FilterMode::Answer => {
                 if self.stream_non_grounded_answer {
-                    self.process_text(bstr, Some(token_log_probs))
+                    self.process_text(bstr)
                 } else {
                     (Vec::new(), bstr.len())
                 }
             }
-            FilterMode::PlainText => self.process_text(bstr, Some(token_log_probs)),
+            FilterMode::PlainText => self.process_text(bstr),
         }
     }
 
@@ -389,10 +388,10 @@ impl FilterImpl {
         if idx != usize::MAX && !s[..idx].is_empty() {
             let text = if let Some(start_idx) = self.cur_citation_byte_index {
                 let (trimmed, _) = self.trim_space(&s[start_idx..idx]);
-                trimmed
+                trimmed.to_string()
             } else {
                 let (trimmed, _) = self.trim_space(&s[..idx]);
-                trimmed
+                trimmed.to_string()
             };
 
             return vec![FilterOutput {
@@ -425,7 +424,7 @@ impl FilterImpl {
             out.push(FilterOutput {
                 search_query: Some(FilterSearchQueryDelta {
                     index: self.curr_search_query_idx,
-                    text: send,
+                    text: send.to_string(),
                 }),
                 ..Default::default()
             });
@@ -435,11 +434,7 @@ impl FilterImpl {
         (out, bstr.len() - rem_right)
     }
 
-    pub(crate) fn process_text(
-        &mut self,
-        bstr: &[u8],
-        token_log_probs: Option<&TokenIDsWithLogProb>,
-    ) -> (Vec<FilterOutput>, usize) {
+    pub(crate) fn process_text(&mut self, bstr: &[u8]) -> (Vec<FilterOutput>, usize) {
         if !Self::utf8_valid_or_limit(bstr) {
             return (Vec::new(), 0);
         }
@@ -449,32 +444,27 @@ impl FilterImpl {
         let mut out = Vec::new();
 
         if !send.is_empty() {
-            let mut output = FilterOutput {
-                text: send,
+            out.push(FilterOutput {
+                text: send.to_string(),
                 ..Default::default()
-            };
-            if let Some(probs) = token_log_probs {
-                output.logprobs = probs.clone();
-            }
-            out.push(output);
+            });
         }
 
         (out, bstr.len() - rem_right)
     }
 
-    // TODO: this can be refactored to avoid all the string allocations
-    pub(crate) fn trim_space(&mut self, s: &str) -> (String, usize) {
-        let mut result = s.to_string();
+    pub(crate) fn trim_space<'a>(&mut self, s: &'a str) -> (&'a str, usize) {
+        let mut result = s;
         let mut rem = 0;
 
         if self.right_trimmed {
-            rem = result.len();
-            result = result.trim_end().to_string();
-            rem -= result.len();
+            let trimmed = result.trim_end();
+            rem = result.len() - trimmed.len();
+            result = trimmed;
         }
 
         if self.left_trimmed {
-            result = result.trim_start().to_string();
+            result = result.trim_start();
             if !result.is_empty() {
                 self.left_trimmed = false;
             }
@@ -484,24 +474,43 @@ impl FilterImpl {
     }
 }
 
-impl Filter for FilterImpl {
-    fn write_decoded(&mut self, decoded_token: &str, l: TokenIDsWithLogProb) -> Vec<FilterOutput> {
-        self.write_text(decoded_token.as_bytes(), l)
-    }
-
-    fn flush_partials(&mut self) -> Vec<FilterOutput> {
+impl FilterImpl {
+    /// Feed all tokens through the filter and return a single result with fully accumulated tool calls.
+    pub fn process_full(&mut self, token_strings: &[String]) -> FilterAggregatedResult {
+        let mut all_outputs = Vec::with_capacity(token_strings.len());
+        for token_str in token_strings {
+            all_outputs.extend(self.write_text(token_str.as_bytes()));
+        }
         self.done = true;
         if !self.buf.is_empty()
             && self.mode != FilterMode::InclusiveStop
             && self.mode != FilterMode::ExclusiveStop
         {
-            // Use take to avoid cloning
             let buf_copy = std::mem::take(&mut self.buf);
-            let log_prob_copy = std::mem::take(&mut self.partial_special_token_log_prob);
-            let (o, _remove) = self.handle_token(self.mode, &buf_copy, true, &log_prob_copy);
-            return o;
+            let (o, _) = self.handle_token(self.mode, &buf_copy, true);
+            all_outputs.extend(o);
         }
-        Vec::new()
+        aggregate(all_outputs)
+    }
+}
+
+impl Filter for FilterImpl {
+    fn write_decoded(&mut self, decoded_token: &str) -> FilterAggregatedResult {
+        let outputs = self.write_text(decoded_token.as_bytes());
+        aggregate(outputs)
+    }
+
+    fn flush_partials(&mut self) -> FilterAggregatedResult {
+        self.done = true;
+        if !self.buf.is_empty()
+            && self.mode != FilterMode::InclusiveStop
+            && self.mode != FilterMode::ExclusiveStop
+        {
+            let buf_copy = std::mem::take(&mut self.buf);
+            let (o, _remove) = self.handle_token(self.mode, &buf_copy, true);
+            return aggregate(o);
+        }
+        FilterAggregatedResult::default()
     }
 }
 
@@ -546,7 +555,8 @@ pub(crate) fn find_partial<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::parsing::filter::find_partial;
+    use super::*;
+    use crate::parsing::types::{FilterCitation, FilterToolCallDelta};
 
     #[test]
     fn test_find_partial() {
@@ -574,5 +584,245 @@ mod tests {
         let (idx, found) = find_partial("ÈÈÈÈÈÈÈR", stops.iter());
         assert_eq!(idx, 14);
         assert_eq!(found, "");
+    }
+
+    #[test]
+    fn test_aggregate_content_only() {
+        let outputs = vec![
+            FilterOutput {
+                text: "hello ".into(),
+                ..Default::default()
+            },
+            FilterOutput {
+                text: "world".into(),
+                ..Default::default()
+            },
+        ];
+        let result = aggregate(outputs);
+        assert_eq!(result.content, Some("hello world".into()));
+        assert!(result.reasoning.is_none());
+        assert!(result.tool_calls.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_reasoning_only() {
+        let outputs = vec![
+            FilterOutput {
+                text: "step 1".into(),
+                is_reasoning: true,
+                ..Default::default()
+            },
+            FilterOutput {
+                text: " step 2".into(),
+                is_reasoning: true,
+                ..Default::default()
+            },
+        ];
+        let result = aggregate(outputs);
+        assert!(result.content.is_none());
+        assert_eq!(result.reasoning, Some("step 1 step 2".into()));
+    }
+
+    #[test]
+    fn test_aggregate_mixed() {
+        let outputs = vec![
+            FilterOutput {
+                text: "thinking...".into(),
+                is_reasoning: true,
+                ..Default::default()
+            },
+            FilterOutput {
+                text: "hello".into(),
+                is_reasoning: false,
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    id: "call_0".into(),
+                    name: "search".into(),
+                    raw_param_delta: r#"{"q":"test"}"#.into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let result = aggregate(outputs);
+        assert_eq!(result.reasoning, Some("thinking...".into()));
+        assert_eq!(result.content, Some("hello".into()));
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_0");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"q":"test"}"#);
+    }
+
+    #[test]
+    fn test_aggregate_with_citations() {
+        let outputs = vec![FilterOutput {
+            text: "cited text".into(),
+            citations: vec![FilterCitation {
+                start_index: 0,
+                end_index: 10,
+                text: "cited text".into(),
+                sources: vec![],
+                is_thinking: false,
+            }],
+            ..Default::default()
+        }];
+        let result = aggregate(outputs);
+        assert_eq!(result.citations.len(), 1);
+        assert_eq!(result.citations[0].start_index, 0);
+    }
+
+    #[test]
+    fn test_aggregate_no_text_fields() {
+        let outputs = vec![FilterOutput {
+            text: String::new(),
+            ..Default::default()
+        }];
+        let result = aggregate(outputs);
+        assert!(result.content.is_none());
+        assert!(result.reasoning.is_none());
+    }
+
+    #[test]
+    fn test_aggregate_empty() {
+        let result = aggregate(vec![]);
+        assert!(result.content.is_none());
+        assert!(result.reasoning.is_none());
+        assert!(result.tool_calls.is_empty());
+        assert!(result.citations.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_tool_calls() {
+        let outputs = vec![
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    id: "0".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    name: "search".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    raw_param_delta: r#"{"q": "#.into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    raw_param_delta: r#""hello"}"#.into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                text: "Response text".into(),
+                ..Default::default()
+            },
+        ];
+
+        let result = aggregate(outputs);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "0");
+        assert_eq!(result.tool_calls[0].name, "search");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"q": "hello"}"#);
+        assert_eq!(result.content, Some("Response text".into()));
+    }
+
+    #[test]
+    fn test_aggregate_multiple_tool_calls() {
+        let outputs = vec![
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    id: "call_0".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    name: "search".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 1,
+                    id: "call_1".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 1,
+                    name: "read".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    raw_param_delta: r#"{"q":"a"}"#.into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 1,
+                    raw_param_delta: r#"{"file":"b"}"#.into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let result = aggregate(outputs);
+        assert_eq!(result.tool_calls.len(), 2);
+        assert_eq!(result.tool_calls[0].id, "call_0");
+        assert_eq!(result.tool_calls[0].name, "search");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"q":"a"}"#);
+        assert_eq!(result.tool_calls[1].id, "call_1");
+        assert_eq!(result.tool_calls[1].name, "read");
+        assert_eq!(result.tool_calls[1].arguments, r#"{"file":"b"}"#);
+    }
+
+    #[test]
+    fn test_aggregate_reasoning_and_content() {
+        let outputs = vec![
+            FilterOutput {
+                text: "thinking".into(),
+                is_reasoning: true,
+                ..Default::default()
+            },
+            FilterOutput {
+                text: "answer".into(),
+                is_reasoning: false,
+                ..Default::default()
+            },
+        ];
+        let result = aggregate(outputs);
+        assert_eq!(result.reasoning, Some("thinking".into()));
+        assert_eq!(result.content, Some("answer".into()));
+        assert!(result.tool_calls.is_empty());
     }
 }

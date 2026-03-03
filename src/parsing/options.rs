@@ -166,6 +166,10 @@ impl FilterOptions {
             .insert("<|START_ACTION|>".to_string(), FilterMode::ToolAction);
         self.special_token_map
             .insert("<|END_ACTION|>".to_string(), FilterMode::Ignore);
+        self.special_token_map
+            .insert("<|START_RESPONSE|>".to_string(), FilterMode::GroundedAnswer);
+        self.special_token_map
+            .insert("<|END_RESPONSE|>".to_string(), FilterMode::Ignore);
         self
     }
 
@@ -441,6 +445,27 @@ impl FilterOptions {
         self
     }
 
+    /// Disable tool call parsing by removing the action tokens.
+    ///
+    /// Removes `<|START_ACTION|>` and `<|END_ACTION|>` from the special token map
+    /// so the filter treats tool call markup as plain text.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::parsing::FilterOptions;
+    ///
+    /// let options = FilterOptions::new()
+    ///     .cmd3()
+    ///     .no_tools();
+    /// ```
+    #[must_use]
+    pub fn no_tools(mut self) -> Self {
+        self.special_token_map.remove("<|START_ACTION|>");
+        self.special_token_map.remove("<|END_ACTION|>");
+        self
+    }
+
     /// Remove a special token from the token map.
     ///
     /// Removes a previously configured special token, preventing it from
@@ -487,7 +512,7 @@ impl FilterOptions {
 /// let options = FilterOptions::new().cmd3();
 /// let mut filter = new_filter(options);
 ///
-/// let outputs = filter.write_decoded("Hello", Default::default());
+/// let outputs = filter.write_decoded("Hello");
 /// ```
 #[must_use]
 pub fn new_filter(options: FilterOptions) -> FilterImpl {

@@ -3,11 +3,10 @@ package gobindings
 // Filter is the interface used to parse the output of a cohere model
 type Filter interface {
 	// WriteDecoded writes a decoded token string to the filter
-	// For raw text processing
-	WriteDecoded(decodedToken string, logprob *TokenIDsWithLogProb) ([]FilterOutput, error)
+	WriteDecoded(decodedToken string) (*AggregatedResult, error)
 
 	// FlushPartials flushes any partial outputs
-	FlushPartials() ([]FilterOutput, error)
+	FlushPartials() (*AggregatedResult, error)
 }
 
 // SyncFilter is a synchronous filter implementation
@@ -43,21 +42,16 @@ func NewFilter(options ...FilterOption) Filter {
 }
 
 // WriteDecoded writes a decoded token string to the filter
-func (f *SyncFilter) WriteDecoded(decodedToken string, logprob *TokenIDsWithLogProb) ([]FilterOutput, error) {
+func (f *SyncFilter) WriteDecoded(decodedToken string) (*AggregatedResult, error) {
 	if f.cfilter == nil {
 		return nil, nil
 	}
 
-	var lp TokenIDsWithLogProb
-	if logprob != nil {
-		lp = *logprob
-	}
-
-	return f.cfilter.writeDecoded(decodedToken, lp)
+	return f.cfilter.writeDecoded(decodedToken)
 }
 
 // FlushPartials flushes any partial outputs
-func (f *SyncFilter) FlushPartials() ([]FilterOutput, error) {
+func (f *SyncFilter) FlushPartials() (*AggregatedResult, error) {
 	if f.cfilter == nil {
 		return nil, nil
 	}

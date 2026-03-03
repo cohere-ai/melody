@@ -200,7 +200,7 @@ func (f *cFilter) free() {
 }
 
 // writeDecoded writes a decoded token to the filter
-func (f *cFilter) writeDecoded(decodedToken string, logprobs TokenIDsWithLogProb) ([]FilterOutput, error) {
+func (f *cFilter) writeDecoded(decodedToken string) (*AggregatedResult, error) {
 	if f.ptr == nil {
 		return nil, nil
 	}
@@ -208,42 +208,21 @@ func (f *cFilter) writeDecoded(decodedToken string, logprobs TokenIDsWithLogProb
 	cToken := C.CString(decodedToken)
 	defer C.free(unsafe.Pointer(cToken))
 
-	var cTokenIds *C.uint32_t
-	var cLogprobs *C.float
-	// Declare tokenIds in the function scope (not inside the if block) so the
-	// backing array remains reachable. Without this, the GC may collect the Go-heap-allocated array
-	// while Rust is still reading through the C-typed pointer, causing "found bad pointer in Go heap".
-	var tokenIds []uint32
-	tokenIdsLen := C.size_t(len(logprobs.TokenIDs))
-	logprobsLen := C.size_t(len(logprobs.Logprobs))
-
-	if len(logprobs.TokenIDs) > 0 {
-		tokenIds = make([]uint32, len(logprobs.TokenIDs))
-		for i, id := range logprobs.TokenIDs {
-			tokenIds[i] = uint32(id)
-		}
-		cTokenIds = (*C.uint32_t)(unsafe.Pointer(&tokenIds[0]))
-	}
-
-	if len(logprobs.Logprobs) > 0 {
-		cLogprobs = (*C.float)(unsafe.Pointer(&logprobs.Logprobs[0]))
-	}
-
-	res := C.melody_filter_write_decoded(f.ptr, cToken, cTokenIds, tokenIdsLen, cLogprobs, logprobsLen)
+	res := C.melody_filter_write_decoded(f.ptr, cToken)
 	if res == nil {
 		return nil, nil
 	}
-	defer C.melody_result_free(res)
+	defer C.melody_aggregated_result_free(res)
 
 	if res.error != nil {
 		return nil, errors.New(C.GoString(res.error))
 	}
 
-	return convertCOutputArray(res.result), nil
+	return convertCAggregatedResult(res.result), nil
 }
 
 // flushPartials flushes any partial outputs from the filter
-func (f *cFilter) flushPartials() ([]FilterOutput, error) {
+func (f *cFilter) flushPartials() (*AggregatedResult, error) {
 	if f.ptr == nil {
 		return nil, nil
 	}
@@ -252,97 +231,64 @@ func (f *cFilter) flushPartials() ([]FilterOutput, error) {
 	if res == nil {
 		return nil, nil
 	}
-	defer C.melody_result_free(res)
+	defer C.melody_aggregated_result_free(res)
 
 	if res.error != nil {
 		return nil, errors.New(C.GoString(res.error))
 	}
 
-	return convertCOutputArray(res.result), nil
+	return convertCAggregatedResult(res.result), nil
 }
 
-// convertCOutputArray converts a C output array to Go FilterOutput slice
-func convertCOutputArray(cArr *C.CFilterOutputArray) []FilterOutput {
-	if cArr == nil || cArr.len == 0 {
+// convertCAggregatedResult converts a C aggregated result to Go AggregatedResult
+func convertCAggregatedResult(cResult *C.CAggregatedResult) *AggregatedResult {
+	if cResult == nil {
 		return nil
 	}
+	result := &AggregatedResult{}
 
-	outputs := make([]FilterOutput, int(cArr.len))
-	cOutputs := unsafe.Slice(cArr.outputs, int(cArr.len))
-
-	for i := 0; i < int(cArr.len); i++ {
-		outputs[i] = convertCOutput(&cOutputs[i])
+	if cResult.content != nil {
+		s := C.GoString(cResult.content)
+		result.Content = &s
+	}
+	if cResult.reasoning != nil {
+		s := C.GoString(cResult.reasoning)
+		result.Reasoning = &s
 	}
 
-	return outputs
-}
-
-// convertCOutput converts a C output to Go FilterOutput
-func convertCOutput(cOutput *C.CFilterOutput) FilterOutput {
-	output := FilterOutput{}
-
-	// Convert text
-	if cOutput.text != nil {
-		output.Text = C.GoString(cOutput.text)
-	}
-
-	// Convert logprobs
-	if cOutput.token_ids != nil && cOutput.token_ids_len > 0 {
-		tokenIds := unsafe.Slice(cOutput.token_ids, int(cOutput.token_ids_len))
-		output.Logprobs.TokenIDs = make([]uint32, len(tokenIds))
-		for i, id := range tokenIds {
-			output.Logprobs.TokenIDs[i] = uint32(id)
-		}
-	}
-
-	if cOutput.logprobs != nil && cOutput.logprobs_len > 0 {
-		logprobs := unsafe.Slice(cOutput.logprobs, int(cOutput.logprobs_len))
-		output.Logprobs.Logprobs = make([]float32, len(logprobs))
-		for i, lp := range logprobs {
-			output.Logprobs.Logprobs[i] = float32(lp)
-		}
-	}
-
-	// Convert search query
-	if cOutput.search_query_index >= 0 {
-		output.SearchQuery = &FilterSearchQueryDelta{
-			Index: uint(cOutput.search_query_index),
-			Text:  C.GoString(cOutput.search_query_text),
-		}
-	}
-
-	// Convert citations
-	if cOutput.citations != nil && cOutput.citations_len > 0 {
-		cCitations := unsafe.Slice(cOutput.citations, int(cOutput.citations_len))
-		output.Citations = make([]FilterCitation, len(cCitations))
-		for i := 0; i < len(cCitations); i++ {
-			output.Citations[i] = convertCCitation(&cCitations[i])
-		}
-	}
-
-	// Convert tool calls
-	if cOutput.tool_call_index >= 0 {
-		tc := &FilterToolCallDelta{
-			Index:         uint(cOutput.tool_call_index),
-			ID:            C.GoString(cOutput.tool_call_id),
-			Name:          C.GoString(cOutput.tool_call_name),
-			RawParamDelta: C.GoString(cOutput.tool_call_raw_param_delta),
-		}
-
-		if cOutput.tool_call_param_name != nil {
-			tc.ParamDelta = &FilterToolParameter{
-				Name:       C.GoString(cOutput.tool_call_param_name),
-				ValueDelta: C.GoString(cOutput.tool_call_param_value_delta),
+	if cResult.tool_calls != nil && cResult.tool_calls_len > 0 {
+		cToolCalls := unsafe.Slice(cResult.tool_calls, int(cResult.tool_calls_len))
+		result.ToolCalls = make([]AccumulatedToolCall, len(cToolCalls))
+		for i, ctc := range cToolCalls {
+			result.ToolCalls[i] = AccumulatedToolCall{
+				Index:     uint(ctc.index),
+				ID:        C.GoString(ctc.id),
+				Name:      C.GoString(ctc.name),
+				Arguments: C.GoString(ctc.arguments),
 			}
 		}
-
-		output.ToolCallDelta = tc
 	}
 
-	output.IsPostAnswer = bool(cOutput.is_post_answer)
-	output.IsReasoning = bool(cOutput.is_reasoning)
+	if cResult.citations != nil && cResult.citations_len > 0 {
+		cCitations := unsafe.Slice(cResult.citations, int(cResult.citations_len))
+		result.Citations = make([]FilterCitation, len(cCitations))
+		for i := 0; i < len(cCitations); i++ {
+			result.Citations[i] = convertCCitation(&cCitations[i])
+		}
+	}
 
-	return output
+	if cResult.search_queries != nil && cResult.search_queries_len > 0 {
+		cSQs := unsafe.Slice(cResult.search_queries, int(cResult.search_queries_len))
+		result.SearchQueries = make([]SearchQueryDelta, len(cSQs))
+		for i, csq := range cSQs {
+			result.SearchQueries[i] = SearchQueryDelta{
+				Index: uint(csq.index),
+				Text:  C.GoString(csq.text),
+			}
+		}
+	}
+
+	return result
 }
 
 // convertCCitation converts a C citation to Go FilterCitation
