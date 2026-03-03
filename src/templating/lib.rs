@@ -321,8 +321,10 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::templating::Content;
+    use crate::templating::Role::User;
     use pretty_assertions::assert_eq;
-    use serde_json::Value;
+    use serde_json::{Value, from_str};
     use serde_path_to_error::deserialize;
     use std::fs;
     use std::path::Path;

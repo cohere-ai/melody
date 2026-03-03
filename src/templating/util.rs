@@ -246,11 +246,12 @@ pub(crate) fn docs_to_template(
         .iter()
         .map(|d| -> Result<_, MelodyError> {
             let escaped = &escape_document_special_tokens(d, special_token_map);
-            Ok(Value::String(add_spaces_to_json_encoding(to_string(&escaped)?.as_str())))
+            Ok(Value::String(add_spaces_to_json_encoding(
+                to_string(&escaped)?.as_str(),
+            )))
         })
         .collect::<Result<Vec<_>, _>>()
 }
-
 
 fn docs_to_template_jinja(
     documents: &[Map<String, Value>],
@@ -258,9 +259,8 @@ fn docs_to_template_jinja(
 ) -> Vec<Value> {
     documents
         .iter()
-        .map(|d| -> Value {
-            Value::Object(escape_document_special_tokens(d, special_token_map))
-        }).collect()
+        .map(|d| -> Value { Value::Object(escape_document_special_tokens(d, special_token_map)) })
+        .collect()
 }
 
 fn build_text_with_citation(text: &String, citation_inserts: &mut [CitationInsertInfo]) -> String {
@@ -398,17 +398,14 @@ pub(crate) fn messages_to_template(
                         let escaped_text = escape_special_tokens(text, special_token_map);
                         obj.insert("content".to_string(), Value::String(escaped_text));
                         let rendered_obj = add_spaces_to_json_encoding(&to_string(&obj)?);
-                        m.tool_results[tool_result_idx]
-                            .documents
-                            .push(rendered_obj);
+                        m.tool_results[tool_result_idx].documents.push(rendered_obj);
                     }
                 } else if content_item.content_type == ContentType::Document {
                     if let Some(ref obj) = content_item.document {
                         let escaped_object = escape_document_special_tokens(obj, special_token_map);
-                        let rendered_obj = add_spaces_to_json_encoding(&to_string(&escaped_object)?);
-                        m.tool_results[tool_result_idx]
-                            .documents
-                            .push(rendered_obj);
+                        let rendered_obj =
+                            add_spaces_to_json_encoding(&to_string(&escaped_object)?);
+                        m.tool_results[tool_result_idx].documents.push(rendered_obj);
                     }
                 } else if content_item.content_type == ContentType::Image {
                     if let Some(ref obj) = content_item.image {
@@ -840,7 +837,10 @@ mod tests {
             Value::String("foofaa".to_string()),
             Value::Object({
                 let mut m = Map::new();
-                m.insert("inner_inner_key_aaa".to_string(), Value::String("inner_inner_value_aaa".to_string()));
+                m.insert(
+                    "inner_inner_key_aaa".to_string(),
+                    Value::String("inner_inner_value_aaa".to_string()),
+                );
                 m
             }),
         ];
@@ -849,11 +849,13 @@ mod tests {
         inner.insert("inner_key_aaa".to_string(), Value::Array(inner_inner_arr));
 
         let mut map = Map::new();
-        map.insert("outer_key".to_string(), Value::Array(vec![
-            Value::String("zoozaa".to_string()),
-            Value::Object(inner),
-        ]));
-
+        map.insert(
+            "outer_key".to_string(),
+            Value::Array(vec![
+                Value::String("zoozaa".to_string()),
+                Value::Object(inner),
+            ]),
+        );
 
         let escaped = escape_document_special_tokens(&map, &special_token_map);
         let result = to_string(&escaped).unwrap();
