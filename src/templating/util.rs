@@ -576,10 +576,6 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
             .unwrap_or(def_vec)) as _
     }
 
-    // Match an invalid json escape sequence (backlash not followed by one of the special chars here: https://stackoverflow.com/a/37689688)
-    // Rust doesn't support lookaround by default so had to convert it a bit
-    let single_backslash_re = regex::Regex::new(r#"\\\\|\\([^"\\/bfnrtu])"#).unwrap();
-
     // These are new messages due to tool results that we will insert after other conversions
     let mut new_messages = vec![];
     // First bit of code is just to be able to loop through the messages mutably
@@ -682,17 +678,12 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                         let doc_str = doc.as_str().ok_or(MelodyError::TemplateValidation(
                             "Invalid tool document format during jinja conversion".to_string(),
                         ))?;
-                        // Escape any invalid single backslashes in the string
-                        let doc_str_json_escaped = single_backslash_re
-                            .replace_all(doc_str, "\\\\$1")
-                            .to_string();
-                        let doc_obj = serde_json::from_str(&doc_str_json_escaped)?;
                         msg_ref
                             .get_mut("content")
                             .unwrap()
                             .as_array_mut()
                             .unwrap()
-                            .push(doc_obj);
+                            .push(serde_json::from_str(doc_str)?);
                     }
                 }
             }

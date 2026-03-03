@@ -2,7 +2,7 @@
   "platform_instruction": "",
   "dev_instruction": "",
   "escaped_special_tokens":{
-    "<|something|>": "\\\\<\\\\|something\\\\|\\\\>"
+    "<|something|>": "\\<\\|something\\|\\>"
   },
   "messages": [
     {

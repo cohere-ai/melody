@@ -1,7 +1,7 @@
 {
   "skip_preamble": true,
   "escaped_special_tokens":{
-    "<|something|>": "\\\\<\\\\|something\\\\|\\\\>"
+    "<|something|>": "\\<\\|something\\|\\>"
   },
   "messages": [
     {
