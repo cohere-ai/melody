@@ -4,15 +4,38 @@
 name: python build wheels
 
 on:
+  workflow_run:
+    workflows: ["auto release"]
+    types: [completed]
   workflow_dispatch:
-  release:
-    types: [published]
 
 permissions:
   contents: read
 
 jobs:
+  resolve-tag:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get latest release tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+          echo "tag=$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
   linux:
+    needs: [resolve-tag]
+    if: needs.resolve-tag.outputs.tag != ''
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -31,6 +54,8 @@ jobs:
             target: ppc64le
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
@@ -39,7 +64,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          sccache: ${{ github.event_name == 'workflow_dispatch' }}
           manylinux: auto
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -73,6 +98,8 @@ jobs:
             pytest --ignore=tests/templating/jinja/python
 
   musllinux:
+    needs: [resolve-tag]
+    if: needs.resolve-tag.outputs.tag != ''
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -87,6 +114,8 @@ jobs:
             target: armv7
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
@@ -95,7 +124,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          sccache: ${{ github.event_name == 'workflow_dispatch' }}
           manylinux: musllinux_1_2
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -133,6 +162,8 @@ jobs:
             pytest --ignore=tests/templating/jinja/python
 
   windows:
+    needs: [resolve-tag]
+    if: needs.resolve-tag.outputs.tag != ''
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -143,6 +174,8 @@ jobs:
             target: x86
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
@@ -152,7 +185,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          sccache: ${{ github.event_name == 'workflow_dispatch' }}
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -170,6 +203,8 @@ jobs:
           pytest --ignore=tests/templating/jinja/python
 
   macos:
+    needs: [resolve-tag]
+    if: needs.resolve-tag.outputs.tag != ''
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -180,6 +215,8 @@ jobs:
             target: aarch64
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
@@ -188,7 +225,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          sccache: ${{ github.event_name == 'workflow_dispatch' }}
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -204,9 +241,13 @@ jobs:
           pytest --ignore=tests/templating/jinja/python
 
   sdist:
+    needs: [resolve-tag]
+    if: needs.resolve-tag.outputs.tag != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -221,8 +262,8 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
-    needs: [linux, musllinux, windows, macos, sdist]
+    if: github.event_name == 'workflow_run'
+    needs: [resolve-tag, linux, musllinux, windows, macos, sdist]
     permissions:
       # Used for PyPI trusted publishing (OIDC)
       id-token: write
@@ -232,6 +273,7 @@ jobs:
       attestations: write
     environment: pypi-release
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -243,6 +285,10 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: "dist/*"
+      - name: Upload wheels to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.resolve-tag.outputs.tag }}" dist/* --clobber
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

@@ -95,6 +95,10 @@ let options = templating::RenderCmd4Options {
 let prompt = templating::render_cmd4(&options).unwrap();
 ```
 
+## Releasing
+
+Bump the version in `Cargo.toml` and push to `main`. The CI will automatically create a GitHub release, build wheels for all platforms, and publish to PyPI.
+
 ## Building Python Bindings
 
 ### Prerequisites (from [pyo3](https://pyo3.rs/v0.27.1/getting-started.html#installation))
