@@ -351,7 +351,8 @@ mod tests {
     fn test_filter_write_decoded() {
         let mut filter = PyFilter::cmd3(None);
         let result = filter.write_decoded("Hello");
-        assert!(result.content.is_some() || result.reasoning.is_some() || result.content.is_none());
+        assert_eq!(result.content, Some("Hello".to_string()));
+        assert!(result.reasoning.is_none());
     }
 
     #[test]
