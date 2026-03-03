@@ -1429,11 +1429,11 @@ unsafe fn convert_cmd3_options<'a>(opts: &CRenderCmd3Options) -> RenderCmd3Optio
     };
 
     if opts.has_citation_quality {
-        rs_opts.citation_quality = Some(map_citation_quality(opts.citation_quality))
+        rs_opts.citation_quality = Some(map_citation_quality(opts.citation_quality));
     }
 
     if opts.has_reasoning_type {
-        rs_opts.reasoning_type = Some(map_reasoning_type(opts.reasoning_type))
+        rs_opts.reasoning_type = Some(map_reasoning_type(opts.reasoning_type));
     }
 
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
@@ -1513,7 +1513,7 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
         ..Default::default()
     };
     if opts.has_grounding {
-        rs_opts.grounding = Some(map_grounding(opts.grounding))
+        rs_opts.grounding = Some(map_grounding(opts.grounding));
     }
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
     let template_jinja = unsafe { CStr::from_ptr(opts.template_jinja).to_str().unwrap() };
