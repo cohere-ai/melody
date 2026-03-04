@@ -240,6 +240,22 @@ func (f *cFilter) flushPartials() (*AggregatedResult, error) {
 	return convertCAggregatedResult(res.result), nil
 }
 
+// Helper to convert C array of FilterToolParameter to Go slice
+func convertCFilterToolParameters(cParams *C.CFilterToolParameter, length C.size_t) []FilterToolParameter {
+	if cParams == nil || length == 0 {
+		return nil
+	}
+	arr := unsafe.Slice(cParams, int(length))
+	params := make([]FilterToolParameter, len(arr))
+	for i, cp := range arr {
+		params[i] = FilterToolParameter{
+			Name:       C.GoString(cp.name),
+			ValueDelta: C.GoString(cp.value_delta),
+		}
+	}
+	return params
+}
+
 // convertCAggregatedResult converts a C aggregated result to Go AggregatedResult
 func convertCAggregatedResult(cResult *C.CAggregatedResult) *AggregatedResult {
 	if cResult == nil {
@@ -261,10 +277,11 @@ func convertCAggregatedResult(cResult *C.CAggregatedResult) *AggregatedResult {
 		result.ToolCalls = make([]AccumulatedToolCall, len(cToolCalls))
 		for i, ctc := range cToolCalls {
 			result.ToolCalls[i] = AccumulatedToolCall{
-				Index:     uint(ctc.index),
-				ID:        C.GoString(ctc.id),
-				Name:      C.GoString(ctc.name),
-				Arguments: C.GoString(ctc.arguments),
+				Index:           uint(ctc.index),
+				ID:              C.GoString(ctc.id),
+				Name:            C.GoString(ctc.name),
+				Arguments:       C.GoString(ctc.arguments),
+				ProcessedParams: convertCFilterToolParameters(ctc.processed_params, ctc.processed_params_len),
 			}
 		}
 	}

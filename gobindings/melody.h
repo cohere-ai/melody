@@ -161,10 +161,17 @@ typedef struct CFilter CFilter;
 typedef struct CFilterOptions CFilterOptions;
 
 typedef struct {
+    char* name;
+    char* value_delta;
+} CFilterToolParameter;
+
+typedef struct {
     size_t index;
     char* id;
     char* name;
     char* arguments;
+    CFilterToolParameter* processed_params;
+    size_t processed_params_len;
 } CAccumulatedToolCall;
 
 typedef struct {

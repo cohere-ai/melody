@@ -149,6 +149,10 @@ pub struct CAccumulatedToolCall {
     pub name: *mut c_char,
     /// Tool call arguments (JSON string)
     pub arguments: *mut c_char,
+    /// Array of processed parameters
+    pub processed_params: *mut CFilterToolParameter,
+    /// Number of processed parameters
+    pub processed_params_len: usize,
 }
 
 /// C-compatible representation of `SearchQueryDelta`
@@ -204,6 +208,15 @@ pub struct CRenderResult {
     pub result: *mut c_char,
     /// Null-terminated C string containing the error (null if success)
     pub error: *mut c_char,
+}
+
+/// C-compatible representation of `FilterToolParameter`
+#[repr(C)]
+pub struct CFilterToolParameter {
+    /// Parameter name (null-terminated C string)
+    pub name: *mut c_char,
+    /// Value delta (null-terminated C string)
+    pub value_delta: *mut c_char,
 }
 
 // ============================================================================
@@ -572,11 +585,28 @@ unsafe fn convert_aggregated_to_c(result: FilterAggregatedResult) -> *mut CAggre
         let c_tcs: Vec<CAccumulatedToolCall> = result
             .tool_calls
             .into_iter()
-            .map(|tc| CAccumulatedToolCall {
-                index: tc.index,
-                id: CString::new(tc.id).unwrap().into_raw(),
-                name: CString::new(tc.name).unwrap().into_raw(),
-                arguments: CString::new(tc.arguments).unwrap().into_raw(),
+            .map(|tc| {
+                let processed_params_len = tc.processed_params.len();
+                let processed_params = if processed_params_len > 0 {
+                    let c_params: Vec<CFilterToolParameter> = tc.processed_params
+                        .into_iter()
+                        .map(|p| CFilterToolParameter {
+                            name: CString::new(p.name).unwrap().into_raw(),
+                            value_delta: CString::new(p.value_delta).unwrap().into_raw(),
+                        })
+                        .collect();
+                    Box::into_raw(c_params.into_boxed_slice()).cast::<CFilterToolParameter>()
+                } else {
+                    std::ptr::null_mut()
+                };
+                CAccumulatedToolCall {
+                    index: tc.index,
+                    id: CString::new(tc.id).unwrap().into_raw(),
+                    name: CString::new(tc.name).unwrap().into_raw(),
+                    arguments: CString::new(tc.arguments).unwrap().into_raw(),
+                    processed_params,
+                    processed_params_len,
+                }
             })
             .collect();
         Box::into_raw(c_tcs.into_boxed_slice()).cast::<CAccumulatedToolCall>()
@@ -703,6 +733,21 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                     }
                     if !tc.arguments.is_null() {
                         let _ = CString::from_raw(tc.arguments);
+                    }
+                    if !tc.processed_params.is_null() && tc.processed_params_len > 0 {
+                        let params = Vec::from_raw_parts(
+                            tc.processed_params,
+                            tc.processed_params_len,
+                            tc.processed_params_len,
+                        );
+                        for p in params {
+                            if !p.name.is_null() {
+                                let _ = CString::from_raw(p.name);
+                            }
+                            if !p.value_delta.is_null() {
+                                let _ = CString::from_raw(p.value_delta);
+                            }
+                        }
                     }
                 }
             }

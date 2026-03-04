@@ -42,7 +42,7 @@ func TestFilter_Command3(t *testing.T) {
 				melody.HandleMultiHopCmd3(),
 				melody.StreamToolActions(),
 			},
-			input: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
+			input:         "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
 			wantContent:   strPtr("foo bar"),
 			wantReasoning: strPtr("This is a rainbow emoji: 🌈"),
 			wantCitations: []melody.FilterCitation{
@@ -58,6 +58,38 @@ func TestFilter_Command3(t *testing.T) {
 						{ToolCallIndex: 1, ToolResultIndices: []uint{3, 4}},
 					},
 					IsThinking: false,
+				},
+			},
+		}, {
+			name: "processed params tool call",
+			options: []melody.FilterOption{
+				melody.HandleMultiHopCmd3(),
+				melody.StreamToolActions(),
+				melody.StreamProcessedParams(),
+			},
+			input:         "<|START_THINKING|>Some plan<|END_THINKING|>\n<|START_ACTION|>[{\"tool_call_id\": \"0\", \"tool_name\": \"add\", \"parameters\": {\"a\": 6, \"b\": 7}}]<|END_ACTION|>",
+			wantReasoning: strPtr("Some plan"),
+			wantToolCalls: []melody.AccumulatedToolCall{
+				{
+					ID: "0",
+				}, {
+					Name: "add",
+				}, {
+					ProcessedParams: []melody.FilterToolParameter{
+						{Name: "a"},
+					},
+				}, {
+					ProcessedParams: []melody.FilterToolParameter{
+						{Name: "a", ValueDelta: "6"},
+					},
+				}, {
+					ProcessedParams: []melody.FilterToolParameter{
+						{Name: "b"},
+					},
+				}, {
+					ProcessedParams: []melody.FilterToolParameter{
+						{Name: "b", ValueDelta: "7"},
+					},
 				},
 			},
 		},

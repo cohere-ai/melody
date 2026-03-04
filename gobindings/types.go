@@ -11,10 +11,17 @@ type AggregatedResult struct {
 
 // AccumulatedToolCall represents a tool call (possibly partial in streaming)
 type AccumulatedToolCall struct {
-	Index     uint
-	ID        string
-	Name      string
-	Arguments string
+	Index           uint
+	ID              string
+	Name            string
+	Arguments       string
+	ProcessedParams []FilterToolParameter
+}
+
+// FilterToolParameter represents a change to a tool parameter
+type FilterToolParameter struct {
+	Name       string
+	ValueDelta string
 }
 
 // SearchQueryDelta represents a search query update
