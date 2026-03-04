@@ -230,6 +230,8 @@ pub struct AccumulatedToolCall {
     pub name: String,
     /// JSON-encoded arguments string.
     pub arguments: String,
+    /// Structured parameters (if `stream_processed_params` is enabled).
+    pub processed_params: Vec<FilterToolParameter>,
 }
 
 /// A search query delta extracted from the stream.

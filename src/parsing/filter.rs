@@ -54,6 +54,17 @@ pub(crate) fn aggregate(outputs: Vec<FilterOutput>) -> FilterAggregatedResult {
                 call.name = tc.name;
             }
             call.arguments.push_str(&tc.raw_param_delta);
+            if let Some(param_delta) = tc.param_delta {
+                if let Some(last_param) = call.processed_params.last_mut() {
+                    if last_param.name == param_delta.name {
+                        last_param.value_delta.push_str(&param_delta.value_delta);
+                    } else {
+                        call.processed_params.push(param_delta);
+                    }
+                } else {
+                    call.processed_params.push(param_delta);
+                }
+            }
         }
         if let Some(sq) = o.search_query {
             search_queries.push(SearchQueryDelta {
@@ -556,7 +567,7 @@ pub(crate) fn find_partial<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parsing::types::{FilterCitation, FilterToolCallDelta};
+    use crate::parsing::types::{FilterCitation, FilterToolCallDelta, FilterToolParameter};
 
     #[test]
     fn test_find_partial() {
@@ -740,6 +751,77 @@ mod tests {
         assert_eq!(result.tool_calls[0].id, "0");
         assert_eq!(result.tool_calls[0].name, "search");
         assert_eq!(result.tool_calls[0].arguments, r#"{"q": "hello"}"#);
+        assert_eq!(result.content, Some("Response text".into()));
+    }
+
+
+    #[test]
+    fn test_aggregate_processed_params_tool_calls() {
+        let outputs = vec![
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    id: "0".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    name: "search".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    param_delta: Some(FilterToolParameter{
+                        name: "q".into(),
+                        value_delta: "".into(),
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    param_delta: Some(FilterToolParameter{
+                        name: "q".into(),
+                        value_delta: "\"hel".into(),
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                tool_call_delta: Some(FilterToolCallDelta {
+                    index: 0,
+                    param_delta: Some(FilterToolParameter{
+                        name: "q".into(),
+                        value_delta: "lo\"".into(),
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            FilterOutput {
+                text: "Response text".into(),
+                ..Default::default()
+            },
+        ];
+
+        let result = aggregate(outputs);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "0");
+        assert_eq!(result.tool_calls[0].name, "search");
+        assert_eq!(result.tool_calls[0].arguments, r#""#);
+        assert_eq!(result.tool_calls[0].processed_params[0], FilterToolParameter{
+            name: "q".into(),
+            value_delta: "\"hello\"".into(),
+        });
         assert_eq!(result.content, Some("Response text".into()));
     }
 
