@@ -754,7 +754,6 @@ mod tests {
         assert_eq!(result.content, Some("Response text".into()));
     }
 
-
     #[test]
     fn test_aggregate_processed_params_tool_calls() {
         let outputs = vec![
@@ -777,7 +776,7 @@ mod tests {
             FilterOutput {
                 tool_call_delta: Some(FilterToolCallDelta {
                     index: 0,
-                    param_delta: Some(FilterToolParameter{
+                    param_delta: Some(FilterToolParameter {
                         name: "q".into(),
                         value_delta: "".into(),
                     }),
@@ -788,7 +787,7 @@ mod tests {
             FilterOutput {
                 tool_call_delta: Some(FilterToolCallDelta {
                     index: 0,
-                    param_delta: Some(FilterToolParameter{
+                    param_delta: Some(FilterToolParameter {
                         name: "q".into(),
                         value_delta: "\"hel".into(),
                     }),
@@ -799,7 +798,7 @@ mod tests {
             FilterOutput {
                 tool_call_delta: Some(FilterToolCallDelta {
                     index: 0,
-                    param_delta: Some(FilterToolParameter{
+                    param_delta: Some(FilterToolParameter {
                         name: "q".into(),
                         value_delta: "lo\"".into(),
                     }),
@@ -818,10 +817,13 @@ mod tests {
         assert_eq!(result.tool_calls[0].id, "0");
         assert_eq!(result.tool_calls[0].name, "search");
         assert_eq!(result.tool_calls[0].arguments, r#""#);
-        assert_eq!(result.tool_calls[0].processed_params[0], FilterToolParameter{
-            name: "q".into(),
-            value_delta: "\"hello\"".into(),
-        });
+        assert_eq!(
+            result.tool_calls[0].processed_params[0],
+            FilterToolParameter {
+                name: "q".into(),
+                value_delta: "\"hello\"".into(),
+            }
+        );
         assert_eq!(result.content, Some("Response text".into()));
     }
 

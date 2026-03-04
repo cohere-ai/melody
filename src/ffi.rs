@@ -588,7 +588,8 @@ unsafe fn convert_aggregated_to_c(result: FilterAggregatedResult) -> *mut CAggre
             .map(|tc| {
                 let processed_params_len = tc.processed_params.len();
                 let processed_params = if processed_params_len > 0 {
-                    let c_params: Vec<CFilterToolParameter> = tc.processed_params
+                    let c_params: Vec<CFilterToolParameter> = tc
+                        .processed_params
                         .into_iter()
                         .map(|p| CFilterToolParameter {
                             name: CString::new(p.name).unwrap().into_raw(),
