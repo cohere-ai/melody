@@ -1,7 +1,9 @@
 use crate::errors::MelodyError;
 use crate::parsing::types::FilterCitation;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
-use crate::templating::{CitationQuality, Content, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options};
+use crate::templating::{
+    CitationQuality, Content, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options,
+};
 use minijinja::Environment;
 use serde_json::{Map, Value, json, to_string};
 use std::collections::{BTreeMap, HashMap};
@@ -337,8 +339,11 @@ fn add_citation_insert_pair(
     citation_inserts.extend([insrt_start, insrt_end]);
 }
 
-fn tool_content_item_to_template(content_item: Content, special_token_map: &BTreeMap<String, String>) -> Result<String, MelodyError> {
-    match content_item.content_type{
+fn tool_content_item_to_template(
+    content_item: Content,
+    special_token_map: &BTreeMap<String, String>,
+) -> Result<String, MelodyError> {
+    match content_item.content_type {
         ContentType::Text => {
             if let Some(ref text) = content_item.text {
                 let mut obj: Map<String, Value> = Map::new();
@@ -346,44 +351,71 @@ fn tool_content_item_to_template(content_item: Content, special_token_map: &BTre
                 obj.insert("content".to_string(), Value::String(escaped_text));
                 return Ok(add_spaces_to_json_encoding(&to_string(&obj)?));
             }
-            Err(MelodyError::TemplateValidation((&"text content type must have text field").parse().unwrap()))
+            Err(MelodyError::TemplateValidation(
+                (&"text content type must have text field").parse().unwrap(),
+            ))
         }
         ContentType::Document => {
             if let Some(ref obj) = content_item.document {
                 let escaped_object = escape_document_special_tokens(obj, special_token_map);
                 return Ok(add_spaces_to_json_encoding(&to_string(&escaped_object)?));
             }
-            Err(MelodyError::TemplateValidation((&"document content type must have document field").parse().unwrap()))
+            Err(MelodyError::TemplateValidation(
+                (&"document content type must have document field")
+                    .parse()
+                    .unwrap(),
+            ))
         }
         ContentType::Image => {
             if let Some(ref obj) = content_item.image {
                 let img_obj = json!({"image_content": obj.template_placeholder.clone()});
                 return Ok(add_spaces_to_json_encoding(&to_string(&img_obj)?));
             }
-            Err(MelodyError::TemplateValidation((&"image content type must have image field").parse().unwrap()))
+            Err(MelodyError::TemplateValidation(
+                (&"image content type must have image field")
+                    .parse()
+                    .unwrap(),
+            ))
         }
         ContentType::Multipart => {
             if let Some(ref parts) = content_item.multipart {
                 let mut part_strings: Vec<String> = Vec::with_capacity(parts.len());
                 for part in parts {
                     if part.content_type == ContentType::Multipart {
-                        return Err(MelodyError::TemplateValidation((&"multipart content cannot be nested in other multipart content").parse().unwrap()));
+                        return Err(MelodyError::TemplateValidation(
+                            (&"multipart content cannot be nested in other multipart content")
+                                .parse()
+                                .unwrap(),
+                        ));
                     }
                     if part.content_type == ContentType::Document {
-                        return Err(MelodyError::TemplateValidation((&"document content cannot be nested in multipart content").parse().unwrap()));
+                        return Err(MelodyError::TemplateValidation(
+                            (&"document content cannot be nested in multipart content")
+                                .parse()
+                                .unwrap(),
+                        ));
                     }
-                    part_strings.push(tool_content_item_to_template(part.clone(), special_token_map)?);
+                    part_strings.push(tool_content_item_to_template(
+                        part.clone(),
+                        special_token_map,
+                    )?);
                 }
-                return Ok(format!("[{}]", part_strings.join(", ")))
+                return Ok(format!("[{}]", part_strings.join(", ")));
             }
-            Err(MelodyError::TemplateValidation((&"multipart content type must have multipart field").parse().unwrap()))
+            Err(MelodyError::TemplateValidation(
+                (&"multipart content type must have multipart field")
+                    .parse()
+                    .unwrap(),
+            ))
         }
-        ContentType::Thinking => {
-            Err(MelodyError::TemplateValidation((&"thinking content type cannot be used in tool messages").parse().unwrap()))
-        }
-        ContentType::Unknown => {
-            Err(MelodyError::TemplateValidation((&"invalid content type").parse().unwrap()))
-        }
+        ContentType::Thinking => Err(MelodyError::TemplateValidation(
+            (&"thinking content type cannot be used in tool messages")
+                .parse()
+                .unwrap(),
+        )),
+        ContentType::Unknown => Err(MelodyError::TemplateValidation(
+            (&"invalid content type").parse().unwrap(),
+        )),
     }
 }
 
@@ -440,7 +472,12 @@ pub(crate) fn messages_to_template(
                 });
 
             for content_item in msg.content.iter() {
-                m.tool_results[tool_result_idx].documents.push(tool_content_item_to_template(content_item.clone(), special_token_map)?)
+                m.tool_results[tool_result_idx]
+                    .documents
+                    .push(tool_content_item_to_template(
+                        content_item.clone(),
+                        special_token_map,
+                    )?)
             }
 
             continue;

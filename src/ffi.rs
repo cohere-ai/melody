@@ -1192,7 +1192,12 @@ unsafe fn convert_ccontent(content: &CContent) -> Content {
         None
     } else {
         let parts = unsafe { slice::from_raw_parts(content.multipart, content.multipart_len) };
-        Some(parts.iter().map(|c| unsafe { convert_ccontent(c) }).collect())
+        Some(
+            parts
+                .iter()
+                .map(|c| unsafe { convert_ccontent(c) })
+                .collect(),
+        )
     };
     Content {
         content_type: map_content_type(content.content_type),
