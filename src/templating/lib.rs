@@ -206,7 +206,7 @@ fn validate_no_multipart(messages: &[Message]) -> Option<MelodyError> {
     for msg in messages {
         for content in &msg.content {
                 if content.content_type == crate::templating::types::ContentType::Multipart {
-                    Some(MelodyError::TemplateValidation(
+                    return Some(MelodyError::TemplateValidation(
                         "multipart content type is not supported for command 3".to_string(),
                     ));
                 }
