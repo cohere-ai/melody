@@ -367,32 +367,32 @@ pub extern "C" fn free_tokenizer(ptr: *mut ::libc::c_void) {
 pub extern "C" fn free_buffer(buf: Buffer) {
     if !buf.ids.is_null() {
         unsafe {
-            Vec::from_raw_parts(buf.ids, buf.len, buf.len);
+            Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.ids, buf.len)).into_vec();
         }
     }
     if !buf.type_ids.is_null() {
         unsafe {
-            Vec::from_raw_parts(buf.type_ids, buf.len, buf.len);
+            Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.type_ids, buf.len)).into_vec();
         }
     }
     if !buf.special_tokens_mask.is_null() {
         unsafe {
-            Vec::from_raw_parts(buf.special_tokens_mask, buf.len, buf.len);
+            Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.special_tokens_mask, buf.len)).into_vec();
         }
     }
     if !buf.attention_mask.is_null() {
         unsafe {
-            Vec::from_raw_parts(buf.attention_mask, buf.len, buf.len);
+            Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.attention_mask, buf.len)).into_vec();
         }
     }
     if !buf.offsets.is_null() {
         unsafe {
-            Vec::from_raw_parts(buf.offsets, buf.len * 2, buf.len * 2);
+            Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.offsets, buf.len * 2)).into_vec();
         }
     }
     if !buf.tokens.is_null() {
         unsafe {
-            let strings = Vec::from_raw_parts(buf.tokens, buf.len, buf.len);
+            let strings = Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.tokens, buf.len)).into_vec();
             for s in strings {
                 drop(std::ffi::CString::from_raw(s.cast::<libc::c_char>()));
             }
