@@ -340,7 +340,7 @@ fn add_citation_insert_pair(
 }
 
 fn tool_content_item_to_template(
-    content_item: Content,
+    content_item: &Content,
     special_token_map: &BTreeMap<String, String>,
 ) -> Result<String, MelodyError> {
     match content_item.content_type {
@@ -352,7 +352,7 @@ fn tool_content_item_to_template(
                 return Ok(add_spaces_to_json_encoding(&to_string(&obj)?));
             }
             Err(MelodyError::TemplateValidation(
-                (&"text content type must have text field").parse().unwrap(),
+                "text content type must have text field".parse().unwrap(),
             ))
         }
         ContentType::Document => {
@@ -361,7 +361,7 @@ fn tool_content_item_to_template(
                 return Ok(add_spaces_to_json_encoding(&to_string(&escaped_object)?));
             }
             Err(MelodyError::TemplateValidation(
-                (&"document content type must have document field")
+                "document content type must have document field"
                     .parse()
                     .unwrap(),
             ))
@@ -372,9 +372,7 @@ fn tool_content_item_to_template(
                 return Ok(add_spaces_to_json_encoding(&to_string(&img_obj)?));
             }
             Err(MelodyError::TemplateValidation(
-                (&"image content type must have image field")
-                    .parse()
-                    .unwrap(),
+                "image content type must have image field".parse().unwrap(),
             ))
         }
         ContentType::Multipart => {
@@ -383,38 +381,35 @@ fn tool_content_item_to_template(
                 for part in parts {
                     if part.content_type == ContentType::Multipart {
                         return Err(MelodyError::TemplateValidation(
-                            (&"multipart content cannot be nested in other multipart content")
+                            "multipart content cannot be nested in other multipart content"
                                 .parse()
                                 .unwrap(),
                         ));
                     }
                     if part.content_type == ContentType::Document {
                         return Err(MelodyError::TemplateValidation(
-                            (&"document content cannot be nested in multipart content")
+                            "document content cannot be nested in multipart content"
                                 .parse()
                                 .unwrap(),
                         ));
                     }
-                    part_strings.push(tool_content_item_to_template(
-                        part.clone(),
-                        special_token_map,
-                    )?);
+                    part_strings.push(tool_content_item_to_template(part, special_token_map)?);
                 }
                 return Ok(format!("[{}]", part_strings.join(", ")));
             }
             Err(MelodyError::TemplateValidation(
-                (&"multipart content type must have multipart field")
+                "multipart content type must have multipart field"
                     .parse()
                     .unwrap(),
             ))
         }
         ContentType::Thinking => Err(MelodyError::TemplateValidation(
-            (&"thinking content type cannot be used in tool messages")
+            "thinking content type cannot be used in tool messages"
                 .parse()
                 .unwrap(),
         )),
         ContentType::Unknown => Err(MelodyError::TemplateValidation(
-            (&"invalid content type").parse().unwrap(),
+            "invalid content type".parse().unwrap(),
         )),
     }
 }
@@ -475,7 +470,7 @@ pub(crate) fn messages_to_template(
                 m.tool_results[tool_result_idx]
                     .documents
                     .push(tool_content_item_to_template(
-                        content_item.clone(),
+                        content_item,
                         special_token_map,
                     )?)
             }
