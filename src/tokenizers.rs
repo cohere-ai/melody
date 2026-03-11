@@ -377,12 +377,20 @@ pub extern "C" fn free_buffer(buf: Buffer) {
     }
     if !buf.special_tokens_mask.is_null() {
         unsafe {
-            Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.special_tokens_mask, buf.len)).into_vec();
+            Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                buf.special_tokens_mask,
+                buf.len,
+            ))
+            .into_vec();
         }
     }
     if !buf.attention_mask.is_null() {
         unsafe {
-            Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.attention_mask, buf.len)).into_vec();
+            Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                buf.attention_mask,
+                buf.len,
+            ))
+            .into_vec();
         }
     }
     if !buf.offsets.is_null() {
@@ -392,7 +400,8 @@ pub extern "C" fn free_buffer(buf: Buffer) {
     }
     if !buf.tokens.is_null() {
         unsafe {
-            let strings = Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.tokens, buf.len)).into_vec();
+            let strings =
+                Box::from_raw(std::ptr::slice_from_raw_parts_mut(buf.tokens, buf.len)).into_vec();
             for s in strings {
                 drop(std::ffi::CString::from_raw(s.cast::<libc::c_char>()));
             }
