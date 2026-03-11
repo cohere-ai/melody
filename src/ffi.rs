@@ -743,7 +743,8 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                         let params = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
                             tc.processed_params,
                             tc.processed_params_len,
-                        )).into_vec();
+                        ))
+                        .into_vec();
                         for p in params {
                             if !p.name.is_null() {
                                 let _ = CString::from_raw(p.name);
@@ -769,7 +770,8 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                         let sources = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
                             citation.sources,
                             citation.sources_len,
-                        )).into_vec();
+                        ))
+                        .into_vec();
                         for source in sources {
                             if !source.tool_result_indices.is_null()
                                 && source.tool_result_indices_len > 0
@@ -788,7 +790,8 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                 let sqs = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
                     r.search_queries,
                     r.search_queries_len,
-                )).into_vec();
+                ))
+                .into_vec();
                 for sq in sqs {
                     if !sq.text.is_null() {
                         let _ = CString::from_raw(sq.text);
