@@ -19,6 +19,7 @@ typedef enum {
     CContentType_Thinking = 2,
     CContentType_Image = 3,
     CContentType_Document = 4,
+    CContentType_Multipart = 5,
 } CContentType;
 
 typedef enum {
@@ -56,13 +57,17 @@ typedef struct {
     const char* template_placeholder;
 } CImage;
 
-typedef struct {
+typedef struct CContent CContent;
+
+struct CContent {
     CContentType content_type;
     const char* text;
     const char* thinking;
     const CImage* image;          // null if None
     const char* document_json;    // null if None; JSON Map<String, Value>
-} CContent;
+    const CContent* multipart;    // null if None; array of content items
+    size_t multipart_len;         // number of multipart items
+};
 
 typedef struct {
     const char* id;

@@ -832,6 +832,8 @@ pub enum CContentType {
     Image = 3,
     /// Document content.
     Document = 4,
+    /// Multipart content.
+    Multipart = 5,
 }
 
 /// C-compatible enum for citation quality.
@@ -923,6 +925,10 @@ pub struct CContent {
     pub image: *const CImage,
     /// Document as a JSON string (null if None)
     pub document_json: *const c_char,
+    /// Pointer to array of multipart content structs (null if None)
+    pub multipart: *const CContent,
+    /// Number of multipart content items
+    pub multipart_len: usize,
 }
 
 /// C-compatible struct for tool calls.
@@ -1074,6 +1080,7 @@ fn map_content_type(t: CContentType) -> ContentType {
         CContentType::Thinking => ContentType::Thinking,
         CContentType::Image => ContentType::Image,
         CContentType::Document => ContentType::Document,
+        CContentType::Multipart => ContentType::Multipart,
     }
 }
 
@@ -1181,12 +1188,19 @@ unsafe fn convert_ccontent(content: &CContent) -> Content {
             _ => None,
         }
     };
+    let multipart = if content.multipart.is_null() {
+        None
+    } else {
+        let parts = unsafe { slice::from_raw_parts(content.multipart, content.multipart_len) };
+        Some(parts.iter().map(|c| unsafe { convert_ccontent(c) }).collect())
+    };
     Content {
         content_type: map_content_type(content.content_type),
         text: unsafe { cstr_opt(content.text) },
         thinking: unsafe { cstr_opt(content.thinking) },
         image,
         document,
+        multipart,
     }
 }
 

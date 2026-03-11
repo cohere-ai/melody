@@ -202,6 +202,19 @@ impl FromStr for CMD4JinjaTemplates {
     }
 }
 
+fn validate_no_multipart(messages: &[Message]) -> Option<MelodyError> {
+    for msg in messages {
+        for content in &msg.content {
+                if content.content_type == crate::templating::types::ContentType::Multipart {
+                    Some(MelodyError::TemplateValidation(
+                        "multipart content type is not supported for command 3".to_string(),
+                    ));
+                }
+        }
+    }
+    None
+}
+
 /// Renders a CMD3 format prompt from the given options.
 ///
 /// # Errors
@@ -212,6 +225,9 @@ impl FromStr for CMD4JinjaTemplates {
 /// - Template rendering fails
 pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let mut template_tools = tools_to_template(&opts.available_tools)?;
+    if let Some(err) = validate_no_multipart(&opts.messages) {
+        return Err(err);
+    }
     let mut messages = messages_to_template(
         &opts.messages,
         !opts.documents.is_empty(),
@@ -398,10 +414,8 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::templating::Content;
-    use crate::templating::Role::User;
     use pretty_assertions::assert_eq;
-    use serde_json::{Value, from_str};
+    use serde_json::Value;
     use serde_path_to_error::deserialize;
     use std::fs;
     use std::path::Path;

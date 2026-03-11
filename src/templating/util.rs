@@ -1,9 +1,7 @@
 use crate::errors::MelodyError;
 use crate::parsing::types::FilterCitation;
 use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
-use crate::templating::{
-    CitationQuality, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options,
-};
+use crate::templating::{CitationQuality, Content, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options};
 use minijinja::Environment;
 use serde_json::{Map, Value, json, to_string};
 use std::collections::{BTreeMap, HashMap};
@@ -339,6 +337,53 @@ fn add_citation_insert_pair(
     citation_inserts.extend([insrt_start, insrt_end]);
 }
 
+fn tool_content_item_to_template(content_item: Content, special_token_map: &BTreeMap<String, String>) -> Result<String, MelodyError> {
+    match content_item.content_type{
+        ContentType::Text => {
+            if let Some(ref text) = content_item.text {
+                let mut obj: Map<String, Value> = Map::new();
+                let escaped_text = escape_special_tokens(text, special_token_map);
+                obj.insert("content".to_string(), Value::String(escaped_text));
+                return Ok(add_spaces_to_json_encoding(&to_string(&obj)?));
+            }
+            Err(MelodyError::TemplateValidation((&"text content type must have text field").parse().unwrap()))
+        }
+        ContentType::Document => {
+            if let Some(ref obj) = content_item.document {
+                let escaped_object = escape_document_special_tokens(obj, special_token_map);
+                return Ok(add_spaces_to_json_encoding(&to_string(&escaped_object)?));
+            }
+            Err(MelodyError::TemplateValidation((&"document content type must have document field").parse().unwrap()))
+        }
+        ContentType::Image => {
+            if let Some(ref obj) = content_item.image {
+                let img_obj = json!({"image_content": obj.template_placeholder.clone()});
+                return Ok(add_spaces_to_json_encoding(&to_string(&img_obj)?));
+            }
+            Err(MelodyError::TemplateValidation((&"image content type must have image field").parse().unwrap()))
+        }
+        ContentType::Multipart => {
+            if let Some(ref parts) = content_item.multipart {
+                let mut part_strings: Vec<String> = Vec::with_capacity(parts.len());
+                for part in parts {
+                    if part.content_type == ContentType::Multipart {
+                        return Err(MelodyError::TemplateValidation((&"multipart content type cannot be nested in other multipart content").parse().unwrap()));
+                    }
+                    part_strings.push(tool_content_item_to_template(part.clone(), special_token_map)?);
+                }
+                return Ok(format!("[{}]", part_strings.join(", ")))
+            }
+            Err(MelodyError::TemplateValidation((&"multipart content type must have multipart field").parse().unwrap()))
+        }
+        ContentType::Thinking => {
+            Err(MelodyError::TemplateValidation((&"thinking content type cannot be used in tool messages").parse().unwrap()))
+        }
+        ContentType::Unknown => {
+            Err(MelodyError::TemplateValidation((&"invalid content type").parse().unwrap()))
+        }
+    }
+}
+
 // Convert messages to template
 #[allow(clippy::too_many_lines)] //TODO: Refactor this function to reduce its length.
 pub(crate) fn messages_to_template(
@@ -391,33 +436,8 @@ pub(crate) fn messages_to_template(
                     m.tool_results.len() - 1
                 });
 
-            for (j, content_item) in msg.content.iter().enumerate() {
-                if content_item.content_type == ContentType::Text {
-                    if let Some(ref text) = content_item.text {
-                        let mut obj: Map<String, Value> = Map::new();
-                        let escaped_text = escape_special_tokens(text, special_token_map);
-                        obj.insert("content".to_string(), Value::String(escaped_text));
-                        let rendered_obj = add_spaces_to_json_encoding(&to_string(&obj)?);
-                        m.tool_results[tool_result_idx].documents.push(rendered_obj);
-                    }
-                } else if content_item.content_type == ContentType::Document {
-                    if let Some(ref obj) = content_item.document {
-                        let escaped_object = escape_document_special_tokens(obj, special_token_map);
-                        let rendered_obj =
-                            add_spaces_to_json_encoding(&to_string(&escaped_object)?);
-                        m.tool_results[tool_result_idx].documents.push(rendered_obj);
-                    }
-                } else if content_item.content_type == ContentType::Image {
-                    if let Some(ref obj) = content_item.image {
-                        let img_obj = json!({"image_content": obj.template_placeholder.clone()});
-                        let rendered_obj = add_spaces_to_json_encoding(&to_string(&img_obj)?);
-                        m.tool_results[tool_result_idx].documents.push(rendered_obj);
-                    }
-                } else {
-                    return Err(MelodyError::TemplateValidation(format!(
-                        "tool message[{i}].content[{j}] invalid content type"
-                    )));
-                }
+            for content_item in msg.content.iter() {
+                m.tool_results[tool_result_idx].documents.push(tool_content_item_to_template(content_item.clone(), special_token_map)?)
             }
 
             continue;
@@ -440,6 +460,14 @@ pub(crate) fn messages_to_template(
                     if msg.role != Role::Tool {
                         return Err(MelodyError::TemplateValidation(
                             "content type object is not supported for non-tool messages"
+                                .to_string(),
+                        ));
+                    }
+                }
+                ContentType::Multipart => {
+                    if msg.role != Role::Tool {
+                        return Err(MelodyError::TemplateValidation(
+                            "content type multipart is not supported for non-tool messages"
                                 .to_string(),
                         ));
                     }

@@ -359,11 +359,12 @@ const (
 type ContentType int32
 
 const (
-	ContentUnknown  ContentType = 0
-	ContentText     ContentType = 1
-	ContentThinking ContentType = 2
-	ContentImage    ContentType = 3
-	ContentDocument ContentType = 4
+	ContentUnknown   ContentType = 0
+	ContentText      ContentType = 1
+	ContentThinking  ContentType = 2
+	ContentImage     ContentType = 3
+	ContentDocument  ContentType = 4
+	ContentMultipart ContentType = 5
 )
 
 type CitationQuality int32
@@ -442,6 +443,8 @@ func (t *ContentType) UnmarshalJSON(data []byte) error {
 			*t = ContentImage
 		case "document":
 			*t = ContentDocument
+		case "multipart":
+			*t = ContentMultipart
 		default:
 			return errors.New("invalid ContentType: " + s)
 		}
@@ -561,11 +564,12 @@ type Image struct {
 }
 
 type Content struct {
-	Type     ContentType        `json:"type"`
-	Text     string             `json:"text,omitempty"`     // optional: empty means omitted
-	Thinking string             `json:"thinking,omitempty"` // optional: empty means omitted
-	Image    *Image             `json:"image,omitempty"`    // optional
-	Document orderedjson.Object `json:"document,omitempty"`
+	Type      ContentType        `json:"type"`
+	Text      string             `json:"text,omitempty"`     // optional: empty means omitted
+	Thinking  string             `json:"thinking,omitempty"` // optional: empty means omitted
+	Image     *Image             `json:"image,omitempty"`    // optional
+	Document  orderedjson.Object `json:"document,omitempty"`
+	Multipart []Content          `json:"multipart,omitempty"` // optional
 }
 
 type ToolCall struct {
@@ -715,6 +719,8 @@ func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
 		arr[i].thinking = nil
 		arr[i].image = nil
 		arr[i].document_json = nil
+		arr[i].multipart = nil
+		arr[i].multipart_len = 0
 
 		if c.Text != "" {
 			arr[i].text = a.CString(c.Text)
@@ -733,6 +739,12 @@ func buildCContents(a *cAllocator, contents []Content) (*C.CContent, C.size_t) {
 		// document_json (optional)
 		if c.Type == ContentDocument {
 			arr[i].document_json = jsonCString(a, c.Document)
+		}
+		// multipart (optional)
+		if c.Type == ContentMultipart {
+			multipartPtr, multipartLen := buildCContents(a, c.Multipart)
+			arr[i].multipart = multipartPtr
+			arr[i].multipart_len = multipartLen
 		}
 	}
 	return base, C.size_t(n)
