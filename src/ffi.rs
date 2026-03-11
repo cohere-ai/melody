@@ -740,11 +740,10 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                         let _ = CString::from_raw(tc.arguments);
                     }
                     if !tc.processed_params.is_null() && tc.processed_params_len > 0 {
-                        let params = Vec::from_raw_parts(
+                        let params = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
                             tc.processed_params,
                             tc.processed_params_len,
-                            tc.processed_params_len,
-                        );
+                        )).into_vec();
                         for p in params {
                             if !p.name.is_null() {
                                 let _ = CString::from_raw(p.name);
@@ -767,11 +766,10 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                         let _ = CString::from_raw(citation.text);
                     }
                     if !citation.sources.is_null() && citation.sources_len > 0 {
-                        let sources = Vec::from_raw_parts(
+                        let sources = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
                             citation.sources,
                             citation.sources_len,
-                            citation.sources_len,
-                        );
+                        )).into_vec();
                         for source in sources {
                             if !source.tool_result_indices.is_null()
                                 && source.tool_result_indices_len > 0
@@ -787,11 +785,10 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                 }
             }
             if !r.search_queries.is_null() && r.search_queries_len > 0 {
-                let sqs = Vec::from_raw_parts(
+                let sqs = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
                     r.search_queries,
                     r.search_queries_len,
-                    r.search_queries_len,
-                );
+                )).into_vec();
                 for sq in sqs {
                     if !sq.text.is_null() {
                         let _ = CString::from_raw(sq.text);
