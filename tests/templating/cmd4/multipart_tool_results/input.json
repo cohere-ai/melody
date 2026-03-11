@@ -46,8 +46,8 @@
               "image": {"template_placeholder": "<|IMG_PATCH|>"}
             },
             {
-              "type": "document",
-              "document": {"reminder":  "something reminder", "five":  5}
+              "type": "text",
+              "text": "this is more text"
             }
           ]
         }

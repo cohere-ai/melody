@@ -367,7 +367,10 @@ fn tool_content_item_to_template(content_item: Content, special_token_map: &BTre
                 let mut part_strings: Vec<String> = Vec::with_capacity(parts.len());
                 for part in parts {
                     if part.content_type == ContentType::Multipart {
-                        return Err(MelodyError::TemplateValidation((&"multipart content type cannot be nested in other multipart content").parse().unwrap()));
+                        return Err(MelodyError::TemplateValidation((&"multipart content cannot be nested in other multipart content").parse().unwrap()));
+                    }
+                    if part.content_type == ContentType::Document {
+                        return Err(MelodyError::TemplateValidation((&"document content cannot be nested in multipart content").parse().unwrap()));
                     }
                     part_strings.push(tool_content_item_to_template(part.clone(), special_token_map)?);
                 }

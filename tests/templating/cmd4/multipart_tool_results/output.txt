@@ -12,7 +12,7 @@
         "tool_call_id": "0",
         "results": {
             "0": {"reminder_id": "59-80bc", "task": "Buy groceries", "due_date": "2023-09-11 23:59:59", "status": "pending"},
-            "1": [{"content": "this is some text content in a multipart block"}, {"image_content": "<|IMG_PATCH|>"}, {"reminder": "something reminder", "five": 5}]
+            "1": [{"content": "this is some text content in a multipart block"}, {"image_content": "<|IMG_PATCH|>"}, {"content": "this is more text"}]
         },
         "is_error": null
     }
