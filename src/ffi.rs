@@ -724,7 +724,7 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                 let _ = CString::from_raw(r.reasoning);
             }
             if !r.tool_calls.is_null() && r.tool_calls_len > 0 {
-                let tcs = Vec::from_raw_parts(r.tool_calls, r.tool_calls_len, r.tool_calls_len);
+                let tcs = Box::from_raw(std::ptr::slice_from_raw_parts_mut(r.tool_calls, r.tool_calls_len)).into_vec();
                 for tc in tcs {
                     if !tc.id.is_null() {
                         let _ = CString::from_raw(tc.id);
@@ -753,7 +753,7 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                 }
             }
             if !r.citations.is_null() && r.citations_len > 0 {
-                let citations = Vec::from_raw_parts(r.citations, r.citations_len, r.citations_len);
+                let citations = Box::from_raw(std::ptr::slice_from_raw_parts_mut(r.citations, r.citations_len)).into_vec();
                 for citation in citations {
                     if !citation.text.is_null() {
                         let _ = CString::from_raw(citation.text);
@@ -768,11 +768,10 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                             if !source.tool_result_indices.is_null()
                                 && source.tool_result_indices_len > 0
                             {
-                                let _ = Vec::from_raw_parts(
+                                let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
                                     source.tool_result_indices,
                                     source.tool_result_indices_len,
-                                    source.tool_result_indices_len,
-                                );
+                                )).into_vec();
                             }
                         }
                     }

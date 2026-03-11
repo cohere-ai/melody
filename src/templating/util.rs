@@ -466,13 +466,13 @@ pub(crate) fn messages_to_template(
                     m.tool_results.len() - 1
                 });
 
-            for content_item in msg.content.iter() {
+            for content_item in &msg.content {
                 m.tool_results[tool_result_idx]
                     .documents
                     .push(tool_content_item_to_template(
                         content_item,
                         special_token_map,
-                    )?)
+                    )?);
             }
 
             continue;
