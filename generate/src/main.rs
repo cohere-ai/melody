@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -7,12 +7,18 @@ use std::fs;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Input file name
+    /// Liquid input file name
     #[arg(long, default_value = "generate/liquid_prompt_config.yaml")]
     liquid_in_file: String,
-    /// Template templates directory
+    /// Template templates directory for liquid
     #[arg(long, default_value = "generate/template_templates/liquid")]
     liquid_template_templates_dir: String,
+    /// Jinja input file name
+    #[arg(long, default_value = "generate/jinja_prompt_config.yaml")]
+    jinja_in_file: String,
+    /// Template templates directory for jinja
+    #[arg(long, default_value = "generate/template_templates/jinja")]
+    jinja_template_templates_dir: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -23,19 +29,42 @@ enum TemplateConfig {
         #[serde(default)]
         path: Option<String>,
         #[serde(default)]
+        render_without_quotes: Option<bool>,
+        #[serde(default)]
         variables: HashMap<String, TemplateConfig>,
     },
 }
 
 impl TemplateConfig {
-    fn get_template_string(&self, base_dir: &String) -> Result<String> {
+    fn is_render_without_quotes(&self) -> bool {
+        match self {
+            TemplateConfig::RawTemplate(_) => false,
+            TemplateConfig::Config {
+                render_without_quotes, ..
+            } => {
+                if let Some(render) = render_without_quotes {
+                    return *render;
+                }
+                false
+            }
+        }
+    }
+    fn get_template_string(&self, base_dir: &String, is_jinja: bool) -> Result<String> {
         match self {
             TemplateConfig::RawTemplate(s) => Ok(s.clone()),
             TemplateConfig::Config {
                 path,
                 variables,
+                render_without_quotes,
             } => {
-                let path_str = path.as_ref().ok_or_else(|| anyhow::anyhow!("Template path is required but not provided"))?;
+                if render_without_quotes.is_some() && !is_jinja {
+                        return Err(anyhow!(
+                            "render_without_quotes is only supported for jinja templates"
+                        ));
+                }
+                let path_str = path
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("Template path is required but not provided"))?;
                 let full_path = format!("{}/{}", base_dir, path_str);
                 let content = fs::read_to_string(&full_path)
                     .with_context(|| format!("Failed to read file: {:?}", full_path))?;
@@ -47,12 +76,22 @@ impl TemplateConfig {
                     keys.sort(); // Sort for consistent output
 
                     for key in keys {
-                        let var_content = variables[key].get_template_string(base_dir)?;
+                        let var_content = variables[key].get_template_string(base_dir, is_jinja)?;
                         let var_content_trimmed = var_content.trim_end_matches('\n');
-                        variable_strings.push(format!(
-                            "{{% capture {} %}}{}{{% endcapture %}}",
-                            key, var_content_trimmed
-                        ));
+                        if is_jinja && self.is_render_without_quotes() {
+                            variable_strings
+                                .push(format!("{{%- set {} = {} -%}}\n", key, var_content_trimmed))
+                        } else if is_jinja {
+                            variable_strings.push(format!(
+                                "{{%- set {} = \"{}\" -%}}\n",
+                                key, var_content_trimmed
+                            ))
+                        } else {
+                            variable_strings.push(format!(
+                                "{{% capture {} %}}{}{{% endcapture %}}",
+                                key, var_content_trimmed
+                            ));
+                        }
                     }
 
                     let variables_string = variable_strings.join("");
@@ -65,7 +104,7 @@ impl TemplateConfig {
     }
 }
 
-fn parse_and_render(args: &Args) -> Result<()> {
+fn parse_and_render_liquid(args: &Args) -> Result<()> {
     let liquid_in_file = &args.liquid_in_file;
     let liquid_template_templates_dir = &args.liquid_template_templates_dir;
 
@@ -77,24 +116,63 @@ fn parse_and_render(args: &Args) -> Result<()> {
         .with_context(|| format!("Failed to parse YAML from: {:?}", liquid_in_file))?;
 
     for (key, template_config) in &config {
-        let template_string = template_config.get_template_string(liquid_template_templates_dir)
-            .with_context(|| format!("Failed to process template for key: {}", key))?;
+        let template_string = template_config
+            .get_template_string(liquid_template_templates_dir, false)
+            .with_context(|| format!("Failed to process liquid template for key: {}", key))?;
         let out_file_path = format!("gen/templates/liquid/{}.tmpl", key);
 
         fs::write(&out_file_path, template_string)
             .with_context(|| format!("Failed to write output file: {:?}", out_file_path))?;
     }
 
-    println!("Successfully generated {} liquid templates from {}", config.len(), args.liquid_in_file);
+    println!(
+        "Successfully generated {} liquid templates from {}",
+        config.len(),
+        args.liquid_in_file
+    );
+    Ok(())
+}
+
+fn parse_and_render_jinja(args: &Args) -> Result<()> {
+    let jinja_in_file = &args.jinja_in_file;
+    let jinja_template_templates_dir = &args.jinja_template_templates_dir;
+
+    let input_content = fs::read_to_string(&jinja_in_file)
+        .with_context(|| format!("Failed to read input file: {:?}", jinja_in_file))?;
+
+    let config: HashMap<String, TemplateConfig> = serde_yaml::from_str(&input_content)
+        .with_context(|| format!("Failed to parse YAML from: {:?}", jinja_in_file))?;
+
+    for (key, template_config) in &config {
+        let template_string = template_config
+            .get_template_string(jinja_template_templates_dir, true)
+            .with_context(|| format!("Failed to process jinja template for key: {}", key))?;
+
+        let out_file_path = format!("gen/templates/jinja/{}.jinja", key);
+
+        fs::write(&out_file_path, template_string)
+            .with_context(|| format!("Failed to write output file: {:?}", out_file_path))?;
+    }
+
+    println!(
+        "Successfully generated {} jinja templates from {}",
+        config.len(),
+        args.jinja_in_file
+    );
+
     Ok(())
 }
 
 fn main() {
     let args = Args::parse();
 
-    if let Err(e) = parse_and_render(&args) {
+    if let Err(e) = parse_and_render_liquid(&args) {
+        eprintln!("Error: {:?}", e);
+        std::process::exit(1);
+    }
+
+    if let Err(e) = parse_and_render_jinja(&args) {
         eprintln!("Error: {:?}", e);
         std::process::exit(1);
     }
 }
-

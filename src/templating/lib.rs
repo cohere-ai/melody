@@ -52,14 +52,14 @@ pub struct RenderCmd3Options<'a> {
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 // for now always set the template to cmd3v1.
-static CMD3V1_TEMPLATE: &str = include_str!("templates/cmd3-v1.tmpl");
+static CMD3V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd3-v1.tmpl");
 static CMD3_JINJA_TEMPLATE_BASE: &str =
-    include_str!("templates/jinja/cmd3/chat_merged_template.jinja");
+    include_str!("../../generate/template_templates/jinja/cmd3/chat_merged_template.jinja");
 static CMD3V1_JINJA_TEMPLATE: &str =
-    include_str!("templates/jinja/cmd3/chat_merged_template_v1.jinja");
+    include_str!("../../generate/template_templates/jinja/cmd3/chat_merged_template_v1.jinja");
 static CMD3V2_JINJA_TEMPLATE: &str = CMD3_JINJA_TEMPLATE_BASE;
 static CMD3V3_JINJA_TEMPLATE: &str =
-    include_str!("templates/jinja/cmd3/chat_merged_template_default_thinking.jinja");
+    include_str!("../../generate/template_templates/jinja/cmd3/chat_merged_template_default_thinking.jinja");
 
 impl Default for RenderCmd3Options<'_> {
     fn default() -> Self {
@@ -122,8 +122,8 @@ pub struct RenderCmd4Options<'a> {
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
 
-static CMD4V1_TEMPLATE: &str = include_str!("templates/cmd4-v1.tmpl");
-static CMD4V1_JINJA_TEMPLATE: &str = include_str!("templates/jinja/cmd4/chat_template.jinja");
+static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.tmpl");
+static CMD4V1_JINJA_TEMPLATE: &str = include_str!("../../generate/template_templates/jinja/cmd4/chat_template.jinja");
 impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
