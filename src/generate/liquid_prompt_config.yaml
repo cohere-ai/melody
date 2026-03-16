@@ -1,0 +1,68 @@
+# paths are relative to src/generate/template_templates/liquid
+cmd3-v1:
+  path: cmd3-v1.tmpl
+  variables:
+    rag_augmented_generation_tool:
+      path: vars/cmd3/rag_augmented_generation_tool.tmpl
+    contextual_safety_preamble:
+      path: vars/cmd3/contextual_safety_preamble.tmpl
+    strict_safety_preamble:
+      path: vars/cmd3/strict_safety_preamble.tmpl
+    rag_preamble_citation_mode_fast:
+      path: vars/cmd3/rag_preamble_citation_mode_fast.tmpl
+    rag_preamble_citation_mode_none:
+      path: vars/cmd3/rag_preamble_citation_mode_none.tmpl
+    rag_preamble_skip_thinking_citation_mode_fast:
+      path: vars/cmd3/rag_preamble_skip_thinking_citation_mode_fast.tmpl
+    rag_preamble_skip_thinking_citation_mode_none:
+      path: vars/cmd3/rag_preamble_skip_thinking_citation_mode_none.tmpl
+    reasoning_preamble:
+      path: vars/cmd3/reasoning_preamble.tmpl
+
+cmd3-v2:
+  path: cmd3-v2.tmpl
+  variables:
+    rag_augmented_generation_tool:
+      path: vars/cmd3/rag_augmented_generation_tool.tmpl
+    contextual_safety_preamble:
+      path: vars/cmd3/contextual_safety_preamble.tmpl
+    strict_safety_preamble:
+      path: vars/cmd3/strict_safety_preamble.tmpl
+    rag_preamble_citation_mode_fast:
+      path: vars/cmd3/rag_preamble_citation_mode_fast.tmpl
+    rag_preamble_citation_mode_none:
+      path: vars/cmd3/rag_preamble_citation_mode_none.tmpl
+    rag_preamble_skip_thinking_citation_mode_fast:
+      path: vars/cmd3/rag_preamble_skip_thinking_citation_mode_fast.tmpl
+    rag_preamble_skip_thinking_citation_mode_none:
+      path: vars/cmd3/rag_preamble_skip_thinking_citation_mode_none.tmpl
+    reasoning_preamble:
+      path: vars/cmd3/reasoning_preamble.tmpl
+
+cmd3-v3:
+  path: cmd3-v3.tmpl
+  variables:
+    rag_augmented_generation_tool:
+      path: vars/cmd3/rag_augmented_generation_tool.tmpl
+    contextual_safety_preamble:
+      path: vars/cmd3/contextual_safety_preamble.tmpl
+    strict_safety_preamble:
+      path: vars/cmd3/strict_safety_preamble.tmpl
+    rag_preamble_citation_mode_fast:
+      path: vars/cmd3/rag_preamble_citation_mode_fast.tmpl
+    rag_preamble_citation_mode_none:
+      path: vars/cmd3/rag_preamble_citation_mode_none.tmpl
+    rag_preamble_skip_thinking_citation_mode_fast:
+      path: vars/cmd3/rag_preamble_skip_thinking_citation_mode_fast.tmpl
+    rag_preamble_skip_thinking_citation_mode_none:
+      path: vars/cmd3/rag_preamble_skip_thinking_citation_mode_none.tmpl
+    reasoning_preamble:
+      path: vars/cmd3/reasoning_preamble.tmpl
+
+cmd4-v1:
+  path: cmd4-v1.tmpl
+  variables:
+    grounding_preamble:
+      path: vars/cmd4/grounding_preamble.tmpl
+    document_injector_tool:
+      path: vars/cmd4/document_injector_tool.tmpl

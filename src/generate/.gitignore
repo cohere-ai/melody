@@ -1,0 +1,17 @@
+# Rust
+/target/
+Cargo.lock
+
+# Example output
+example/example_output.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+

@@ -35,3 +35,6 @@ tkzrs = ["tokenizers", "libc"]
 
 [lints.clippy]
 pedantic = "warn"
+
+[workspace]
+members = ["src/generate"]
