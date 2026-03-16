@@ -1,4 +1,4 @@
-# paths are relative to src/generate/template_templates/liquid
+# paths are relative to src/template_generation/templates/liquid
 cmd3-v1:
   path: cmd3/cmd3-v1.tmpl
   variables:

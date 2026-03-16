@@ -37,4 +37,4 @@ tkzrs = ["tokenizers", "libc"]
 pedantic = "warn"
 
 [workspace]
-members = ["generate"]
+members = ["template_generation"]

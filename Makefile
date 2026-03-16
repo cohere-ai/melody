@@ -65,16 +65,16 @@ rust-build-with-tokenizers:
 #--------------------
 
 generate-build:
-	cargo build --release -p generate
+	cargo build --release -p template_generation
 
-target/release/generate:
+target/release/template_generation:
 	$(MAKE) generate-build
 
-generate-run: target/release/generate
-	./target/release/generate $(ARGS)
+generate-run: target/release/template_generation
+	./target/release/template_generation $(ARGS)
 
 generate-dev:
-	cargo run -p generate -- $(ARGS)
+	cargo run -p template_generation -- $(ARGS)
 
 #--------------------
 # PYTHON THINGS

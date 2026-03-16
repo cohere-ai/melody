@@ -1,4 +1,4 @@
-# paths are relative to src/generate/template_templates/jinja
+# paths are relative to src/template_generation/templates/jinja
 cmd3-v1:
   path: cmd3/chat_merged_template_v1.jinja
   includes:

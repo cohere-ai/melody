@@ -8,17 +8,17 @@ use std::fs;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Liquid input file name
-    #[arg(long, default_value = "generate/liquid_prompt_config.yaml")]
+    #[arg(long, default_value = "template_generation/liquid_prompt_config.yaml")]
     liquid_in_file: String,
     /// Template templates directory for liquid
-    #[arg(long, default_value = "generate/template_templates/liquid")]
-    liquid_template_templates_dir: String,
+    #[arg(long, default_value = "template_generation/templates/liquid")]
+    liquid_templates_dir: String,
     /// Jinja input file name
-    #[arg(long, default_value = "generate/jinja_prompt_config.yaml")]
+    #[arg(long, default_value = "template_generation/jinja_prompt_config.yaml")]
     jinja_in_file: String,
     /// Template templates directory for jinja
-    #[arg(long, default_value = "generate/template_templates/jinja")]
-    jinja_template_templates_dir: String,
+    #[arg(long, default_value = "template_generation/templates/jinja")]
+    jinja_templates_dir: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,7 +72,7 @@ impl LiquidTemplateConfig {
 
 fn parse_and_render_liquid(args: &Args) -> Result<()> {
     let liquid_in_file = &args.liquid_in_file;
-    let liquid_template_templates_dir = &args.liquid_template_templates_dir;
+    let liquid_templates_dir = &args.liquid_templates_dir;
 
     // Read the input config file
     let input_content = fs::read_to_string(&liquid_in_file)
@@ -83,7 +83,7 @@ fn parse_and_render_liquid(args: &Args) -> Result<()> {
 
     for (key, template_config) in &config {
         let template_string = template_config
-            .get_template_string(liquid_template_templates_dir)
+            .get_template_string(liquid_templates_dir)
             .with_context(|| format!("Failed to process liquid template for key: {}", key))?;
         let out_file_path = format!("gen/templates/liquid/{}.tmpl", key);
 
@@ -160,7 +160,7 @@ impl JinjaTemplateConfig {
 
 fn parse_and_render_jinja(args: &Args) -> Result<()> {
     let jinja_in_file = &args.jinja_in_file;
-    let jinja_template_templates_dir = &args.jinja_template_templates_dir;
+    let jinja_templates_dir = &args.jinja_templates_dir;
 
     let input_content = fs::read_to_string(&jinja_in_file)
         .with_context(|| format!("Failed to read input file: {:?}", jinja_in_file))?;
@@ -170,7 +170,7 @@ fn parse_and_render_jinja(args: &Args) -> Result<()> {
 
     for (key, template_config) in &config {
         let template_string = template_config
-            .get_template_string(jinja_template_templates_dir)
+            .get_template_string(jinja_templates_dir)
             .with_context(|| format!("Failed to process jinja template for key: {}", key))?;
 
         let out_file_path = format!("gen/templates/jinja/{}.jinja", key);

@@ -1,5 +1,5 @@
 [package]
-name = "generate"
+name = "template_generation"
 version = "0.1.0"
 edition = "2021"
 
