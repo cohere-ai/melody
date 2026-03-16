@@ -8,10 +8,10 @@ use std::fs;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Input file name
-    #[arg(long, default_value = "src/generate/liquid_prompt_config.yaml")]
+    #[arg(long, default_value = "generate/liquid_prompt_config.yaml")]
     liquid_in_file: String,
     /// Template templates directory
-    #[arg(long, default_value = "src/generate/template_templates/liquid")]
+    #[arg(long, default_value = "generate/template_templates/liquid")]
     liquid_template_templates_dir: String,
 }
 

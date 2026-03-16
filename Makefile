@@ -74,7 +74,7 @@ generate-run: target/release/generate
 	./target/release/generate $(ARGS)
 
 generate-dev:
-    cargo run -p generate -- $(ARGS)
+	cargo run -p generate -- $(ARGS)
 
 #--------------------
 # PYTHON THINGS
