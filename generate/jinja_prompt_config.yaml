@@ -1,21 +1,18 @@
 # paths are relative to src/generate/template_templates/jinja
 cmd3-v1:
-  path: cmd3/chat_merged_template.jinja
-  render_without_quotes: true
-  variables:
-    template_v1: "true"
-    reasoning: "false"
-    reasoning_v1: "true if reasoning else false"
-    skip_thinking: "skip_thinking if skip_thinking is not undefined else false"
+  path: cmd3/chat_merged_template_v1.jinja
+  includes:
+    chat_merged_template.jinja:
+      path: cmd3/chat_merged_template.jinja
 
 cmd3-v2:
   path: cmd3/chat_merged_template.jinja
 
 cmd3-v3:
-  path: cmd3/chat_merged_template.jinja
-  variables:
-    thinking_default_val:
-      path: cmd3/vars/default_thinking_v3.jinja
+  path: cmd3/chat_merged_template_default_thinking.jinja
+  includes:
+    chat_merged_template.jinja:
+      path: cmd3/chat_merged_template.jinja
 
 cmd4-v1:
   path: cmd4/chat_template.jinja
