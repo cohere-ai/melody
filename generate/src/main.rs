@@ -126,19 +126,28 @@ impl JinjaTemplateConfig {
                 // Process variables
                 if !includes.is_empty() {
                     for (key, include_config) in includes {
-                        let include_content = include_config.get_template_string(base_dir)?.trim_end_matches('\n').to_string();
+                        let include_content = include_config
+                            .get_template_string(base_dir)?
+                            .trim_end_matches('\n')
+                            .to_string();
                         // regex replace includes like `{% include "chat_merged_template.jinja" %}` with the include_content
                         let include_statement = format!(r#"\{{%\s*include\s*"{}"\s*%\}}"#, key);
-                        let re = regex::Regex::new(&include_statement)
-                            .with_context(|| format!("Failed to create regex for include: {}", key))?;
-                        content = re.replace_all(&content, include_content.as_str()).to_string();
+                        let re = regex::Regex::new(&include_statement).with_context(|| {
+                            format!("Failed to create regex for include: {}", key)
+                        })?;
+                        content = re
+                            .replace_all(&content, include_content.as_str())
+                            .to_string();
 
                         // Also support `{%-` which trims whitespace
-                        let include_statement_trim = format!(r#"\s*\{{%-\s*include\s*"{}"\s*%\}}\s*"#, key);
-                        let re = regex::Regex::new(&include_statement_trim)
-                            .with_context(|| format!("Failed to create regex for include: {}", key))?;
-                        content = re.replace_all(&content, include_content.as_str()).to_string();
-
+                        let include_statement_trim =
+                            format!(r#"\s*\{{%-\s*include\s*"{}"\s*%\}}\s*"#, key);
+                        let re = regex::Regex::new(&include_statement_trim).with_context(|| {
+                            format!("Failed to create regex for include: {}", key)
+                        })?;
+                        content = re
+                            .replace_all(&content, include_content.as_str())
+                            .to_string();
                     }
                     Ok(content)
                 } else {
