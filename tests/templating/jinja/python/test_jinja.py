@@ -23,7 +23,7 @@ def render_template_jinja2(template_dir: str, template_name: str, **kwargs: Any)
         trim_blocks=True,
         extensions=["jinja2.ext.loopcontrols"],
     )
-    if "chat_merged_template_v1" in template_name:
+    if "cmd3-v1" in template_name:
         kwargs["add_generation_prompt"] = True
     # Overriding tojson with ensure_ascii=False so that tojson doesn't write unicode
     # characters as \uxxxx
@@ -59,7 +59,7 @@ def render_template_minijinja(
         lstrip_blocks=True,
         trim_blocks=True,
     )
-    if "chat_merged_template_v1" in template_name:
+    if "cmd3-v1" in template_name:
         kwargs["add_generation_prompt"] = True
 
     return env.render_template(template_name, **kwargs)
@@ -92,29 +92,27 @@ def get_template_info(template_path: str) -> tuple[str, str, str]:
     template_name = basename(template_path)
     template_name_no_ext = template_name.replace(".jinja", "")
 
-    if template_name_no_ext == "chat_merged_template_v1":
+    if template_name_no_ext == "cmd3-v1":
         template_dir_name = "cmd3_v1_hf"
-    elif template_name_no_ext == "chat_merged_template":
+    elif template_name_no_ext == "cmd3-v2":
         template_dir_name = "cmd3_reasoning_hf"
-    elif template_name_no_ext == "chat_template":
+    elif template_name_no_ext == "cmd4-v1":
         template_dir_name = "cmd4_v1"
 
-    test_dir = f"jinja_tests/{template_dir_name}/{template_name_no_ext}"
-
-    return template_dir, test_dir, template_name
+    return template_dir, template_name
 
 
 @pytest.mark.parametrize(
-    "template_path",
+    "template_path, test_dir",
     [
-        "templates/jinja/cmd3/chat_merged_template_v1.jinja",
-        "templates/jinja/cmd3/chat_merged_template.jinja",
-        "templates/jinja/cmd4/chat_template.jinja",
+        ("templates/jinja/cmd3-v1.jinja", "jinja_tests/cmd3_v1_hf/chat_merged_template_v1"),
+        ("templates/jinja/cmd3-v2.jinja", "jinja_tests/cmd3_reasoning_hf/chat_merged_template"),
+        ("templates/jinja/cmd4-v1.jinja", "jinja_tests/cmd4_v1/chat_template"),
     ],
 )
 @pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
-def test_render_template(template_path: str, engine: Engine) -> None:
-    template_dir, test_dir, template_name = get_template_info(template_path)
+def test_render_template(template_path: str, test_dir: str, engine: Engine) -> None:
+    template_dir, template_name = get_template_info(template_path)
 
     # get all .json files from the test_dir
     test_files = [
