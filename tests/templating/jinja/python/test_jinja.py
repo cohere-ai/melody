@@ -83,21 +83,12 @@ def read_test_data(file_path: str) -> Any:
         return json.load(file)
 
 
-def get_template_info(template_path: str) -> tuple[str, str, str]:
+def get_template_info(template_path: str) -> tuple[str, str]:
     # Get template directory, and the directory's name
     template_dir = dirname(template_path)
-    template_dir_name = basename(template_dir)
 
     # Get template name
     template_name = basename(template_path)
-    template_name_no_ext = template_name.replace(".jinja", "")
-
-    if template_name_no_ext == "cmd3-v1":
-        template_dir_name = "cmd3_v1_hf"
-    elif template_name_no_ext == "cmd3-v2":
-        template_dir_name = "cmd3_reasoning_hf"
-    elif template_name_no_ext == "cmd4-v1":
-        template_dir_name = "cmd4_v1"
 
     return template_dir, template_name
 
