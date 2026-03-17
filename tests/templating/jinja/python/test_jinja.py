@@ -105,8 +105,14 @@ def get_template_info(template_path: str) -> tuple[str, str, str]:
 @pytest.mark.parametrize(
     "template_path, test_dir",
     [
-        ("templates/jinja/cmd3-v1.jinja", "jinja_tests/cmd3_v1_hf/chat_merged_template_v1"),
-        ("templates/jinja/cmd3-v2.jinja", "jinja_tests/cmd3_reasoning_hf/chat_merged_template"),
+        (
+            "templates/jinja/cmd3-v1.jinja",
+            "jinja_tests/cmd3_v1_hf/chat_merged_template_v1",
+        ),
+        (
+            "templates/jinja/cmd3-v2.jinja",
+            "jinja_tests/cmd3_reasoning_hf/chat_merged_template",
+        ),
         ("templates/jinja/cmd4-v1.jinja", "jinja_tests/cmd4_v1/chat_template"),
     ],
 )
