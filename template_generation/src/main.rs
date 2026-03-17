@@ -136,7 +136,7 @@ impl JinjaTemplateConfig {
                             format!("Failed to create regex for include: {}", key)
                         })?;
                         content = re
-                            .replace_all(&content, include_content.as_str())
+                            .replace_all(&content, regex::NoExpand(include_content.as_str()))
                             .to_string();
 
                         // Also support `{%-` which trims whitespace
@@ -146,7 +146,7 @@ impl JinjaTemplateConfig {
                             format!("Failed to create regex for include: {}", key)
                         })?;
                         content = re
-                            .replace_all(&content, include_content.as_str())
+                            .replace_all(&content, regex::NoExpand(include_content.as_str()))
                             .to_string();
                     }
                     Ok(content)
