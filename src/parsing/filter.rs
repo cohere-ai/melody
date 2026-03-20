@@ -22,6 +22,59 @@ fn push_text(target: &mut Option<String>, text: &mut String) {
 
 #[must_use]
 pub(crate) fn aggregate(outputs: Vec<FilterOutput>) -> FilterAggregatedResult {
+    match outputs.len() {
+        0 => FilterAggregatedResult::default(),
+        1 => aggregate_single(outputs),
+        _ => aggregate_general(outputs),
+    }
+}
+
+fn aggregate_single(mut outputs: Vec<FilterOutput>) -> FilterAggregatedResult {
+    let o = outputs.pop().unwrap();
+
+    let (content, reasoning) = if o.text.is_empty() {
+        (None, None)
+    } else if o.is_reasoning {
+        (None, Some(o.text))
+    } else {
+        (Some(o.text), None)
+    };
+
+    let tool_calls = if let Some(tc) = o.tool_call_delta {
+        let mut call = AccumulatedToolCall {
+            index: tc.index,
+            id: tc.id,
+            name: tc.name,
+            arguments: tc.raw_param_delta,
+            ..Default::default()
+        };
+        if let Some(pd) = tc.param_delta {
+            call.processed_params.push(pd);
+        }
+        vec![call]
+    } else {
+        Vec::new()
+    };
+
+    let search_queries = if let Some(sq) = o.search_query {
+        vec![SearchQueryDelta {
+            index: sq.index,
+            text: sq.text,
+        }]
+    } else {
+        Vec::new()
+    };
+
+    FilterAggregatedResult {
+        content,
+        reasoning,
+        tool_calls,
+        citations: o.citations,
+        search_queries,
+    }
+}
+
+fn aggregate_general(outputs: Vec<FilterOutput>) -> FilterAggregatedResult {
     let mut content: Option<String> = None;
     let mut reasoning: Option<String> = None;
     let mut tool_call_map: HashMap<usize, AccumulatedToolCall> = HashMap::new();
@@ -492,6 +545,53 @@ impl FilterImpl {
         for token_str in token_strings {
             all_outputs.extend(self.write_text(token_str.as_bytes()));
         }
+        self.done = true;
+        if !self.buf.is_empty()
+            && self.mode != FilterMode::InclusiveStop
+            && self.mode != FilterMode::ExclusiveStop
+        {
+            let buf_copy = std::mem::take(&mut self.buf);
+            let (o, _) = self.handle_token(self.mode, &buf_copy, true);
+            all_outputs.extend(o);
+        }
+        aggregate(all_outputs)
+    }
+
+    /// Process a complete model output string in one call.
+    ///
+    /// Unlike `process_full` which requires pre-tokenized chunks, this method
+    /// takes the raw text and internally splits at special token boundaries,
+    /// reducing the number of processing passes from `O(n_tokens)` to
+    /// `O(n_special_tokens)`.
+    pub fn process_full_text(&mut self, text: &str) -> FilterAggregatedResult {
+        let tokens: Vec<String> = self.special_token_map.keys().cloned().collect();
+        let mut all_outputs = Vec::new();
+        let mut pos = 0;
+
+        while pos < text.len() && !self.done {
+            let remaining = &text[pos..];
+
+            let mut best_idx = usize::MAX;
+            let mut best_len = 0;
+            for token in &tokens {
+                if let Some(idx) = remaining.find(token.as_str())
+                    && (idx < best_idx || (idx == best_idx && token.len() > best_len))
+                {
+                    best_idx = idx;
+                    best_len = token.len();
+                }
+            }
+
+            if best_idx == usize::MAX {
+                all_outputs.extend(self.write_text(remaining.as_bytes()));
+                pos = text.len();
+            } else {
+                let end = best_idx + best_len;
+                all_outputs.extend(self.write_text(&remaining.as_bytes()[..end]));
+                pos += end;
+            }
+        }
+
         self.done = true;
         if !self.buf.is_empty()
             && self.mode != FilterMode::InclusiveStop

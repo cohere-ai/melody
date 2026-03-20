@@ -256,6 +256,13 @@ impl PyFilter {
         self.inner.process_full(&token_strings)
     }
 
+    /// Process a complete model output string in one call.
+    ///
+    /// The text is split at special token boundaries internally in Rust.
+    fn process_full_text(&mut self, text: &str) -> FilterAggregatedResult {
+        self.inner.process_full_text(text)
+    }
+
     fn __repr__(&self) -> String {
         format!("PyFilter(\"{}\")", self.config)
     }
