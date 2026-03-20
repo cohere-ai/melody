@@ -667,6 +667,7 @@ pub(crate) fn find_partial<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parsing::options::{new_filter, FilterOptions};
     use crate::parsing::types::{FilterCitation, FilterToolCallDelta, FilterToolParameter};
 
     #[test]
@@ -1008,5 +1009,349 @@ mod tests {
         assert_eq!(result.reasoning, Some("thinking".into()));
         assert_eq!(result.content, Some("answer".into()));
         assert!(result.tool_calls.is_empty());
+    }
+
+    fn make_cmd3_filter() -> FilterImpl {
+        new_filter(FilterOptions::default().cmd3())
+    }
+
+    fn make_cmd4_filter() -> FilterImpl {
+        new_filter(FilterOptions::default().cmd4())
+    }
+
+    fn make_cmd4_no_tools_filter() -> FilterImpl {
+        new_filter(FilterOptions::default().cmd4().no_tools())
+    }
+
+    #[test]
+    fn test_process_full_text_cmd3_thinking_and_response() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_THINKING|>Let me think about this.\
+                     <|END_THINKING|>\
+                     <|START_RESPONSE|>Here is the answer.\
+                     <|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Let me think about this.".into()));
+        assert_eq!(result.content, Some("Here is the answer.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_cmd4_thinking_and_response() {
+        let mut f = make_cmd4_filter();
+        let text = "<|START_THINKING|>Step 1: analyze.\
+                     <|END_THINKING|>\
+                     <|START_TEXT|>The result is 42.\
+                     <|END_TEXT|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Step 1: analyze.".into()));
+        assert_eq!(result.content, Some("The result is 42.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_cmd4_start_response_also_works() {
+        let mut f = make_cmd4_filter();
+        let text = "<|START_THINKING|>Think.\
+                     <|END_THINKING|>\
+                     <|START_RESPONSE|>Response text.\
+                     <|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Think.".into()));
+        assert_eq!(result.content, Some("Response text.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_response_only() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_RESPONSE|>Just a response.<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert!(result.reasoning.is_none());
+        assert_eq!(result.content, Some("Just a response.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_thinking_only_no_response() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_THINKING|>I am thinking.<|END_THINKING|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("I am thinking.".into()));
+        assert!(result.content.is_none());
+    }
+
+    #[test]
+    fn test_process_full_text_plain_text_no_special_tokens() {
+        let mut f = make_cmd3_filter();
+        let text = "Hello world, no special tokens here.";
+        let result = f.process_full_text(text);
+        assert_eq!(
+            result.content,
+            Some("Hello world, no special tokens here.".into())
+        );
+        assert!(result.reasoning.is_none());
+    }
+
+    #[test]
+    fn test_process_full_text_empty_string() {
+        let mut f = make_cmd3_filter();
+        let result = f.process_full_text("");
+        assert!(result.content.is_none());
+        assert!(result.reasoning.is_none());
+        assert!(result.tool_calls.is_empty());
+        assert!(result.citations.is_empty());
+    }
+
+    #[test]
+    fn test_process_full_text_empty_thinking_block() {
+        let mut f = make_cmd3_filter();
+        let text =
+            "<|START_THINKING|><|END_THINKING|><|START_RESPONSE|>Content.<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.content, Some("Content.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_empty_response_block() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_THINKING|>Thinking.<|END_THINKING|>\
+                     <|START_RESPONSE|><|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Thinking.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_utf8_multibyte() {
+        let mut f = make_cmd4_no_tools_filter();
+        let text = "<|START_THINKING|>Réflexion 🤔 über Ñoño\
+                     <|END_THINKING|>\
+                     <|START_RESPONSE|>Ответ: café ☕\
+                     <|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert_eq!(
+            result.reasoning,
+            Some("Réflexion 🤔 über Ñoño".into())
+        );
+        assert_eq!(result.content, Some("Ответ: café ☕".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_adjacent_special_tokens() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_THINKING|><|END_THINKING|>\
+                     <|START_RESPONSE|><|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert!(result.reasoning.is_none());
+        assert!(result.content.is_none());
+    }
+
+    #[test]
+    fn test_process_full_text_long_content() {
+        let mut f = make_cmd4_no_tools_filter();
+        let filler = "word ".repeat(10_000);
+        let text = format!(
+            "<|START_THINKING|>{filler}<|END_THINKING|>\
+             <|START_RESPONSE|>{filler}<|END_RESPONSE|>"
+        );
+        let result = f.process_full_text(&text);
+        assert!(result.reasoning.is_some());
+        assert!(result.content.is_some());
+        let reasoning = result.reasoning.unwrap();
+        let content = result.content.unwrap();
+        assert!(reasoning.contains("word"));
+        assert!(content.contains("word"));
+        assert!(reasoning.len() > 40_000);
+        assert!(content.len() > 40_000);
+    }
+
+    #[test]
+    fn test_process_full_text_with_inclusive_stop() {
+        let opts = FilterOptions::default()
+            .cmd3()
+            .with_inclusive_stops(vec!["STOP_HERE".to_string()]);
+        let mut f = new_filter(opts);
+        let text = "<|START_RESPONSE|>Before stop STOP_HERE After stop<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert!(result.content.is_some());
+        let content = result.content.unwrap();
+        assert!(content.contains("Before stop"));
+        assert!(content.contains("STOP_HERE"));
+        assert!(!content.contains("After stop"));
+    }
+
+    #[test]
+    fn test_process_full_text_with_exclusive_stop() {
+        let opts = FilterOptions::default()
+            .cmd3()
+            .with_exclusive_stops(vec!["STOP_HERE".to_string()]);
+        let mut f = new_filter(opts);
+        let text = "<|START_RESPONSE|>Before stop STOP_HERE After stop<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert!(result.content.is_some());
+        let content = result.content.unwrap();
+        assert!(content.contains("Before stop"));
+        assert!(!content.contains("STOP_HERE"));
+        assert!(!content.contains("After stop"));
+    }
+
+    #[test]
+    fn test_process_full_text_matches_process_full_simple() {
+        let text = "<|START_THINKING|>Think hard.\
+                     <|END_THINKING|>\
+                     <|START_RESPONSE|>The answer is 7.\
+                     <|END_RESPONSE|>";
+
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+
+        let mut f1 = make_cmd3_filter();
+        let result_full_text = f1.process_full_text(text);
+
+        let mut f2 = make_cmd3_filter();
+        let result_full = f2.process_full(&chunks);
+
+        assert_eq!(result_full_text.reasoning, result_full.reasoning);
+        assert_eq!(result_full_text.content, result_full.content);
+        assert_eq!(result_full_text.tool_calls.len(), result_full.tool_calls.len());
+        assert_eq!(result_full_text.citations.len(), result_full.citations.len());
+    }
+
+    #[test]
+    fn test_process_full_text_matches_process_full_cmd4() {
+        let text = "<|START_THINKING|>Plan: step 1, step 2.\
+                     <|END_THINKING|>\
+                     <|START_TEXT|>Final result here.\
+                     <|END_TEXT|>";
+
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+
+        let mut f1 = make_cmd4_no_tools_filter();
+        let result_full_text = f1.process_full_text(text);
+
+        let mut f2 = make_cmd4_no_tools_filter();
+        let result_full = f2.process_full(&chunks);
+
+        assert_eq!(result_full_text.reasoning, result_full.reasoning);
+        assert_eq!(result_full_text.content, result_full.content);
+    }
+
+    #[test]
+    fn test_process_full_text_matches_process_full_plain_text() {
+        let text = "Just plain text without any markers.";
+
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+
+        let mut f1 = make_cmd3_filter();
+        let result_full_text = f1.process_full_text(text);
+
+        let mut f2 = make_cmd3_filter();
+        let result_full = f2.process_full(&chunks);
+
+        assert_eq!(result_full_text.content, result_full.content);
+        assert_eq!(result_full_text.reasoning, result_full.reasoning);
+    }
+
+    #[test]
+    fn test_process_full_text_matches_process_full_utf8() {
+        let text = "<|START_THINKING|>日本語テスト\
+                     <|END_THINKING|>\
+                     <|START_RESPONSE|>中文回答\
+                     <|END_RESPONSE|>";
+
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+
+        let mut f1 = make_cmd3_filter();
+        let result_full_text = f1.process_full_text(text);
+
+        let mut f2 = make_cmd3_filter();
+        let result_full = f2.process_full(&chunks);
+
+        assert_eq!(result_full_text.reasoning, result_full.reasoning);
+        assert_eq!(result_full_text.content, result_full.content);
+    }
+
+    #[test]
+    fn test_process_full_text_with_tool_action() {
+        let opts = FilterOptions::default().cmd4().stream_tool_actions();
+        let mut f = new_filter(opts);
+        let text = "<|START_THINKING|>I should search.\
+                     <|END_THINKING|>\
+                     <|START_ACTION|>\n[{\"tool_call_id\": \"call_0\", \"tool_name\": \"web_search\", \"parameters\": {\"query\": \"test\"}}]\
+                     <|END_ACTION|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("I should search.".into()));
+        assert!(!result.tool_calls.is_empty());
+        assert_eq!(result.tool_calls[0].name, "web_search");
+    }
+
+    #[test]
+    fn test_process_full_text_text_before_first_special_token() {
+        let mut f = make_cmd3_filter();
+        let text = "Preamble text <|START_RESPONSE|>Response.<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert!(result.content.is_some());
+        let content = result.content.unwrap();
+        assert!(content.contains("Preamble text"));
+        assert!(content.contains("Response."));
+    }
+
+    #[test]
+    fn test_process_full_text_text_after_end_response() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_RESPONSE|>Content.<|END_RESPONSE|>Trailing garbage";
+        let result = f.process_full_text(text);
+        assert_eq!(result.content, Some("Content.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_repeated_thinking_blocks() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_THINKING|>First thought.<|END_THINKING|>\
+                     <|START_RESPONSE|>Middle answer.<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("First thought.".into()));
+        assert_eq!(result.content, Some("Middle answer.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_special_token_like_substring() {
+        let mut f = make_cmd4_no_tools_filter();
+        let text = "<|START_RESPONSE|>The tag <|NOT_A_TOKEN|> is not special.<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert!(result.content.is_some());
+        let content = result.content.unwrap();
+        assert!(content.contains("<|NOT_A_TOKEN|>"));
+    }
+
+    #[test]
+    fn test_process_full_text_citations_in_response() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_RESPONSE|>The sky is <co: 0>blue</co: 0>.<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert!(result.content.is_some());
+        let content = result.content.unwrap();
+        assert!(content.contains("blue"));
+        assert!(!result.citations.is_empty());
+        assert_eq!(result.citations[0].text, "blue");
+    }
+
+    #[test]
+    fn test_process_full_text_no_tools_mode() {
+        let mut f = make_cmd4_no_tools_filter();
+        let text = "<|START_THINKING|>Reasoning.\
+                     <|END_THINKING|>\
+                     <|START_RESPONSE|>Answer.\
+                     <|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Reasoning.".into()));
+        assert_eq!(result.content, Some("Answer.".into()));
+        assert!(result.tool_calls.is_empty());
+    }
+
+    #[test]
+    fn test_process_full_text_sets_done_flag() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_RESPONSE|>Hello.<|END_RESPONSE|>";
+        let _ = f.process_full_text(text);
+        assert!(f.done);
+
+        let result = f.write_text(b"More text");
+        assert!(result.is_empty());
     }
 }
