@@ -667,7 +667,7 @@ pub(crate) fn find_partial<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parsing::options::{new_filter, FilterOptions};
+    use crate::parsing::options::{FilterOptions, new_filter};
     use crate::parsing::types::{FilterCitation, FilterToolCallDelta, FilterToolParameter};
 
     #[test]
@@ -1102,8 +1102,7 @@ mod tests {
     #[test]
     fn test_process_full_text_empty_thinking_block() {
         let mut f = make_cmd3_filter();
-        let text =
-            "<|START_THINKING|><|END_THINKING|><|START_RESPONSE|>Content.<|END_RESPONSE|>";
+        let text = "<|START_THINKING|><|END_THINKING|><|START_RESPONSE|>Content.<|END_RESPONSE|>";
         let result = f.process_full_text(text);
         assert_eq!(result.content, Some("Content.".into()));
     }
@@ -1125,10 +1124,7 @@ mod tests {
                      <|START_RESPONSE|>Ответ: café ☕\
                      <|END_RESPONSE|>";
         let result = f.process_full_text(text);
-        assert_eq!(
-            result.reasoning,
-            Some("Réflexion 🤔 über Ñoño".into())
-        );
+        assert_eq!(result.reasoning, Some("Réflexion 🤔 über Ñoño".into()));
         assert_eq!(result.content, Some("Ответ: café ☕".into()));
     }
 
@@ -1208,8 +1204,14 @@ mod tests {
 
         assert_eq!(result_full_text.reasoning, result_full.reasoning);
         assert_eq!(result_full_text.content, result_full.content);
-        assert_eq!(result_full_text.tool_calls.len(), result_full.tool_calls.len());
-        assert_eq!(result_full_text.citations.len(), result_full.citations.len());
+        assert_eq!(
+            result_full_text.tool_calls.len(),
+            result_full.tool_calls.len()
+        );
+        assert_eq!(
+            result_full_text.citations.len(),
+            result_full.citations.len()
+        );
     }
 
     #[test]
