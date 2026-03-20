@@ -31,6 +31,15 @@ jobs:
         run: |
           TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
           echo "tag=$TAG"
+          # On workflow_run, skip if this version is already on PyPI
+          # (happens when Cargo.toml changes without a version bump)
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            VERSION="${TAG#v}"
+            if curl -sSf "https://pypi.org/pypi/cohere_melody/$VERSION/json" > /dev/null 2>&1; then
+              echo "Version $VERSION already exists on PyPI, skipping"
+              exit 0
+            fi
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   linux:
