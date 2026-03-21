@@ -76,40 +76,14 @@ class CohereCommand2ReasoningParser(ReasoningParser):
     def extract_reasoning(
         self, model_output: str, request: ChatCompletionRequest | ResponsesRequest
     ) -> tuple[Optional[str], Optional[str]]:
-        reasoning_content = None
-        content = None
-        # create a new melody parser that ignores special tool action tokens
-        # since the tool parser will be called on the resulting content
         melody = PyFilter(
             PyFilterOptions()
             .cmd3()
             .remove_token("<|START_ACTION|>")
             .remove_token("<|END_ACTION|>")
         )
-        # tokenize to provide token size string fragments to melody
-        tokens = self.model_tokenizer.encode(model_output, add_special_tokens=False)
-        token_buf = []
-        for t in tokens:
-            token_buf.append(t)
-            token_str = self.model_tokenizer.decode(
-                token_buf, skip_special_tokens=False
-            )
-            # buffer tokens that generate incomplete strings
-            if token_str.endswith(REPLACEMENT_CHAR):
-                continue
-
-            result = melody.write_decoded(token_str)
-            if result.reasoning is not None:
-                reasoning_content = (
-                    "" if reasoning_content is None else reasoning_content
-                )
-                reasoning_content += result.reasoning
-            if result.content is not None:
-                content = "" if content is None else content
-                content += result.content
-
-            token_buf = []
-        return reasoning_content, content
+        result = melody.process_full_text(model_output)
+        return result.reasoning, result.content
 
     def extract_content_ids(self, input_ids: list[int]) -> list[int]:
         melody = PyFilter(
@@ -192,20 +166,7 @@ class CohereCommand2ToolParser(ToolParser):
         model_output: str,
         request: ChatCompletionRequest,
     ) -> ExtractedToolCallInformation:
-        tokens = self.model_tokenizer.encode(model_output, add_special_tokens=False)
-        token_buf = []
-        token_strings = []
-        for t in tokens:
-            token_buf.append(t)
-            token_str = self.model_tokenizer.decode(
-                token_buf, skip_special_tokens=False
-            )
-            if token_str.endswith(REPLACEMENT_CHAR):
-                continue
-            token_strings.append(token_str)
-            token_buf = []
-
-        result = self.melody.process_full(token_strings)
+        result = self.melody.process_full_text(model_output)
 
         tool_calls = [
             ToolCall(
