@@ -271,7 +271,6 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_run'
     needs: [resolve-tag, linux, musllinux, windows, macos, sdist]
     permissions:
       # Used for PyPI trusted publishing (OIDC)
