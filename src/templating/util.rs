@@ -741,12 +741,14 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                         let doc_str = doc.as_str().ok_or(MelodyError::TemplateValidation(
                             "Invalid tool document format during jinja conversion".to_string(),
                         ))?;
+                        let doc_obj: Value = serde_json::from_str(doc_str)?;
+                        let doc_wrapper = json!({"type": "document", "document": {"data": doc_obj}});
                         msg_ref
                             .get_mut("content")
                             .unwrap()
                             .as_array_mut()
                             .unwrap()
-                            .push(serde_json::from_str(doc_str)?);
+                            .push(doc_wrapper);
                     }
                 }
             }

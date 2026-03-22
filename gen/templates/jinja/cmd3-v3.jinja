@@ -70,7 +70,7 @@
 {%- if item.type|lower == "text" -%}
 {%- set text_wrapper = {"content": item.text} -%}
 {{ text_wrapper|tojson }}
-{%- elif item.type|lower == "document" and item.document.data -%}
+{%- elif item.type|lower == "document" and item.document and "data" in item.document -%}
 {{ item.document.data|tojson }}
 {%- else -%}
 {{ item|tojson }}

@@ -1,0 +1,11 @@
+<BOS_TOKEN><|START_OF_TURN_TOKEN|><|USER_TOKEN|>What is 2 + 2?<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>I will use the Calculator tool to calculate 2 + 2.<|END_THINKING|><|START_ACTION|>[
+    {"tool_call_id": "0", "tool_name": "calculator", "parameters": {"expression": "2 + 2"}}
+]<|END_ACTION|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
+    {
+        "tool_call_id": "0",
+        "results": {
+            "0": {"type": "text", "text": "some_text", "some_key": "some_value", "another_key": "another_value"}
+        },
+        "is_error": null
+    }
+]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>
