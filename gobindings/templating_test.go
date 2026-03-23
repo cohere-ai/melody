@@ -82,3 +82,37 @@ func TestTemplating_RenderCMD4_DirCases(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplating_RenderCMD3_DirCases_Jinja(t *testing.T) {
+	t.Parallel()
+	cases := readTemplatingTestCases(t, "cmd3")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var opts RenderCmd3Options
+			err := json.Unmarshal(tc.input, &opts)
+			require.NoError(t, err)
+			opts.UseJinja = true
+			got, err := RenderCMD3(opts)
+			require.NoError(t, err)
+			require.Equal(t, tc.output, got)
+		})
+	}
+}
+
+func TestTemplating_RenderCMD4_DirCases_Jinja(t *testing.T) {
+	t.Parallel()
+	cases := readTemplatingTestCases(t, "cmd4")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var opts RenderCmd4Options
+			err := json.Unmarshal(tc.input, &opts)
+			require.NoError(t, err)
+			opts.UseJinja = true
+			got, err := RenderCMD4(opts)
+			require.NoError(t, err)
+			require.Equal(t, tc.output, got)
+		})
+	}
+}

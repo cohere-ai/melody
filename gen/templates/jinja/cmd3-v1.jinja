@@ -267,7 +267,7 @@ Your output should adhere to the following json schema:
             {% if not skip_thinking %}
                 {% if message.tool_plan -%}
                     <|START_THINKING|>{{message.tool_plan}}<|END_THINKING|>
-                {%- elif message.thinking or (message.content and message.content[0].thinking) -%}
+                {%- elif message.thinking or (message.content and message.content[0].type == "thinking") -%}
                     <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
                 {%- elif thinking_default_val and not skip_thinking -%}
                     <|START_THINKING|>{{ thinking_default_val }}<|END_THINKING|>
@@ -281,7 +281,7 @@ Your output should adhere to the following json schema:
 
 ]<|END_ACTION|><|END_OF_TURN_TOKEN|>
         {%- else -%}
-            {% if (message.thinking or (message.content and message.content[0].thinking)) and not skip_thinking -%}
+            {% if (message.thinking or (message.content and message.content[0].type == "thinking")) and not skip_thinking -%}
                 <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
             {%- elif thinking_default_val and not skip_thinking -%}
                 <|START_THINKING|>{{ thinking_default_val }}<|END_THINKING|>
