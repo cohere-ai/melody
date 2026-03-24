@@ -53,6 +53,7 @@ pub struct RenderCmd3Options<'a> {
 }
 // for now always set the template to cmd3v1.
 static CMD3V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd3-v1.tmpl");
+static CMD3V3_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd3-v3.tmpl");
 static CMD3V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v1.jinja");
 static CMD3V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v2.jinja");
 static CMD3V3_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v3.jinja");
@@ -458,6 +459,23 @@ mod tests {
     }
 
     #[test]
+    fn test_render_cmd3v3_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("cmd3_v3") {
+            println!("Running cmd3v3 test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
+            if test_name != "template_provided" {
+                opts.template = CMD3V3_TEMPLATE;
+            }
+            if opts.reasoning_type.is_none() || opts.reasoning_type == Some(ReasoningType::Unknown) {
+                // Default for cmd3v3 on platform is reasoning is enabled
+                opts.reasoning_type = Some(ReasoningType::Enabled);
+            }
+            let rendered = render_cmd3(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
     fn test_render_cmd3_jinja_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v1") {
             println!("Running cmd3 jinja test case: {}", test_name);
@@ -482,7 +500,7 @@ mod tests {
     #[test]
     fn test_render_cmd3v3_jinja_from_liquid_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd3_v3") {
-            println!("Running cmd3 jinja liquid test case: {}", test_name);
+            println!("Running cmd3v3 jinja liquid test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
             if test_name != "template_provided" {
