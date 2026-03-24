@@ -53,6 +53,7 @@ pub struct RenderCmd3Options<'a> {
 }
 // for now always set the template to cmd3v1.
 static CMD3V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd3-v1.tmpl");
+#[allow(dead_code)] // this is used in a test below
 static CMD3V3_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd3-v3.tmpl");
 static CMD3V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v1.jinja");
 static CMD3V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v2.jinja");
