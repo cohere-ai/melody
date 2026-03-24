@@ -4,6 +4,8 @@ FROM rust:1.90 as builder-rust
 ARG TARGETPLATFORM
 WORKDIR /workspace
 COPY ./src ./src
+COPY ./gen ./gen
+COPY ./template_generation ./template_generation
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 RUN cargo build --release --features tkzrs
