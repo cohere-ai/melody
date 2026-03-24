@@ -466,7 +466,8 @@ mod tests {
             if test_name != "template_provided" {
                 opts.template = CMD3V3_TEMPLATE;
             }
-            if opts.reasoning_type.is_none() || opts.reasoning_type == Some(ReasoningType::Unknown) {
+            if opts.reasoning_type.is_none() || opts.reasoning_type == Some(ReasoningType::Unknown)
+            {
                 // Default for cmd3v3 on platform is reasoning is enabled
                 opts.reasoning_type = Some(ReasoningType::Enabled);
             }
