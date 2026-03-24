@@ -4,6 +4,7 @@
 {%- set render_tools_section = true %}
 {%- set render_grounding = grounding_enabled and tools_or_docs_exist %}
 {%- set render_platform_instruction_override = true if platform_instruction_override else false %}
+{%- set has_developer_instruction = developer_instruction or developer_instruction == "" %}
 {%- set render_developer_instruction = true if developer_instruction else false %}
 {{ bos_token }}
 {%- macro document_turn(documents) -%}
@@ -117,7 +118,7 @@
 {{ msg.content[0].thinking }}
     {%- endif %}
 {%- endmacro %}
-{%- if messages and messages[0]['role']|lower == 'system' %}{%- set developer_instruction = messages[0] %}{%- set render_developer_instruction = true %}{% endif %}
+{%- if messages and messages[0]['role']|lower == 'system' and not has_developer_instruction %}{%- set developer_instruction = messages[0] %}{%- set render_developer_instruction = true %}{%- set initial_instruction_message = true %}{% endif %}
 {%- set json_object = true if response_format and response_format.type == "json_object" else false %}
 {%- set json_schema = (response_format.json_schema or response_format.schema) if response_format %}
 {%- set json_mode = json_object or json_schema %}
@@ -199,7 +200,7 @@ Your output should adhere to the following json schema:
 {%- endif %}
 {%- for message in messages %}
     {%- set msg_role_downcased = message.role | lower %}
-    {%- if msg_role_downcased == 'system' and (not (loop.first and developer_instruction)) -%}
+    {%- if msg_role_downcased == 'system' and (not (loop.first and initial_instruction_message)) -%}
 <|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
     {%- elif msg_role_downcased == 'user' -%}
 <|START_OF_TURN_TOKEN|><|USER_TOKEN|>{{ print_msg(message) }}<|END_OF_TURN_TOKEN|>

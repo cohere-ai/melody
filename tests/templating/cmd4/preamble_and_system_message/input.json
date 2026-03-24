@@ -1,0 +1,23 @@
+{
+  "dev_instruction": "This is a preamble",
+  "messages": [
+    {
+      "role": "System",
+      "content": [
+        {
+          "type": "text",
+          "text": "This is a system message"
+        }
+      ]
+    },
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hello"
+        }
+      ]
+    }
+  ]
+}

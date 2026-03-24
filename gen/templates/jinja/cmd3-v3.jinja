@@ -4,6 +4,7 @@
 {%- set skip_thinking = skip_thinking if skip_thinking is not undefined else (not reasoning and not reasoning_v1) -%}
 {%- set thinking_default_val = thinking_default_val | default(None) -%}
 {%- set safety_mode = safety_mode if safety_mode is not undefined else "CONTEXTUAL" -%}
+{%- set has_developer_preamble = developer_preamble or developer_preamble == "" -%}
 {{ bos_token }}
 {%- macro document_turn(documents) -%}
 {# format documents into chat turn -#}
@@ -16,7 +17,7 @@
 {%- for doc in documents %}
 {%- set doc_val = doc.data if doc.data else doc %}
 
-            "{{ loop.index0 }}": {{doc_val|tojson}}{% if not loop.last %},
+            "{{ loop.index0 }}": {{ doc_val|tojson }}{% if not loop.last %},
             {%- endif %}
 {%- endfor %}
 
@@ -118,9 +119,9 @@
 {%- set regen_tool_call_ids = regen_tool_call_ids if regen_tool_call_ids is not undefined else true -%}
 {%- set sent_documents = namespace(value=false) -%}
 {%- if skip_preamble -%}
-{% if developer_preamble %}<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(developer_preamble) }}<|END_OF_TURN_TOKEN|>{% endif %}
+{% if has_developer_preamble %}<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(developer_preamble) }}<|END_OF_TURN_TOKEN|>{% endif %}
 {%- else -%}
-{%- if messages and messages[0]['role']|lower == 'system' %}{%- set developer_preamble = messages[0] %}{% endif %}
+{%- if messages and messages[0]['role']|lower == 'system' and not has_developer_preamble %}{%- set developer_preamble = messages[0] %}{%- set initial_instruction_message = true %}{% endif %}
 <|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|># System Preamble
 {% if safety_mode != "NONE" %}
     {%- if safety_mode|upper == 'STRICT' %}
@@ -253,7 +254,7 @@ Your output should adhere to the following json schema:
 <|END_OF_TURN_TOKEN|>
 {%- endif -%}
 {%- for message in messages %}
-    {%- if message.role|lower == 'system' and (not (loop.first and developer_preamble) or skip_preamble) -%}
+    {%- if message.role|lower == 'system' and (not (loop.first and initial_instruction_message) or skip_preamble) -%}
 <|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
     {%- elif message.role|lower == 'user' -%}
 <|START_OF_TURN_TOKEN|><|USER_TOKEN|>{{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
@@ -263,7 +264,7 @@ Your output should adhere to the following json schema:
         {%- if message.tool_calls %}
             {% if not skip_thinking %}
                 {% if message.tool_plan -%}
-                    <|START_THINKING|>{{message.tool_plan}}<|END_THINKING|>
+                    <|START_THINKING|>{{ message.tool_plan }}<|END_THINKING|>
                 {%- elif message.thinking or (message.content and message.content[0].type == "thinking") -%}
                     <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
                 {%- elif thinking_default_val and not skip_thinking -%}
