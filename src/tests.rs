@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_handle_inclusive_stop() {
-        let filter = FilterImpl::new();
+        let mut filter = FilterImpl::new();
 
         let outputs = filter.handle_inclusive_stop("hello<|END|>", 5, "<|END|>");
         assert_eq!(outputs.len(), 1);
