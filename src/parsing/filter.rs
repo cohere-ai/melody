@@ -287,7 +287,8 @@ impl FilterImpl {
             let str = String::from_utf8_lossy(&self.buf).to_string();
 
             // If is a partial special token, we need to wait for the next token.
-            let (special_token_idx, found_seq) = find_partial(&str, &mut self.special_token_map.keys());
+            let (special_token_idx, found_seq) =
+                find_partial(&str, &mut self.special_token_map.keys());
             if special_token_idx != usize::MAX && found_seq.is_empty() {
                 // Partial match found - process everything before it, then wait
                 if special_token_idx > 0 {
@@ -323,7 +324,8 @@ impl FilterImpl {
                     // Before the special token, process the buffer with the old mode
                     let pre_special_token = &str[..special_token_idx];
                     if !pre_special_token.is_empty() {
-                        let (o, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), false);
+                        let (o, _) =
+                            self.handle_token(self.mode, pre_special_token.as_bytes(), false);
                         out.extend(o);
                     }
 
@@ -1029,7 +1031,6 @@ mod tests {
         assert!(result.tool_calls.is_empty());
     }
 
-<<<<<<< Updated upstream
     fn make_cmd3_filter() -> FilterImpl {
         new_filter(FilterOptions::default().cmd3())
     }
@@ -1374,7 +1375,7 @@ mod tests {
 
         let result = f.write_text(b"More text");
         assert!(result.is_empty());
-=======
+    }
     #[test]
     fn test_write_text_handles_multiple_special_tokens() {
         use crate::parsing::options::FilterOptions;
@@ -1383,8 +1384,12 @@ mod tests {
         let mut filter = FilterImpl::new();
         let mut options = FilterOptions::default();
         options.stream_tool_actions = true; // Enable reasoning output
-        options.special_token_map.insert("<|START|>".to_string(), FilterMode::PlainText);
-        options.special_token_map.insert("<|REASON|>".to_string(), FilterMode::ToolReason);
+        options
+            .special_token_map
+            .insert("<|START|>".to_string(), FilterMode::PlainText);
+        options
+            .special_token_map
+            .insert("<|REASON|>".to_string(), FilterMode::ToolReason);
         filter = filter.apply_options(options);
 
         // Feed entire generation with multiple special tokens in one call (no stop)
@@ -1408,9 +1413,15 @@ mod tests {
         let mut options = FilterOptions::default();
         options.stream_non_grounded_answer = true;
         options.stream_tool_actions = true; // Enable reasoning output
-        options.special_token_map.insert("<answer>".to_string(), FilterMode::Answer);
-        options.special_token_map.insert("<grounded>".to_string(), FilterMode::GroundedAnswer);
-        options.special_token_map.insert("<reason>".to_string(), FilterMode::ToolReason);
+        options
+            .special_token_map
+            .insert("<answer>".to_string(), FilterMode::Answer);
+        options
+            .special_token_map
+            .insert("<grounded>".to_string(), FilterMode::GroundedAnswer);
+        options
+            .special_token_map
+            .insert("<reason>".to_string(), FilterMode::ToolReason);
         filter = filter.apply_options(options);
 
         // Feed entire generation with multiple mode switches
@@ -1425,6 +1436,5 @@ mod tests {
         assert!(result.content.is_some());
         assert!(result.reasoning.is_some());
         assert_eq!(result.reasoning.as_ref().unwrap(), "text3");
->>>>>>> Stashed changes
     }
 }
