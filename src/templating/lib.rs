@@ -58,6 +58,8 @@ static CMD3V3_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd3-v3.
 static CMD3V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v1.jinja");
 static CMD3V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v2.jinja");
 static CMD3V3_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v3.jinja");
+#[allow(dead_code)] // this is used in a test below
+static CMD3V1_JINJA_HF_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v1-hf.jinja");
 
 impl Default for RenderCmd3Options<'_> {
     fn default() -> Self {
@@ -483,6 +485,7 @@ mod tests {
             println!("Running cmd3 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
+            opts.template_jinja = CMD3V1_JINJA_HF_TEMPLATE;
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }

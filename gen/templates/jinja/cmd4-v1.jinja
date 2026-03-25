@@ -6,6 +6,7 @@
 {%- set render_platform_instruction_override = true if platform_instruction_override else false %}
 {%- set has_developer_instruction = developer_instruction or developer_instruction == "" %}
 {%- set render_developer_instruction = true if developer_instruction else false %}
+{%- set convert_first_system_msg = convert_first_system_msg | default(true) -%}
 {{ bos_token }}
 {%- macro document_turn(documents) -%}
 {# format documents into chat turn -#}
@@ -18,7 +19,7 @@
 {%- for doc in documents %}
 {%- set doc_val = doc.data if doc.data else doc %}
 
-            "{{ loop.index0 }}": {{doc_val|tojson}}{% if not loop.last %},
+            "{{ loop.index0 }}": {{ doc_val|tojson }}{% if not loop.last %},
             {%- endif %}
 {%- endfor %}
 
@@ -118,7 +119,7 @@
 {{ msg.content[0].thinking }}
     {%- endif %}
 {%- endmacro %}
-{%- if messages and messages[0]['role']|lower == 'system' and not has_developer_instruction %}{%- set developer_instruction = messages[0] %}{%- set render_developer_instruction = true %}{%- set initial_instruction_message = true %}{% endif %}
+{%- if messages and messages[0]['role']|lower == 'system' and not has_developer_instruction and convert_first_system_msg %}{%- set developer_instruction = messages[0] %}{%- set render_developer_instruction = true %}{%- set initial_instruction_message = true %}{% endif %}
 {%- set json_object = true if response_format and response_format.type == "json_object" else false %}
 {%- set json_schema = (response_format.json_schema or response_format.schema) if response_format %}
 {%- set json_mode = json_object or json_schema %}

@@ -816,6 +816,7 @@ pub(crate) fn add_jinja_substitutions_common(
     substitutions.insert("add_generation_prompt".to_string(), Value::Bool(true));
     substitutions.insert("bos_token".to_string(), json!("<BOS_TOKEN>"));
     substitutions.insert("regen_tool_call_ids".to_string(), json!(false));
+    substitutions.insert("convert_first_system_msg".to_string(), json!(false));
 
     substitutions.insert(
         "tools".to_string(),

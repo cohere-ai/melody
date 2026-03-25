@@ -14,5 +14,11 @@ cmd3-v3:
     chat_merged_template.jinja:
       path: cmd3/chat_merged_template.jinja
 
+cmd3-v1-hf:
+  path: cmd3/chat_merged_template_v1_huggingface.jinja
+  includes:
+    chat_merged_template.jinja:
+      path: cmd3/chat_merged_template.jinja
+
 cmd4-v1:
   path: cmd4/chat_template.jinja

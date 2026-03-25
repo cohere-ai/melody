@@ -1,4 +1,8 @@
-{%- set thinking_default_val = "I will assist the user with their request." -%}
+{%- set template_v1 = true -%}
+{%- set reasoning_v1 = true if reasoning else false -%}
+{%- set reasoning = false -%}
+{%- set skip_thinking = skip_thinking if skip_thinking is not undefined else false -%}
+{%- set convert_first_system_msg = true -%}
 {%- set reasoning = reasoning if reasoning is not undefined else true -%}
 {%- set reasoning_v1 = reasoning_v1 if reasoning_v1 else false -%}
 {%- set skip_thinking = skip_thinking if skip_thinking is not undefined else (not reasoning and not reasoning_v1) -%}

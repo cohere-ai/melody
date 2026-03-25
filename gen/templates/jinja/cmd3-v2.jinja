@@ -4,6 +4,7 @@
 {%- set thinking_default_val = thinking_default_val | default(None) -%}
 {%- set safety_mode = safety_mode if safety_mode is not undefined else "CONTEXTUAL" -%}
 {%- set has_developer_preamble = developer_preamble or developer_preamble == "" -%}
+{%- set convert_first_system_msg = convert_first_system_msg | default(true) -%}
 {{ bos_token }}
 {%- macro document_turn(documents) -%}
 {# format documents into chat turn -#}
@@ -120,7 +121,7 @@
 {%- if skip_preamble -%}
 {% if has_developer_preamble %}<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(developer_preamble) }}<|END_OF_TURN_TOKEN|>{% endif %}
 {%- else -%}
-{%- if messages and messages[0]['role']|lower == 'system' and not has_developer_preamble %}{%- set developer_preamble = messages[0] %}{%- set initial_instruction_message = true %}{% endif %}
+{%- if messages and messages[0]['role']|lower == 'system' and not has_developer_preamble and convert_first_system_msg %}{%- set developer_preamble = messages[0] %}{%- set initial_instruction_message = true %}{% endif %}
 <|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|># System Preamble
 {% if safety_mode != "NONE" %}
     {%- if safety_mode|upper == 'STRICT' %}
