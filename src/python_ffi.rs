@@ -263,6 +263,12 @@ impl PyFilter {
         self.inner.process_full_text(text)
     }
 
+    /// Classify decoded chunks by whether they emit content.
+    #[allow(clippy::needless_pass_by_value)]
+    fn classify_content_chunks(&mut self, token_strings: Vec<String>) -> Vec<bool> {
+        self.inner.classify_content_chunks(&token_strings)
+    }
+
     fn __repr__(&self) -> String {
         format!("PyFilter(\"{}\")", self.config)
     }

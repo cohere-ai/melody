@@ -73,6 +73,9 @@ class CohereCommand2ReasoningParser(ReasoningParser):
 
         return msg
 
+    def uses_only_delta_streaming(self) -> bool:
+        return True
+
     def extract_reasoning(
         self, model_output: str, request: ChatCompletionRequest | ResponsesRequest
     ) -> tuple[Optional[str], Optional[str]]:
@@ -93,6 +96,8 @@ class CohereCommand2ReasoningParser(ReasoningParser):
             .remove_token("<|END_ACTION|>")
         )
         token_buf = []
+        decoded_chunks = []
+        chunk_token_ids = []
         content_ids = []
         for t in input_ids:
             token_buf.append(t)
@@ -103,11 +108,18 @@ class CohereCommand2ReasoningParser(ReasoningParser):
             if token_str.endswith(REPLACEMENT_CHAR):
                 continue
 
-            result = melody.write_decoded(token_str)
-            if result.content is not None:
-                content_ids.extend(token_buf)
-
+            decoded_chunks.append(token_str)
+            chunk_token_ids.append(token_buf)
             token_buf = []
+
+        content_mask = melody.classify_content_chunks(decoded_chunks)
+        for has_content, token_ids in zip(
+            content_mask,
+            chunk_token_ids,
+            strict=False,
+        ):
+            if has_content:
+                content_ids.extend(token_ids)
         return content_ids
 
     def is_reasoning_end(self, input_ids: list[int]) -> bool:
@@ -160,6 +172,9 @@ class CohereCommand2ToolParser(ToolParser):
         ]
 
         return DeltaMessage(tool_calls=delta_tool_calls)
+
+    def uses_only_delta_streaming(self) -> bool:
+        return True
 
     def extract_tool_calls(
         self,

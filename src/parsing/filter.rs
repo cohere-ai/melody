@@ -182,6 +182,7 @@ pub struct FilterImpl {
     // Mode and special token configuration
     pub(crate) default_mode: FilterMode,
     pub(crate) special_token_map: HashMap<String, FilterMode>,
+    pub(crate) special_token_start_bytes: [bool; 256],
     pub(crate) stream_non_grounded_answer: bool,
     pub(crate) stream_tool_actions: bool,
     pub(crate) stream_processed_params: bool,
@@ -221,6 +222,7 @@ impl FilterImpl {
             right_trimmed: false,
             default_mode: FilterMode::PlainText,
             special_token_map: HashMap::new(),
+            special_token_start_bytes: [false; 256],
             stream_non_grounded_answer: false,
             stream_tool_actions: false,
             stream_processed_params: false,
@@ -257,16 +259,25 @@ impl FilterImpl {
         // Merge special token maps
         for (token, mode) in &options.special_token_map {
             self.special_token_map.insert(token.clone(), *mode);
+            if let Some(first_byte) = token.as_bytes().first() {
+                self.special_token_start_bytes[usize::from(*first_byte)] = true;
+            }
         }
 
         // Add inclusive stops
         for stop in options.inclusive_stops {
+            if let Some(first_byte) = stop.as_bytes().first() {
+                self.special_token_start_bytes[usize::from(*first_byte)] = true;
+            }
             self.special_token_map
                 .insert(stop, FilterMode::InclusiveStop);
         }
 
         // Add exclusive stops
         for stop in options.exclusive_stops {
+            if let Some(first_byte) = stop.as_bytes().first() {
+                self.special_token_start_bytes[usize::from(*first_byte)] = true;
+            }
             self.special_token_map
                 .insert(stop, FilterMode::ExclusiveStop);
         }
@@ -280,20 +291,37 @@ impl FilterImpl {
         }
 
         self.buf.extend_from_slice(text);
-        let str = String::from_utf8_lossy(&self.buf).to_string();
+        let mut special_token_idx = usize::MAX;
+        let mut found_seq = String::new();
+        let mut decoded_buf: Option<String> = None;
 
-        // If is a partial special token, we need to wait for the next token.
-        let (special_token_idx, found_seq) = find_partial(&str, &mut self.special_token_map.keys());
-        if special_token_idx != usize::MAX && found_seq.is_empty() {
-            return Vec::new();
+        if self
+            .buf
+            .iter()
+            .any(|byte| self.special_token_start_bytes[usize::from(*byte)])
+        {
+            let decoded = String::from_utf8_lossy(&self.buf).into_owned();
+
+            // If is a partial special token, we need to wait for the next token.
+            let (idx, seq) = find_partial(&decoded, &mut self.special_token_map.keys());
+            if idx != usize::MAX && seq.is_empty() {
+                return Vec::new();
+            }
+
+            special_token_idx = idx;
+            found_seq = seq;
+            decoded_buf = Some(decoded);
         }
 
         let mut out = Vec::new();
 
         // If it is a whole special token, change the mode, remove the tokens and continue
         if special_token_idx != usize::MAX && !found_seq.is_empty() {
+            let decoded = decoded_buf
+                .as_ref()
+                .expect("decoded buffer must exist when a special token is found");
             let (o, new_mode, stop, valid_special) =
-                self.handle_special_token(&str, special_token_idx, &found_seq, self.mode);
+                self.handle_special_token(decoded, special_token_idx, &found_seq, self.mode);
             out.extend(o);
 
             if valid_special {
@@ -304,7 +332,7 @@ impl FilterImpl {
                 }
 
                 // Before the special token, process the buffer with the old mode
-                let pre_special_token = &str[..special_token_idx];
+                let pre_special_token = &decoded[..special_token_idx];
                 if !pre_special_token.is_empty() {
                     let (o, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), false);
                     out.extend(o);
@@ -327,10 +355,13 @@ impl FilterImpl {
                 return out;
             }
 
-            let buf = std::mem::take(&mut self.buf);
+            let mut buf = std::mem::take(&mut self.buf);
             let (o, remove) = self.handle_token(self.mode, &buf, false);
             out.extend(o);
-            self.buf = buf[remove..].to_vec();
+            if remove > 0 {
+                buf.drain(..remove);
+            }
+            self.buf = buf;
             self.num_tokens_in_chunk = 0;
         }
 
@@ -555,6 +586,16 @@ impl FilterImpl {
             all_outputs.extend(o);
         }
         aggregate(all_outputs)
+    }
+
+    /// Classify decoded chunks by whether they emit content.
+    pub fn classify_content_chunks(&mut self, token_strings: &[String]) -> Vec<bool> {
+        let mut content_mask = Vec::with_capacity(token_strings.len());
+        for token_str in token_strings {
+            let result = self.write_decoded(token_str);
+            content_mask.push(result.content.is_some());
+        }
+        content_mask
     }
 
     /// Process a complete model output string in one call.
@@ -1355,5 +1396,66 @@ mod tests {
 
         let result = f.write_text(b"More text");
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_classify_content_chunks_marks_only_content_after_reasoning() {
+        let mut f = make_cmd4_no_tools_filter();
+        let chunks = vec![
+            "<|START_THINKING|>".to_string(),
+            "Step 1".to_string(),
+            "<|END_THINKING|>".to_string(),
+            "<|START_TEXT|>".to_string(),
+            "Final".to_string(),
+            " answer".to_string(),
+            "<|END_TEXT|>".to_string(),
+        ];
+
+        let content_mask = f.classify_content_chunks(&chunks);
+
+        assert_eq!(
+            content_mask,
+            vec![false, false, false, false, true, true, false]
+        );
+    }
+
+    #[test]
+    fn test_classify_content_chunks_marks_transition_chunk_with_content() {
+        let mut f = make_cmd3_filter();
+        let chunks = vec![
+            "<|START_THINKING|>".to_string(),
+            "Thinking".to_string(),
+            "<|END_THINKING|>Answer".to_string(),
+            "<|END_RESPONSE|>".to_string(),
+        ];
+
+        let content_mask = f.classify_content_chunks(&chunks);
+
+        assert_eq!(content_mask, vec![false, false, true, false]);
+    }
+
+    #[test]
+    fn test_classify_content_chunks_excludes_tool_action_chunks() {
+        let opts = FilterOptions::default().cmd4().stream_tool_actions();
+        let mut f = new_filter(opts);
+        let chunks = vec![
+            "<|START_THINKING|>".to_string(),
+            "Need a tool.".to_string(),
+            "<|END_THINKING|>".to_string(),
+            "<|START_ACTION|>".to_string(),
+            r#"[{"tool_call_id":"call_0","tool_name":"web_search","parameters":{"query":"weather"}}]"#
+                .to_string(),
+            "<|END_ACTION|>".to_string(),
+            "<|START_TEXT|>".to_string(),
+            "Sunny.".to_string(),
+            "<|END_TEXT|>".to_string(),
+        ];
+
+        let content_mask = f.classify_content_chunks(&chunks);
+
+        assert_eq!(
+            content_mask,
+            vec![false, false, false, false, false, false, false, true, false]
+        );
     }
 }
