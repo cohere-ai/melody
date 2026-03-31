@@ -230,7 +230,6 @@ enum SpecialTokenScanResult {
 enum ApplySpecialTokenResult {
     Stopped,
     Consumed,
-    NotSpecial,
 }
 
 pub(crate) enum PartialMatchResult {
@@ -360,7 +359,6 @@ impl FilterImpl {
                     match self.apply_special_token_match(&token_match, &mut out) {
                         ApplySpecialTokenResult::Stopped => return out,
                         ApplySpecialTokenResult::Consumed => continue,
-                        ApplySpecialTokenResult::NotSpecial => {}
                     }
                 }
                 SpecialTokenScanResult::NoMatch => {}
@@ -414,7 +412,15 @@ impl FilterImpl {
         );
 
         if !valid_special {
-            return ApplySpecialTokenResult::NotSpecial;
+            // False positive (e.g. literal `Answer:` inside `GroundedAnswer`). Emit through the
+            // current mode and advance past it so `detect_special_token` can find later markers
+            // (`Cited Documents:`, etc.) in the same buffer.
+            let end = token_match.idx + token_match.sequence.len();
+            let segment = &token_match.decoded[..end];
+            let (o_seg, remove) = self.handle_token(self.mode, segment.as_bytes(), false);
+            out.extend(o_seg);
+            self.buf.drain(..remove);
+            return ApplySpecialTokenResult::Consumed;
         }
 
         if stop {
@@ -1515,6 +1521,26 @@ mod tests {
         assert!(result.content.is_some());
         assert!(result.reasoning.is_some());
         assert_eq!(result.reasoning.as_ref().unwrap(), "text3");
+    }
+
+    /// Literal `Answer:` inside an answer section is not a mode switch; a later marker such as
+    /// `Grounded answer:` must still be detected in the same `write_text` / `process_full_text`
+    /// chunk (regression: do not emit the whole buffer as text and stop scanning).
+    #[test]
+    fn test_process_full_text_grounded_literal_answer_then_cited_documents() {
+        use crate::parsing::options::FilterOptions;
+
+        let mut filter = FilterImpl::new();
+        let options = FilterOptions::new().handle_multi_hop();
+        filter = filter.apply_options(options);
+
+        let text = "Answer:Hello Answer: more Grounded answer: blah blah";
+        let result = filter.process_full_text(text);
+        let content = result.content.unwrap_or_default();
+        assert!(
+            !content.contains("Grounded answer"),
+            "expected Grounded answer block to be stripped from streamed content, got {content:?}"
+        );
     }
 
     #[test]
