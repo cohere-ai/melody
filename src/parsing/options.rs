@@ -8,6 +8,8 @@ use std::collections::HashMap;
 
 /// Configuration builder for creating filters.
 ///
+/// Empty strings in `special_token_map` keys or in inclusive/exclusive stops are ignored.
+///
 /// This struct uses the builder pattern to configure filter behavior before creating
 /// a `FilterImpl` instance. It supports preset configurations for different Cohere
 /// model output formats (Command 3, Command 4, etc.) as well as fine-grained control.

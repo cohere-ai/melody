@@ -284,8 +284,11 @@ impl FilterImpl {
         self.default_mode = options.default_mode;
         self.mode = options.default_mode;
 
-        // Merge special token maps
+        // Merge special token maps (empty strings are ignored; they break `find_partial` scanning)
         for (token, mode) in &options.special_token_map {
+            if token.is_empty() {
+                continue;
+            }
             self.special_token_map.insert(token.clone(), *mode);
             if let Some(first_byte) = token.as_bytes().first() {
                 self.special_token_start_bytes[usize::from(*first_byte)] = true;
@@ -294,6 +297,9 @@ impl FilterImpl {
 
         // Add inclusive stops
         for stop in options.inclusive_stops {
+            if stop.is_empty() {
+                continue;
+            }
             if let Some(first_byte) = stop.as_bytes().first() {
                 self.special_token_start_bytes[usize::from(*first_byte)] = true;
             }
@@ -303,6 +309,9 @@ impl FilterImpl {
 
         // Add exclusive stops
         for stop in options.exclusive_stops {
+            if stop.is_empty() {
+                continue;
+            }
             if let Some(first_byte) = stop.as_bytes().first() {
                 self.special_token_start_bytes[usize::from(*first_byte)] = true;
             }
@@ -794,6 +803,25 @@ mod tests {
                 panic!("expected partial UTF-8 match")
             }
         }
+    }
+
+    #[test]
+    fn test_empty_special_tokens_ignored() {
+        let mut options = FilterOptions::new();
+        options
+            .special_token_map
+            .insert(String::new(), FilterMode::PlainText);
+        options
+            .special_token_map
+            .insert("<X>".to_string(), FilterMode::Answer);
+        options.inclusive_stops.push(String::new());
+        options.exclusive_stops.push(String::new());
+        let filter = new_filter(options);
+        assert!(!filter.special_token_map.contains_key(""));
+        assert_eq!(
+            filter.special_token_map.get("<X>"),
+            Some(&FilterMode::Answer)
+        );
     }
 
     #[test]
