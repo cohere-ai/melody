@@ -350,7 +350,11 @@ impl FilterImpl {
                     idx: special_token_idx,
                 } => {
                     if special_token_idx > 0 {
-                        if self.emit_handled_chunk_or_defer(std::mem::take(&mut self.buf), Some(special_token_idx), &mut out) {
+                        if self.emit_handled_chunk_or_defer(
+                            std::mem::take(&mut self.buf),
+                            Some(special_token_idx),
+                            &mut out,
+                        ) {
                             return out;
                         }
                     }
