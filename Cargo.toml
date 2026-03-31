@@ -19,6 +19,7 @@ pretty_assertions = "1.4.1"
 thiserror = "2"
 
 [dev-dependencies]
+divan = "0.1.21"
 env_logger = "0.11"
 tokenizers = { version = "0.22.1", features = ["http"] }
 
@@ -26,6 +27,10 @@ tokenizers = { version = "0.22.1", features = ["http"] }
 name = "cohere_melody"
 path = "src/lib.rs"
 crate-type = ["rlib", "staticlib"]
+
+[[bench]]
+name = "write_decoded"
+harness = false
 
 [features]
 default = ["ffi"]

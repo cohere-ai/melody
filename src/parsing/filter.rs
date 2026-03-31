@@ -182,6 +182,7 @@ pub struct FilterImpl {
     // Mode and special token configuration
     pub(crate) default_mode: FilterMode,
     pub(crate) special_token_map: HashMap<String, FilterMode>,
+    pub(crate) special_token_start_bytes: [bool; 256],
     pub(crate) stream_non_grounded_answer: bool,
     pub(crate) stream_tool_actions: bool,
     pub(crate) stream_processed_params: bool,
@@ -214,6 +215,30 @@ pub struct FilterImpl {
     pub(crate) done: bool,
 }
 
+struct SpecialTokenMatch {
+    idx: usize,
+    sequence: String,
+    decoded: String,
+}
+
+enum SpecialTokenScanResult {
+    NoMatch,
+    Partial { idx: usize },
+    Found(SpecialTokenMatch),
+}
+
+enum ApplySpecialTokenResult {
+    Stopped,
+    Consumed,
+    NotSpecial,
+}
+
+pub(crate) enum PartialMatchResult {
+    NoMatch,
+    Partial { idx: usize },
+    Full { idx: usize, sequence: String },
+}
+
 impl FilterImpl {
     pub(crate) fn new() -> Self {
         Self {
@@ -221,6 +246,7 @@ impl FilterImpl {
             right_trimmed: false,
             default_mode: FilterMode::PlainText,
             special_token_map: HashMap::new(),
+            special_token_start_bytes: [false; 256],
             stream_non_grounded_answer: false,
             stream_tool_actions: false,
             stream_processed_params: false,
@@ -257,16 +283,25 @@ impl FilterImpl {
         // Merge special token maps
         for (token, mode) in &options.special_token_map {
             self.special_token_map.insert(token.clone(), *mode);
+            if let Some(first_byte) = token.as_bytes().first() {
+                self.special_token_start_bytes[usize::from(*first_byte)] = true;
+            }
         }
 
         // Add inclusive stops
         for stop in options.inclusive_stops {
+            if let Some(first_byte) = stop.as_bytes().first() {
+                self.special_token_start_bytes[usize::from(*first_byte)] = true;
+            }
             self.special_token_map
                 .insert(stop, FilterMode::InclusiveStop);
         }
 
         // Add exclusive stops
         for stop in options.exclusive_stops {
+            if let Some(first_byte) = stop.as_bytes().first() {
+                self.special_token_start_bytes[usize::from(*first_byte)] = true;
+            }
             self.special_token_map
                 .insert(stop, FilterMode::ExclusiveStop);
         }
@@ -282,66 +317,34 @@ impl FilterImpl {
         self.buf.extend_from_slice(text);
         let mut out = Vec::new();
 
-        // Loop to process all special tokens in the buffer
         loop {
-            let str = String::from_utf8_lossy(&self.buf).to_string();
+            match self.detect_special_token() {
+                SpecialTokenScanResult::Partial { idx: special_token_idx } => {
+                    if special_token_idx > 0 {
+                        self.num_tokens_in_chunk += 1;
 
-            // If is a partial special token, we need to wait for the next token.
-            let (special_token_idx, found_seq) =
-                find_partial(&str, &mut self.special_token_map.keys());
-            if special_token_idx != usize::MAX && found_seq.is_empty() {
-                // Partial match found - process everything before it, then wait
-                if special_token_idx > 0 {
-                    self.num_tokens_in_chunk += 1;
+                        if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
+                            return out;
+                        }
 
-                    if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
-                        return out;
-                    }
-
-                    let pre_partial = self.buf[..special_token_idx].to_vec();
-                    let (o, remove) = self.handle_token(self.mode, &pre_partial, false);
-                    out.extend(o);
-                    self.buf.drain(..remove);
-                    self.num_tokens_in_chunk = 0;
-                }
-                break;
-            }
-
-            // If it is a whole special token, change the mode, remove the tokens and continue
-            if special_token_idx != usize::MAX && !found_seq.is_empty() {
-                let (stop_outputs, new_mode, is_stop, valid_special) =
-                    self.handle_special_token(&str, special_token_idx, &found_seq, self.mode);
-
-                if valid_special {
-                    if is_stop {
-                        // For stop tokens, handle_special_token already processed everything
-                        out.extend(stop_outputs);
-                        self.buf.clear();
-                        self.done = true;
-                        return out;
-                    }
-
-                    // Before the special token, process the buffer with the old mode
-                    let pre_special_token = &str[..special_token_idx];
-                    if !pre_special_token.is_empty() {
-                        let (o, _) =
-                            self.handle_token(self.mode, pre_special_token.as_bytes(), false);
+                        let pre_partial = self.buf[..special_token_idx].to_vec();
+                        let (o, remove) = self.handle_token(self.mode, &pre_partial, false);
                         out.extend(o);
+                        self.buf.drain(..remove);
+                        self.num_tokens_in_chunk = 0;
                     }
-
-                    // Remove the special token and the text before
-                    let remove_len = pre_special_token.len() + found_seq.len();
-                    self.buf.drain(..remove_len);
-
-                    // Change mode
-                    self.mode = new_mode;
-
-                    // Continue loop to process any remaining special tokens
-                    continue;
+                    break;
                 }
+                SpecialTokenScanResult::Found(token_match) => {
+                    match self.apply_special_token_match(&token_match, &mut out) {
+                        ApplySpecialTokenResult::Stopped => return out,
+                        ApplySpecialTokenResult::Consumed => continue,
+                        ApplySpecialTokenResult::NotSpecial => {}
+                    }
+                }
+                SpecialTokenScanResult::NoMatch => {}
             }
 
-            // No special token found - process the buffer by mode
             if !self.buf.is_empty() {
                 self.num_tokens_in_chunk += 1;
 
@@ -349,17 +352,80 @@ impl FilterImpl {
                     return out;
                 }
 
-                let buf = std::mem::take(&mut self.buf);
+                let mut buf = std::mem::take(&mut self.buf);
                 let (o, remove) = self.handle_token(self.mode, &buf, false);
                 out.extend(o);
-                self.buf = buf[remove..].to_vec();
+                if remove > 0 {
+                    buf.drain(..remove);
+                }
+                self.buf = buf;
                 self.num_tokens_in_chunk = 0;
             }
-
             break;
         }
 
         out
+    }
+
+    fn detect_special_token(&self) -> SpecialTokenScanResult {
+        if !self
+            .buf
+            .iter()
+            .any(|byte| self.special_token_start_bytes[usize::from(*byte)])
+        {
+            return SpecialTokenScanResult::NoMatch;
+        }
+
+        let decoded = String::from_utf8_lossy(&self.buf).into_owned();
+        match find_partial(&decoded, self.special_token_map.keys()) {
+            PartialMatchResult::NoMatch => SpecialTokenScanResult::NoMatch,
+            PartialMatchResult::Partial { idx } => SpecialTokenScanResult::Partial { idx },
+            PartialMatchResult::Full { idx, sequence } => {
+                SpecialTokenScanResult::Found(SpecialTokenMatch {
+                    idx,
+                    sequence,
+                    decoded,
+                })
+            }
+        }
+    }
+
+    fn apply_special_token_match(
+        &mut self,
+        token_match: &SpecialTokenMatch,
+        out: &mut Vec<FilterOutput>,
+    ) -> ApplySpecialTokenResult {
+        let (o, new_mode, stop, valid_special) = self.handle_special_token(
+            &token_match.decoded,
+            token_match.idx,
+            &token_match.sequence,
+            self.mode,
+        );
+
+        if !valid_special {
+            return ApplySpecialTokenResult::NotSpecial;
+        }
+
+        if stop {
+            out.extend(o);
+            self.buf.clear();
+            self.done = true;
+            return ApplySpecialTokenResult::Stopped;
+        }
+
+        out.extend(o);
+
+        // `idx` is a byte offset produced by string search on `decoded`.
+        let pre_special_token = &token_match.decoded[..token_match.idx];
+        if !pre_special_token.is_empty() {
+            let (o_pre, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), false);
+            out.extend(o_pre);
+        }
+
+        let remove_len = pre_special_token.len() + token_match.sequence.len();
+        self.buf.drain(..remove_len);
+        self.mode = new_mode;
+        ApplySpecialTokenResult::Consumed
     }
 
     fn handle_token(
@@ -578,6 +644,14 @@ impl FilterImpl {
         aggregate(all_outputs)
     }
 
+    /// Classify decoded chunks by whether they emit content.
+    pub fn classify_content_chunks(&mut self, token_strings: &[String]) -> Vec<bool> {
+        token_strings
+            .iter()
+            .map(|token_str| self.write_decoded(token_str).content.is_some())
+            .collect()
+    }
+
     /// Process a complete model output string in one call.
     ///
     /// Unlike `process_full` which requires pre-tokenized chunks, this method
@@ -631,12 +705,11 @@ impl Filter for FilterImpl {
 pub(crate) fn find_partial<'a>(
     s: &str,
     stops: impl Iterator<Item = &'a String>,
-) -> (usize, String) {
+) -> PartialMatchResult {
     let mut min_idx = usize::MAX;
     let mut found_stop = String::new();
 
     for stop in stops {
-        // If we find the stop sequence, check if it's earlier than our current minimum
         if let Some(idx) = s.find(stop) {
             if min_idx == usize::MAX || idx < min_idx {
                 min_idx = idx;
@@ -655,14 +728,23 @@ pub(crate) fn find_partial<'a>(
                 let idx = s.len() - suffix.len();
                 if min_idx == usize::MAX || min_idx > idx {
                     min_idx = idx;
-                    found_stop = String::new(); // Partial match, no complete stop found
+                    found_stop = String::new();
                 }
                 break;
             }
         }
     }
 
-    (min_idx, found_stop)
+    if min_idx == usize::MAX {
+        PartialMatchResult::NoMatch
+    } else if found_stop.is_empty() {
+        PartialMatchResult::Partial { idx: min_idx }
+    } else {
+        PartialMatchResult::Full {
+            idx: min_idx,
+            sequence: found_stop,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -676,27 +758,41 @@ mod tests {
         let stops = vec!["<co: ".to_string(), "</co: ".to_string()];
 
         // Test full match
-        let (idx, found) = find_partial("hello <co: ", stops.iter());
-        assert_eq!(idx, 6);
-        assert_eq!(found, "<co: ");
+        match find_partial("hello <co: ", stops.iter()) {
+            PartialMatchResult::Full { idx, sequence } => {
+                assert_eq!(idx, 6);
+                assert_eq!(sequence, "<co: ");
+            }
+            PartialMatchResult::NoMatch | PartialMatchResult::Partial { .. } => {
+                panic!("expected full match")
+            }
+        }
 
         // Test partial match
-        let (idx, found) = find_partial("hello <c", stops.iter());
-        assert_eq!(idx, 6);
-        assert_eq!(found, "");
+        match find_partial("hello <c", stops.iter()) {
+            PartialMatchResult::Partial { idx } => assert_eq!(idx, 6),
+            PartialMatchResult::NoMatch | PartialMatchResult::Full { .. } => {
+                panic!("expected partial match")
+            }
+        }
 
         // Test no match
-        let (idx, _) = find_partial("hello world", stops.iter());
-        assert_eq!(idx, usize::MAX);
+        assert!(matches!(
+            find_partial("hello world", stops.iter()),
+            PartialMatchResult::NoMatch
+        ));
     }
 
     #[test]
     fn test_find_partial_utf8() {
         // This test ensures we don't slice in the middle of a UTF-8 character (we used to panic here).
         let stops = vec!["RÈGLES".to_string()];
-        let (idx, found) = find_partial("ÈÈÈÈÈÈÈR", stops.iter());
-        assert_eq!(idx, 14);
-        assert_eq!(found, "");
+        match find_partial("ÈÈÈÈÈÈÈR", stops.iter()) {
+            PartialMatchResult::Partial { idx } => assert_eq!(idx, 14),
+            PartialMatchResult::NoMatch | PartialMatchResult::Full { .. } => {
+                panic!("expected partial UTF-8 match")
+            }
+        }
     }
 
     #[test]
@@ -1357,6 +1453,7 @@ mod tests {
         let result = f.write_text(b"More text");
         assert!(result.is_empty());
     }
+
     #[test]
     fn test_write_text_handles_multiple_special_tokens() {
         use crate::parsing::options::FilterOptions;
@@ -1417,5 +1514,66 @@ mod tests {
         assert!(result.content.is_some());
         assert!(result.reasoning.is_some());
         assert_eq!(result.reasoning.as_ref().unwrap(), "text3");
+    }
+
+    #[test]
+    fn test_classify_content_chunks_marks_only_content_after_reasoning() {
+        let mut f = make_cmd4_no_tools_filter();
+        let chunks = vec![
+            "<|START_THINKING|>".to_string(),
+            "Step 1".to_string(),
+            "<|END_THINKING|>".to_string(),
+            "<|START_TEXT|>".to_string(),
+            "Final".to_string(),
+            " answer".to_string(),
+            "<|END_TEXT|>".to_string(),
+        ];
+
+        let content_mask = f.classify_content_chunks(&chunks);
+
+        assert_eq!(
+            content_mask,
+            vec![false, false, false, false, true, true, false]
+        );
+    }
+
+    #[test]
+    fn test_classify_content_chunks_marks_transition_chunk_with_content() {
+        let mut f = make_cmd3_filter();
+        let chunks = vec![
+            "<|START_THINKING|>".to_string(),
+            "Thinking".to_string(),
+            "<|END_THINKING|>Answer".to_string(),
+            "<|END_RESPONSE|>".to_string(),
+        ];
+
+        let content_mask = f.classify_content_chunks(&chunks);
+
+        assert_eq!(content_mask, vec![false, false, true, false]);
+    }
+
+    #[test]
+    fn test_classify_content_chunks_excludes_tool_action_chunks() {
+        let opts = FilterOptions::default().cmd4().stream_tool_actions();
+        let mut f = new_filter(opts);
+        let chunks = vec![
+            "<|START_THINKING|>".to_string(),
+            "Need a tool.".to_string(),
+            "<|END_THINKING|>".to_string(),
+            "<|START_ACTION|>".to_string(),
+            r#"[{"tool_call_id":"call_0","tool_name":"web_search","parameters":{"query":"weather"}}]"#
+                .to_string(),
+            "<|END_ACTION|>".to_string(),
+            "<|START_TEXT|>".to_string(),
+            "Sunny.".to_string(),
+            "<|END_TEXT|>".to_string(),
+        ];
+
+        let content_mask = f.classify_content_chunks(&chunks);
+
+        assert_eq!(
+            content_mask,
+            vec![false, false, false, false, false, false, false, true, false]
+        );
     }
 }

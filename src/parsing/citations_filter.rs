@@ -5,16 +5,29 @@
 //! tool results.
 //!
 
-use crate::parsing::filter::{FilterImpl, find_partial};
+use crate::parsing::filter::{FilterImpl, PartialMatchResult, find_partial};
 use crate::parsing::types::{FilterCitation, FilterMode, FilterOutput, Source};
 
 // Citation marker constants
 const START_FIRST_CIT: &str = "<co: ";
 const START_LAST_CIT: &str = "</co: ";
 const END_OF_CIT: &str = ">";
+const START_OF_CIT: char = '<';
 const START_FIRST_CIT_CMD3: &str = "<co";
 
 impl FilterImpl {
+    fn emit_plain_text_citation_output(&mut self, s: &str) -> (Option<FilterOutput>, usize) {
+        self.cur_text_index += s.chars().count();
+        self.cur_text_byte_index += s.len();
+        (
+            Some(FilterOutput {
+                text: s.to_string(),
+                ..Default::default()
+            }),
+            s.len(),
+        )
+    }
+
     /// Process text response, extracting citations.
     ///
     /// This method is called when in `GroundedAnswer` or `ToolReason` mode. It parses
@@ -77,6 +90,10 @@ impl FilterImpl {
         s: &str,
         mode: FilterMode,
     ) -> (Option<FilterOutput>, usize) {
+        if !s.contains(START_OF_CIT) {
+            return self.emit_plain_text_citation_output(s);
+        }
+
         let start_first_citation_str = if self.cmd3_citations {
             START_FIRST_CIT_CMD3
         } else {
@@ -88,15 +105,7 @@ impl FilterImpl {
 
         // No citation was found so send the plain text and remove from buffer
         if start_first_id == usize::MAX {
-            self.cur_text_index += s.chars().count();
-            self.cur_text_byte_index += s.len();
-            return (
-                Some(FilterOutput {
-                    text: s.to_string(),
-                    ..Default::default()
-                }),
-                s.len(),
-            );
+            return self.emit_plain_text_citation_output(s);
         }
 
         // Only partial citation found so we need to wait for the complete citation.
@@ -248,15 +257,11 @@ impl FilterImpl {
         end: &str,
         cmd3_citations: bool,
     ) -> (usize, usize, Vec<Source>) {
-        let (start_id, start_found) = find_partial(s, [start.to_string()].iter());
-
-        if start_id == usize::MAX {
-            return (usize::MAX, usize::MAX, Vec::new());
-        }
-
-        if start_found.is_empty() {
-            return (start_id, usize::MAX, Vec::new());
-        }
+        let start_id = match find_partial(s, [start.to_string()].iter()) {
+            PartialMatchResult::NoMatch => return (usize::MAX, usize::MAX, Vec::new()),
+            PartialMatchResult::Partial { idx } => return (idx, usize::MAX, Vec::new()),
+            PartialMatchResult::Full { idx, .. } => idx,
+        };
 
         let Some(end_id) = s[start_id + 1..].find(end) else {
             return (start_id, usize::MAX, Vec::new());
@@ -501,6 +506,60 @@ mod tests {
         let output = output.unwrap();
         assert_eq!(output.text, "hello coo");
         assert_eq!(remove, 9);
+    }
+
+    #[test]
+    fn test_handle_citations_no_citation_updates_ascii_indices() {
+        let mut filter = FilterImpl::new();
+        filter.cur_text_index = 7;
+        filter.cur_text_byte_index = 7;
+
+        let (output, remove) =
+            filter.parse_citations("plain ascii text", FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "plain ascii text");
+        assert!(output.citations.is_empty());
+        assert_eq!(remove, 16);
+        assert_eq!(filter.cur_text_index, 23);
+        assert_eq!(filter.cur_text_byte_index, 23);
+    }
+
+    #[test]
+    fn test_handle_citations_no_citation_updates_multibyte_indices() {
+        let mut filter = FilterImpl::new();
+        filter.cur_text_index = 2;
+        filter.cur_text_byte_index = 2;
+
+        let (output, remove) = filter.parse_citations("hi🌈é", FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hi🌈é");
+        assert!(output.citations.is_empty());
+        assert_eq!(remove, "hi🌈é".len());
+        assert_eq!(filter.cur_text_index, 6);
+        assert_eq!(filter.cur_text_byte_index, 10);
+    }
+
+    #[test]
+    fn test_handle_citations_non_citation_angle_bracket_updates_indices() {
+        let mut filter = FilterImpl::new();
+
+        let (output, remove) =
+            filter.parse_citations("hello <not-a-citation>", FilterMode::GroundedAnswer);
+
+        assert!(output.is_some());
+        let output = output.unwrap();
+        assert_eq!(output.text, "hello <not-a-citation>");
+        assert!(output.citations.is_empty());
+        assert_eq!(remove, "hello <not-a-citation>".len());
+        assert_eq!(
+            filter.cur_text_index,
+            "hello <not-a-citation>".chars().count()
+        );
+        assert_eq!(filter.cur_text_byte_index, "hello <not-a-citation>".len());
     }
 
     #[test]
