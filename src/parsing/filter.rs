@@ -708,7 +708,7 @@ pub(crate) fn find_partial<'a>(
 
     for stop in stops {
         if let Some(idx) = s.find(stop) {
-            if min_idx == usize::MAX || idx < min_idx {
+            if min_idx == usize::MAX || idx <= min_idx {
                 min_idx = idx;
                 found_stop.clone_from(stop);
             }
