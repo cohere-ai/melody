@@ -309,6 +309,31 @@ impl FilterImpl {
         self
     }
 
+    /// Applies [`chunk_size`] batching, then runs [`handle_token`] on a prefix of `buf` when the
+    /// chunk is ready. Assigns back to [`Self::buf`]. `input_len` is `Some(n)` to process the
+    /// first `n` bytes, or `None` to process the full buffer. Returns `true` if deferred (caller
+    /// should return from `write_text` without further work).
+    fn emit_handled_chunk_or_defer(
+        &mut self,
+        mut buf: Vec<u8>,
+        input_len: Option<usize>,
+        out: &mut Vec<FilterOutput>,
+    ) -> bool {
+        let input_len = input_len.unwrap_or_else(|| buf.len());
+        self.num_tokens_in_chunk += 1;
+        if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
+            self.buf = buf;
+            return true;
+        }
+        let input = &buf[..input_len];
+        let (o, remove) = self.handle_token(self.mode, input, false);
+        out.extend(o);
+        buf.drain(..remove);
+        self.num_tokens_in_chunk = 0;
+        self.buf = buf;
+        false
+    }
+
     pub(crate) fn write_text(&mut self, text: &[u8]) -> Vec<FilterOutput> {
         if self.done {
             return Vec::new();
@@ -325,17 +350,9 @@ impl FilterImpl {
                     idx: special_token_idx,
                 } => {
                     if special_token_idx > 0 {
-                        self.num_tokens_in_chunk += 1;
-
-                        if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
+                        if self.emit_handled_chunk_or_defer(std::mem::take(&mut self.buf), Some(special_token_idx), &mut out) {
                             return out;
                         }
-
-                        let pre_partial = self.buf[..special_token_idx].to_vec();
-                        let (o, remove) = self.handle_token(self.mode, &pre_partial, false);
-                        out.extend(o);
-                        self.buf.drain(..remove);
-                        self.num_tokens_in_chunk = 0;
                     }
                     break;
                 }
@@ -351,20 +368,9 @@ impl FilterImpl {
 
             // No special token left to peel: emit under the current mode (respects `chunk_size`).
             if !self.buf.is_empty() {
-                self.num_tokens_in_chunk += 1;
-
-                if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
+                if self.emit_handled_chunk_or_defer(std::mem::take(&mut self.buf), None, &mut out) {
                     return out;
                 }
-
-                let mut buf = std::mem::take(&mut self.buf);
-                let (o, remove) = self.handle_token(self.mode, &buf, false);
-                out.extend(o);
-                if remove > 0 {
-                    buf.drain(..remove);
-                }
-                self.buf = buf;
-                self.num_tokens_in_chunk = 0;
             }
             break;
         }
