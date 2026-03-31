@@ -12,6 +12,7 @@ use crate::parsing::types::{FilterCitation, FilterMode, FilterOutput, Source};
 const START_FIRST_CIT: &str = "<co: ";
 const START_LAST_CIT: &str = "</co: ";
 const END_OF_CIT: &str = ">";
+const START_OF_CIT: char = '<';
 const START_FIRST_CIT_CMD3: &str = "<co";
 
 impl FilterImpl {
@@ -93,7 +94,7 @@ impl FilterImpl {
         s: &str,
         mode: FilterMode,
     ) -> (Option<FilterOutput>, usize) {
-        if !s.as_bytes().contains(&b'<') {
+        if !s.contains(START_OF_CIT) {
             return self.emit_plain_text_citation_output(s);
         }
 
@@ -562,7 +563,10 @@ mod tests {
         assert_eq!(output.text, "hello <not-a-citation>");
         assert!(output.citations.is_empty());
         assert_eq!(remove, "hello <not-a-citation>".len());
-        assert_eq!(filter.cur_text_index, "hello <not-a-citation>".chars().count());
+        assert_eq!(
+            filter.cur_text_index,
+            "hello <not-a-citation>".chars().count()
+        );
         assert_eq!(filter.cur_text_byte_index, "hello <not-a-citation>".len());
     }
 

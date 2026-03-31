@@ -590,12 +590,10 @@ impl FilterImpl {
 
     /// Classify decoded chunks by whether they emit content.
     pub fn classify_content_chunks(&mut self, token_strings: &[String]) -> Vec<bool> {
-        let mut content_mask = Vec::with_capacity(token_strings.len());
-        for token_str in token_strings {
-            let result = self.write_decoded(token_str);
-            content_mask.push(result.content.is_some());
-        }
-        content_mask
+        token_strings
+            .iter()
+            .map(|token_str| self.write_decoded(token_str).content.is_some())
+            .collect()
     }
 
     /// Process a complete model output string in one call.
