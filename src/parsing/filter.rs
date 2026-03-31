@@ -11,6 +11,11 @@ use crate::parsing::types::{
 };
 use std::collections::HashMap;
 
+/// Multi-hop section markers ([`FilterOptions::handle_multi_hop`]). See
+/// [`FilterImpl::omit_multi_hop_marker_from_special_scan`].
+const MULTI_HOP_ANSWER_MARKER: &str = "Answer:";
+const MULTI_HOP_GROUNDED_ANSWER_MARKER: &str = "Grounded answer:";
+
 fn push_text(target: &mut Option<String>, text: &mut String) {
     match target {
         Some(s) => s.push_str(text),
@@ -374,6 +379,25 @@ impl FilterImpl {
         out
     }
 
+    /// Whether a multi-hop marker should be left out of [`find_partial`] for this mode. Only
+    /// [`MULTI_HOP_ANSWER_MARKER`] is omitted (in grounded or answer mode); [`MULTI_HOP_GROUNDED_ANSWER_MARKER`]
+    /// is always scanned. Other keys (e.g. `<|START_TEXT|>`) are never affected.
+    fn omit_multi_hop_marker_from_special_scan(token: &str, mode: FilterMode) -> bool {
+        if token == MULTI_HOP_GROUNDED_ANSWER_MARKER {
+            return false;
+        }
+        token == MULTI_HOP_ANSWER_MARKER
+            && (mode == FilterMode::GroundedAnswer || mode == FilterMode::Answer)
+    }
+
+    /// Keys passed to [`find_partial`]: [`Self::special_token_map`] minus multi-hop markers per
+    /// [`Self::omit_multi_hop_marker_from_special_scan`].
+    fn special_token_keys_for_scan(&self) -> impl Iterator<Item = &String> {
+        self.special_token_map.keys().filter(move |token| {
+            !Self::omit_multi_hop_marker_from_special_scan(token.as_str(), self.mode)
+        })
+    }
+
     /// If the buffer may contain a special token, decode and classify via [`find_partial`].
     fn detect_special_token(&self) -> SpecialTokenScanResult {
         if !self
@@ -385,7 +409,7 @@ impl FilterImpl {
         }
 
         let decoded = String::from_utf8_lossy(&self.buf).into_owned();
-        match find_partial(&decoded, self.special_token_map.keys()) {
+        match find_partial(&decoded, self.special_token_keys_for_scan()) {
             PartialMatchResult::NoMatch => SpecialTokenScanResult::NoMatch,
             PartialMatchResult::Partial { idx } => SpecialTokenScanResult::Partial { idx },
             PartialMatchResult::Full { idx, sequence } => {
@@ -404,24 +428,8 @@ impl FilterImpl {
         token_match: &SpecialTokenMatch,
         out: &mut Vec<FilterOutput>,
     ) -> ApplySpecialTokenResult {
-        let (o, new_mode, stop, valid_special) = self.handle_special_token(
-            &token_match.decoded,
-            token_match.idx,
-            &token_match.sequence,
-            self.mode,
-        );
-
-        if !valid_special {
-            // False positive (e.g. literal `Answer:` inside `GroundedAnswer`). Emit through the
-            // current mode and advance past it so `detect_special_token` can find later markers
-            // (`Cited Documents:`, etc.) in the same buffer.
-            let end = token_match.idx + token_match.sequence.len();
-            let segment = &token_match.decoded[..end];
-            let (o_seg, remove) = self.handle_token(self.mode, segment.as_bytes(), false);
-            out.extend(o_seg);
-            self.buf.drain(..remove);
-            return ApplySpecialTokenResult::Consumed;
-        }
+        let (o, new_mode, stop) =
+            self.handle_special_token(&token_match.decoded, token_match.idx, &token_match.sequence);
 
         if stop {
             out.extend(o);
@@ -479,53 +487,45 @@ impl FilterImpl {
     // - A vector of FilterOutput to emit immediately (e.g. for inclusive/exclusive stops)
     // - The new FilterMode to transition into
     // - A boolean indicating whether this token should trigger stopping the stream
-    // - A boolean indicating whether this token was recognized as a valid special token
+    //
+    // [`MULTI_HOP_ANSWER_MARKER`] is omitted from scanning in grounded/answer mode
+    // ([`Self::special_token_keys_for_scan`]) so it never reaches here as a match in those modes.
     fn handle_special_token(
         &mut self,
         s: &str,
         idx: usize,
         token: &str,
-        cur_mode: FilterMode,
-    ) -> (Vec<FilterOutput>, FilterMode, bool, bool) {
+    ) -> (Vec<FilterOutput>, FilterMode, bool) {
         let new_mode = self
             .special_token_map
             .get(token)
             .copied()
             .unwrap_or(FilterMode::PlainText);
 
-        // Disable mode change if in grounded answer or answer mode and see "Answer:" in the text
-        let not_special = (cur_mode == FilterMode::GroundedAnswer
-            || cur_mode == FilterMode::Answer)
-            && new_mode == FilterMode::Answer;
-
-        if not_special {
-            return (Vec::new(), cur_mode, false, false);
-        }
-
         match new_mode {
             FilterMode::InclusiveStop => {
                 let out = self.handle_inclusive_stop(s, idx, token);
-                (out, new_mode, true, true)
+                (out, new_mode, true)
             }
             FilterMode::ExclusiveStop => {
                 let out = self.handle_exclusive_stop(s, idx);
-                (out, new_mode, true, true)
+                (out, new_mode, true)
             }
             FilterMode::GroundedAnswer => {
                 self.cur_text_index = 0;
                 if self.stream_non_grounded_answer {
                     self.left_trimmed = true;
                 }
-                (Vec::new(), new_mode, false, true)
+                (Vec::new(), new_mode, false)
             }
             FilterMode::ToolReason => {
                 self.left_trimmed = true;
                 self.right_trimmed = true;
-                (Vec::new(), new_mode, false, true)
+                (Vec::new(), new_mode, false)
             }
             FilterMode::Answer | FilterMode::SearchQuery => {
                 self.left_trimmed = true;
-                (Vec::new(), new_mode, false, true)
+                (Vec::new(), new_mode, false)
             }
             FilterMode::NextSearchQuery => {
                 self.left_trimmed = true;
@@ -533,9 +533,9 @@ impl FilterImpl {
                     self.curr_search_query_idx += 1;
                     self.sent_curr_index = false;
                 }
-                (Vec::new(), FilterMode::SearchQuery, false, true)
+                (Vec::new(), FilterMode::SearchQuery, false)
             }
-            _ => (Vec::new(), new_mode, false, true),
+            _ => (Vec::new(), new_mode, false),
         }
     }
 
@@ -1535,6 +1535,25 @@ mod tests {
         filter = filter.apply_options(options);
 
         let text = "Answer:Hello Answer: more Grounded answer: blah blah";
+        let result = filter.process_full_text(text);
+        let content = result.content.unwrap_or_default();
+        assert!(
+            !content.contains("Grounded answer"),
+            "expected Grounded answer block to be stripped from streamed content, got {content:?}"
+        );
+    }
+
+    /// Literal `Answer:` is not scanned as a special token in grounded mode, so incomplete
+    /// `<co: …>` before it does not interact with the old false-positive drain path.
+    #[test]
+    fn test_false_positive_answer_with_incomplete_citation_drains_segment() {
+        use crate::parsing::options::FilterOptions;
+
+        let mut filter = FilterImpl::new();
+        let options = FilterOptions::new().handle_multi_hop();
+        filter = filter.apply_options(options);
+
+        let text = "Grounded answer: x <co: 1>y Answer: more Grounded answer: blah";
         let result = filter.process_full_text(text);
         let content = result.content.unwrap_or_default();
         assert!(
