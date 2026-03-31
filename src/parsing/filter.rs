@@ -317,6 +317,8 @@ impl FilterImpl {
         self.buf.extend_from_slice(text);
         let mut out = Vec::new();
 
+        // Repeatedly handle special tokens (buffer may contain several). Trailing partials: emit a
+        // safe prefix when possible, leave the incomplete suffix buffered for the next call.
         loop {
             match self.detect_special_token() {
                 SpecialTokenScanResult::Partial { idx: special_token_idx } => {
@@ -345,6 +347,7 @@ impl FilterImpl {
                 SpecialTokenScanResult::NoMatch => {}
             }
 
+            // No special token left to peel: emit under the current mode (respects `chunk_size`).
             if !self.buf.is_empty() {
                 self.num_tokens_in_chunk += 1;
 
@@ -367,6 +370,7 @@ impl FilterImpl {
         out
     }
 
+    /// If the buffer may contain a special token, decode and classify via [`find_partial`].
     fn detect_special_token(&self) -> SpecialTokenScanResult {
         if !self
             .buf
@@ -390,6 +394,7 @@ impl FilterImpl {
         }
     }
 
+    // On a valid full match: emit stop output, or prefix under the old mode, then drain and set mode.
     fn apply_special_token_match(
         &mut self,
         token_match: &SpecialTokenMatch,
@@ -415,7 +420,6 @@ impl FilterImpl {
 
         out.extend(o);
 
-        // `idx` is a byte offset produced by string search on `decoded`.
         let pre_special_token = &token_match.decoded[..token_match.idx];
         if !pre_special_token.is_empty() {
             let (o_pre, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), false);
@@ -459,6 +463,11 @@ impl FilterImpl {
         }
     }
 
+    // handle_special_token processes a detected special token and determines:
+    // - A vector of FilterOutput to emit immediately (e.g. for inclusive/exclusive stops)
+    // - The new FilterMode to transition into
+    // - A boolean indicating whether this token should trigger stopping the stream
+    // - A boolean indicating whether this token was recognized as a valid special token
     fn handle_special_token(
         &mut self,
         s: &str,
@@ -652,16 +661,11 @@ impl FilterImpl {
             .collect()
     }
 
-    /// Process a complete model output string in one call.
-    ///
-    /// Unlike `process_full` which requires pre-tokenized chunks, this method
-    /// takes the raw text and internally splits at special token boundaries,
-    /// reducing the number of processing passes from `O(n_tokens)` to
-    /// `O(n_special_tokens)`.
+    /// Combines [`Self::write_decoded`] and [`Self::flush_partials`] so buffered tail and final
+    /// flush are both reflected in the returned aggregate.
     pub fn process_full_text(&mut self, text: &str) -> FilterAggregatedResult {
         let o1 = self.write_decoded(text);
         let o2 = self.flush_partials();
-        // Adds o1 and o2 together, concatenating content and reasoning, merging tool calls and citations
         FilterAggregatedResult {
             content: Self::concatenate_o_strings(o1.content.as_ref(), o2.content.as_ref()),
             reasoning: Self::concatenate_o_strings(o1.reasoning.as_ref(), o2.reasoning.as_ref()),
@@ -671,6 +675,7 @@ impl FilterImpl {
         }
     }
 
+    // Used only to merge `content` / `reasoning` from the two aggregate halves in `process_full_text`.
     fn concatenate_o_strings(s1: Option<&String>, s2: Option<&String>) -> Option<String> {
         match (s1, s2) {
             (Some(str1), Some(str2)) => Some(format!("{str1}{str2}")),
@@ -701,7 +706,9 @@ impl Filter for FilterImpl {
     }
 }
 
-/// Find partial returns first index in str that might match one of stop sequences.
+/// Among all `stops`, find the earliest index that matters: prefer a full substring match at
+/// that offset; otherwise the leftmost position where `s` ends with a non-empty prefix of some
+/// stop (partial / wait for more input).
 pub(crate) fn find_partial<'a>(
     s: &str,
     stops: impl Iterator<Item = &'a String>,
