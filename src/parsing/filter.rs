@@ -647,21 +647,28 @@ impl FilterImpl {
 }
 
 impl FilterImpl {
-    /// Feed all tokens through the filter and return a single result with fully accumulated tool calls.
-    pub fn process_full(&mut self, token_strings: &[String]) -> FilterAggregatedResult {
-        let mut all_outputs = Vec::with_capacity(token_strings.len());
-        for token_str in token_strings {
-            all_outputs.extend(self.write_text(token_str.as_bytes()));
-        }
+    /// Mark the stream finished and emit any buffered tail (same rules as [`Filter::flush_partials`]).
+    fn take_flush_tail_outputs(&mut self) -> Vec<FilterOutput> {
         self.done = true;
         if !self.buf.is_empty()
             && self.mode != FilterMode::InclusiveStop
             && self.mode != FilterMode::ExclusiveStop
         {
             let buf_copy = std::mem::take(&mut self.buf);
-            let (o, _) = self.handle_token(self.mode, &buf_copy, true);
-            all_outputs.extend(o);
+            let (o, _remove) = self.handle_token(self.mode, &buf_copy, true);
+            o
+        } else {
+            Vec::new()
         }
+    }
+
+    /// Feed all tokens through the filter and return a single result with fully accumulated tool calls.
+    pub fn process_full(&mut self, token_strings: &[String]) -> FilterAggregatedResult {
+        let mut all_outputs = Vec::with_capacity(token_strings.len());
+        for token_str in token_strings {
+            all_outputs.extend(self.write_text(token_str.as_bytes()));
+        }
+        all_outputs.extend(self.take_flush_tail_outputs());
         aggregate(all_outputs)
     }
 
@@ -673,12 +680,13 @@ impl FilterImpl {
             .collect()
     }
 
-    /// Combines [`Self::write_decoded`] and [`Self::flush_partials`] so buffered tail and final
-    /// flush are both reflected in the returned aggregate.
+    /// Processes `text` in one pass and returns one aggregate (same merge semantics as
+    /// [`Self::process_full`]: a single [`aggregate`] over all outputs, including the final flush
+    /// tail, so tool calls are merged by index and not duplicated across write/flush boundaries).
     pub fn process_full_text(&mut self, text: &str) -> FilterAggregatedResult {
-        let decoded = self.write_decoded(text);
-        let flushed = self.flush_partials();
-        decoded.merge_chain(flushed)
+        let mut all_outputs = self.write_text(text.as_bytes());
+        all_outputs.extend(self.take_flush_tail_outputs());
+        aggregate(all_outputs)
     }
 }
 
@@ -689,16 +697,7 @@ impl Filter for FilterImpl {
     }
 
     fn flush_partials(&mut self) -> FilterAggregatedResult {
-        self.done = true;
-        if !self.buf.is_empty()
-            && self.mode != FilterMode::InclusiveStop
-            && self.mode != FilterMode::ExclusiveStop
-        {
-            let buf_copy = std::mem::take(&mut self.buf);
-            let (o, _remove) = self.handle_token(self.mode, &buf_copy, true);
-            return aggregate(o);
-        }
-        FilterAggregatedResult::default()
+        aggregate(self.take_flush_tail_outputs())
     }
 }
 
@@ -1380,6 +1379,36 @@ mod tests {
         assert_eq!(result.reasoning, Some("I should search.".into()));
         assert!(!result.tool_calls.is_empty());
         assert_eq!(result.tool_calls[0].name, "web_search");
+    }
+
+    /// `process_full_text` must match `process_full` on a single chunk so tool-call accumulation
+    /// is not split incorrectly across `write_decoded` vs `flush_partials` aggregates.
+    #[test]
+    fn test_process_full_text_matches_process_full_streaming_tools_one_chunk() {
+        let opts = FilterOptions::default().cmd4().stream_tool_actions();
+        let text = "<|START_THINKING|>I should search.\
+                     <|END_THINKING|>\
+                     <|START_ACTION|>\n[{\"tool_call_id\": \"call_0\", \"tool_name\": \"web_search\", \"parameters\": {\"query\": \"test\"}}]\
+                     <|END_ACTION|>";
+        let mut f1 = new_filter(opts.clone());
+        let mut f2 = new_filter(opts);
+        let full_text = f1.process_full_text(text);
+        let process_full = f2.process_full(&[text.to_string()]);
+        assert_eq!(full_text.tool_calls.len(), process_full.tool_calls.len());
+        for (a, b) in full_text
+            .tool_calls
+            .iter()
+            .zip(process_full.tool_calls.iter())
+        {
+            assert_eq!(a.index, b.index);
+            assert_eq!(a.id, b.id);
+            assert_eq!(a.name, b.name);
+            assert_eq!(a.arguments, b.arguments);
+            assert_eq!(a.processed_params, b.processed_params);
+        }
+        assert_eq!(full_text.content, process_full.content);
+        assert_eq!(full_text.reasoning, process_full.reasoning);
+        assert_eq!(full_text.citations, process_full.citations);
     }
 
     #[test]
