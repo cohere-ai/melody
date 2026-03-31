@@ -308,7 +308,6 @@ impl FilterImpl {
 
         self
     }
-
     /// Applies [`chunk_size`] batching, then runs [`handle_token`] on a prefix of the buffer when
     /// the chunk is ready. Takes [`Self::buf`] with [`std::mem::take`], then assigns back.
     /// `input_len` is `Some(n)` to process the first `n` bytes, or `None` to process the full
@@ -319,19 +318,19 @@ impl FilterImpl {
         input_len: Option<usize>,
         out: &mut Vec<FilterOutput>,
     ) -> bool {
-        let mut buf = std::mem::take(&mut self.buf);
-        let input_len = input_len.unwrap_or_else(|| buf.len());
+        let input_len = input_len.unwrap_or_else(|| self.buf.len());
         self.num_tokens_in_chunk += 1;
         if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
-            self.buf = buf;
             return true;
         }
+        // Take `buf` so the slice passed to `handle_token` does not borrow `self` (E0502).
+        let mut buf = std::mem::take(&mut self.buf);
         let input = &buf[..input_len];
         let (o, remove) = self.handle_token(self.mode, input, false);
         out.extend(o);
         buf.drain(..remove);
-        self.num_tokens_in_chunk = 0;
         self.buf = buf;
+        self.num_tokens_in_chunk = 0;
         false
     }
 
