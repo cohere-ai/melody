@@ -430,7 +430,10 @@ mod tests {
             .parent()
             .unwrap();
         let test_dir = cur_dir.join("tests/templating").join(version);
-        assert!(test_dir.exists(), "Test directory {test_dir:?} does not exist.");
+        assert!(
+            test_dir.exists(),
+            "Test directory {test_dir:?} does not exist."
+        );
         for entry in fs::read_dir(&test_dir).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
