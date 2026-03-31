@@ -589,38 +589,19 @@ impl FilterImpl {
         let o2 = self.flush_partials();
         // Adds o1 and o2 together, concatenating content and reasoning, merging tool calls and citations
         FilterAggregatedResult {
-            content: Self::concatenate_o_strings(&o1.content, &o2.content),
-            reasoning: Self::concatenate_o_strings(&o1.reasoning, &o2.reasoning),
-            tool_calls: Self::concatenate_o_vecs(&Some(o1.tool_calls), &Some(o2.tool_calls))
-                .unwrap_or_default(),
-            citations: Self::concatenate_o_vecs(&Some(o1.citations), &Some(o2.citations))
-                .unwrap_or_default(),
-            search_queries: Self::concatenate_o_vecs(
-                &Some(o1.search_queries),
-                &Some(o2.search_queries),
-            )
-            .unwrap_or_default(),
+            content: Self::concatenate_o_strings(o1.content.as_ref(), o2.content.as_ref()),
+            reasoning: Self::concatenate_o_strings(o1.reasoning.as_ref(), o2.reasoning.as_ref()),
+            search_queries: o1.search_queries.iter().chain(o2.search_queries.iter()).cloned().collect(),
+            tool_calls: o1.tool_calls.iter().chain(o2.tool_calls.iter()).cloned().collect(),
+            citations: o1.citations.iter().chain(o2.citations.iter()).cloned().collect(),
         }
     }
 
-    fn concatenate_o_strings(s1: &Option<String>, s2: &Option<String>) -> Option<String> {
+    fn concatenate_o_strings(s1: Option<&String>, s2: Option<&String>) -> Option<String> {
         match (s1, s2) {
-            (Some(str1), Some(str2)) => Some(format!("{}{}", str1, str2)),
+            (Some(str1), Some(str2)) => Some(format!("{str1}{str2}")),
             (Some(str1), None) => Some(str1.clone()),
             (None, Some(str2)) => Some(str2.clone()),
-            (None, None) => None,
-        }
-    }
-
-    fn concatenate_o_vecs<T: Clone>(v1: &Option<Vec<T>>, v2: &Option<Vec<T>>) -> Option<Vec<T>> {
-        match (v1, v2) {
-            (Some(vec1), Some(vec2)) => {
-                let mut result = vec1.clone();
-                result.extend_from_slice(vec2);
-                Some(result)
-            }
-            (Some(vec1), None) => Some(vec1.clone()),
-            (None, Some(vec2)) => Some(vec2.clone()),
             (None, None) => None,
         }
     }
@@ -659,7 +640,7 @@ pub(crate) fn find_partial<'a>(
         if let Some(idx) = s.find(stop) {
             if min_idx == usize::MAX || idx < min_idx {
                 min_idx = idx;
-                found_stop = stop.clone();
+                found_stop.clone_from(stop);
             }
             continue;
         }
