@@ -595,15 +595,15 @@ impl FilterImpl {
                 .unwrap_or_default(),
             citations: Self::concatenate_o_vecs(&Some(o1.citations), &Some(o2.citations))
                 .unwrap_or_default(),
-            search_queries: Self::concatenate_o_vecs(&Some(o1.search_queries), &Some(o2.search_queries))
-                .unwrap_or_default(),
+            search_queries: Self::concatenate_o_vecs(
+                &Some(o1.search_queries),
+                &Some(o2.search_queries),
+            )
+            .unwrap_or_default(),
         }
     }
 
-    fn concatenate_o_strings(
-        s1: &Option<String>,
-        s2: &Option<String>,
-    ) -> Option<String> {
+    fn concatenate_o_strings(s1: &Option<String>, s2: &Option<String>) -> Option<String> {
         match (s1, s2) {
             (Some(str1), Some(str2)) => Some(format!("{}{}", str1, str2)),
             (Some(str1), None) => Some(str1.clone()),
@@ -612,10 +612,7 @@ impl FilterImpl {
         }
     }
 
-    fn concatenate_o_vecs<T: Clone>(
-        v1: &Option<Vec<T>>,
-        v2: &Option<Vec<T>>,
-    ) -> Option<Vec<T>> {
+    fn concatenate_o_vecs<T: Clone>(v1: &Option<Vec<T>>, v2: &Option<Vec<T>>) -> Option<Vec<T>> {
         match (v1, v2) {
             (Some(vec1), Some(vec2)) => {
                 let mut result = vec1.clone();

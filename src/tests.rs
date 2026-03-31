@@ -270,8 +270,6 @@ mod tests {
             tt.name
         );
 
-
-
         // Also test parsing the entire text at once
         let mut filter = crate::parsing::new_filter(tt.options);
         let result = filter.process_full_text(&tt.input);
@@ -307,7 +305,6 @@ mod tests {
             "Test case '{}' (full parse) failed - citations not equal",
             tt.name
         );
-
     }
 
     #[test]
