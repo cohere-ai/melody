@@ -40,21 +40,21 @@ fn run_repeated_stream(options: FilterOptions, chunks: &[&str], repeats: usize) 
     black_box(filter.flush_partials());
 }
 
-#[divan::bench(args = [1_024, 16_384])]
+#[divan::bench(args = [1_024, 16_384, 65_536])]
 fn write_decoded_plain_ascii(bencher: divan::Bencher, repeats: usize) {
     bencher.bench_local(|| {
         run_repeated_stream(FilterOptions::new(), PLAIN_ASCII_CHUNKS, repeats);
     });
 }
 
-#[divan::bench(args = [1_024, 16_384])]
+#[divan::bench(args = [1_024, 16_384, 65_536])]
 fn write_decoded_plain_unicode(bencher: divan::Bencher, repeats: usize) {
     bencher.bench_local(|| {
         run_repeated_stream(FilterOptions::new(), PLAIN_UNICODE_CHUNKS, repeats);
     });
 }
 
-#[divan::bench(args = [256, 4_096])]
+#[divan::bench(args = [256, 4_096, 8_192])]
 fn write_decoded_cmd4_reasoning_stream(bencher: divan::Bencher, repeats: usize) {
     bencher.bench_local(|| {
         run_repeated_stream(
@@ -65,7 +65,7 @@ fn write_decoded_cmd4_reasoning_stream(bencher: divan::Bencher, repeats: usize) 
     });
 }
 
-#[divan::bench(args = [128, 1_024])]
+#[divan::bench(args = [128, 1_024, 7_280])]
 fn write_decoded_cmd4_tool_stream(bencher: divan::Bencher, repeats: usize) {
     bencher.bench_local(|| {
         run_repeated_stream(FilterOptions::new().cmd4(), CMD4_TOOL_CHUNKS, repeats);
