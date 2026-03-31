@@ -17,11 +17,7 @@ const START_FIRST_CIT_CMD3: &str = "<co";
 
 impl FilterImpl {
     fn emit_plain_text_citation_output(&mut self, s: &str) -> (Option<FilterOutput>, usize) {
-        self.cur_text_index += if s.is_ascii() {
-            s.len()
-        } else {
-            s.chars().count()
-        };
+        self.cur_text_index += s.chars().count();
         self.cur_text_byte_index += s.len();
         (
             Some(FilterOutput {
