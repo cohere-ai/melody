@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::parsing::types::*;
     use crate::parsing::{Filter, FilterImpl, FilterOptions};
@@ -183,6 +184,7 @@ mod tests {
         want_citations: Vec<FilterCitation>,
     }
 
+    #[allow(clippy::too_many_lines)]
     fn run_filter_test(tt: FilterTestCase) {
         let encoding = TOKENIZER.encode(tt.input.clone(), false).unwrap();
         let tokens = encoding.get_ids();
@@ -236,9 +238,10 @@ mod tests {
             }
             for tc in &result.tool_calls {
                 if tc.index >= out_tool_calls.len() {
-                    let mut ftcd = FilterToolCallDelta::default();
-                    ftcd.index = tc.index;
-                    out_tool_calls.push(ftcd);
+                    out_tool_calls.push(FilterToolCallDelta {
+                        index: tc.index,
+                        ..Default::default()
+                    });
                 }
                 out_tool_calls[tc.index].id.push_str(&tc.id);
                 out_tool_calls[tc.index].name.push_str(&tc.name);
@@ -315,7 +318,7 @@ mod tests {
             options: FilterOptions::new().with_inclusive_stops(vec!["emperor penguin".to_string()]),
             want_text: "The tallest penguin is the emperor penguin",
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -326,7 +329,7 @@ mod tests {
             options: FilterOptions::new().with_exclusive_stops(vec!["emperor penguin".to_string()]),
             want_text: "The tallest penguin is the ",
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -348,7 +351,7 @@ mod tests {
             options: FilterOptions::new(),
             want_text: "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -359,7 +362,7 @@ mod tests {
             options: FilterOptions::new().with_left_trimmed(),
             want_text: "foo bar baz\t\n ",
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -370,7 +373,7 @@ mod tests {
             options: FilterOptions::new().with_right_trimmed(),
             want_text: "\n \tfoo bar baz",
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -382,7 +385,7 @@ mod tests {
             options: FilterOptions::new().cmd3(),
             want_text: "<completion_A> is nice <rating>5</rating>",
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -410,7 +413,7 @@ mod tests {
                 is_thinking: false,
             }],
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -450,7 +453,7 @@ mod tests {
                 },
             ],
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -471,7 +474,7 @@ mod tests {
                 is_thinking: false,
             }],
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -489,12 +492,12 @@ mod tests {
                 raw_param_delta: "{\"a\": 6, \"b\": 7}".to_string(),
             }],
             ..Default::default()
-        })
+        });
     }
 
     #[test]
     fn test_filter_command3_python_tool() {
-        let python_code = r#"import matplotlib.pyplot as plt
+        let python_code = r"import matplotlib.pyplot as plt
 
 # Data for the mountains and number of climbers
 data = {'Mount Everest': None}
@@ -509,7 +512,7 @@ plt.xlabel('Mountain')
 plt.ylabel('Number of Climbers')
             plt.xticks(rotation=45, ha='right')
             plt.tight_layout()
-            plt.savefig('top_ten_mountains_by_climbers.png')"#;
+            plt.savefig('top_ten_mountains_by_climbers.png')";
         let input = format!(
             r#"<|START_THINKING|>I will use the python tool to generate a bar graph of the top ten mountains by number of climbers.<|END_THINKING|><|START_ACTION|>[{{"tool_call_id": "0", "tool_name": "python", "parameters": {{"code": {}}}}}]<|END_ACTION|>"#,
             serde_json::to_string(&python_code).unwrap()
@@ -528,7 +531,7 @@ plt.ylabel('Number of Climbers')
                 raw_param_delta: r#"{"code": "import matplotlib.pyplot as plt\n\n# Data for the mountains and number of climbers\ndata = {'Mount Everest': None}\n# Sort the data by number of climbers\nsorted_data = dict(sorted(data.items(), key=lambda x: x[1], reverse=True))\n# Get the top 10 mountains\ntop_10_mountains = list(sorted_data.keys())[:10]\n# Plot the graph\nplt.figure(figsize=(10, 6))\nplt.bar(top_10_mountains, [data[mountain] for mountain in top_10_mountains])\nplt.xlabel('Mountain')\nplt.ylabel('Number of Climbers')\n            plt.xticks(rotation=45, ha='right')\n            plt.tight_layout()\n            plt.savefig('top_ten_mountains_by_climbers.png')"}"#.to_string(),
             }],
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -545,7 +548,7 @@ plt.ylabel('Number of Climbers')
                 raw_param_delta: "{\"a\": 6, \"b\": 7}".to_string(),
             }],
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -564,7 +567,7 @@ plt.ylabel('Number of Climbers')
                 raw_param_delta: r##"{"order_id": "#W9284598", "reason": "طلبته بالخطأ"}"##.to_string(),
             }],
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -591,7 +594,7 @@ plt.ylabel('Number of Climbers')
                 },
             ],
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -618,7 +621,7 @@ plt.ylabel('Number of Climbers')
                 },
             ],
             ..Default::default()
-        })
+        });
     }
 
     #[test]
@@ -633,7 +636,7 @@ plt.ylabel('Number of Climbers')
             want_text: "<|START_ACTION|>[{\"tool_call_id\": \"0\", \"tool_name\": \"add\", \"parameters\": {\"a\": 6, \"b\": 7}}]<|END_ACTION|>",
             want_thinking: "I will use the add tool to calculate the sum of 6 and 7.",
             ..Default::default()
-        })
+        });
     }
 
     #[test] // For VLLM, <|START_RESPONSE|> gets omitted because it's a special token (and thinking <|*_THINKING|> is not)

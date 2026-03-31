@@ -430,9 +430,7 @@ mod tests {
             .parent()
             .unwrap();
         let test_dir = cur_dir.join("tests/templating").join(version);
-        if !test_dir.exists() {
-            panic!("Test directory {:?} does not exist.", test_dir);
-        }
+        assert!(test_dir.exists(), "Test directory {test_dir:?} does not exist.");
         for entry in fs::read_dir(&test_dir).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
@@ -454,7 +452,7 @@ mod tests {
     #[test]
     fn test_render_cmd3_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd3") {
-            println!("Running cmd3 test case: {}", test_name);
+            println!("Running cmd3 test case: {test_name}");
             let opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
@@ -464,7 +462,7 @@ mod tests {
     #[test]
     fn test_render_cmd3v3_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd3_v3") {
-            println!("Running cmd3v3 test case: {}", test_name);
+            println!("Running cmd3v3 test case: {test_name}");
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             if test_name != "template_provided" {
                 opts.template = CMD3V3_TEMPLATE;
@@ -482,7 +480,7 @@ mod tests {
     #[test]
     fn test_render_cmd3_jinja_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v1") {
-            println!("Running cmd3 jinja test case: {}", test_name);
+            println!("Running cmd3 jinja test case: {test_name}");
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
             opts.template_jinja = CMD3V1_JINJA_HF_TEMPLATE;
@@ -494,7 +492,7 @@ mod tests {
     #[test]
     fn test_render_cmd3_jinja_from_liquid_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd3") {
-            println!("Running cmd3 jinja liquid test case: {}", test_name);
+            println!("Running cmd3 jinja liquid test case: {test_name}");
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
             let rendered = render_cmd3(&opts).unwrap();
@@ -505,7 +503,7 @@ mod tests {
     #[test]
     fn test_render_cmd3v3_jinja_from_liquid_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd3_v3") {
-            println!("Running cmd3v3 jinja liquid test case: {}", test_name);
+            println!("Running cmd3v3 jinja liquid test case: {test_name}");
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
             if test_name != "template_provided" {
@@ -519,7 +517,7 @@ mod tests {
     #[test]
     fn test_render_cmd4_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd4") {
-            println!("Running cmd4 test case: {}", test_name);
+            println!("Running cmd4 test case: {test_name}");
             let opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
@@ -529,7 +527,7 @@ mod tests {
     #[test]
     fn test_render_cmd4_jinja_from_liquid_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd4") {
-            println!("Running cmd4 jinja liquid test case: {}", test_name);
+            println!("Running cmd4 jinja liquid test case: {test_name}");
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
             let rendered = render_cmd4(&opts).unwrap();

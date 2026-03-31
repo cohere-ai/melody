@@ -215,11 +215,10 @@ mod tests {
         assert_eq!(actual_remove, 6);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "30");
     }
@@ -236,11 +235,10 @@ mod tests {
         assert_eq!(actual_remove, 8);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "1.2");
     }
@@ -257,11 +255,10 @@ mod tests {
         assert_eq!(actual_remove, 9);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "null");
     }
@@ -278,11 +275,10 @@ mod tests {
         assert_eq!(actual_remove, 9);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "true");
     }
@@ -299,11 +295,10 @@ mod tests {
         assert_eq!(actual_remove, 8);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "\"testing");
     }
@@ -320,11 +315,10 @@ mod tests {
         assert_eq!(actual_remove, 21);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "\"testing string\"");
     }
@@ -341,11 +335,10 @@ mod tests {
         assert_eq!(actual_remove, 21);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "{\"tes t\": [\"}\"]}");
     }
@@ -362,11 +355,10 @@ mod tests {
         assert_eq!(actual_remove, 18);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "{\"tes t\": [\"}    ,");
     }
@@ -383,11 +375,10 @@ mod tests {
         assert_eq!(actual_remove, 24);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "[{\"test\",[\"}\",\"]\"]}]   }");
     }
@@ -404,11 +395,10 @@ mod tests {
         assert_eq!(actual_remove, 21);
         let mut result = String::new();
         for o in out {
-            if let Some(tool_calls) = o.tool_call_delta {
-                if let Some(param_delta) = tool_calls.param_delta {
+            if let Some(tool_calls) = o.tool_call_delta
+                && let Some(param_delta) = tool_calls.param_delta {
                     result.push_str(&param_delta.value_delta);
                 }
-            }
         }
         assert_eq!(result, "[{\"test\",[\"}\",\"]    ,");
     }

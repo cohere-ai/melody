@@ -318,7 +318,7 @@ impl FilterImpl {
         input_len: Option<usize>,
         out: &mut Vec<FilterOutput>,
     ) -> bool {
-        let input_len = input_len.unwrap_or_else(|| self.buf.len());
+        let input_len = input_len.unwrap_or(self.buf.len());
         self.num_tokens_in_chunk += 1;
         if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
             return true;
@@ -349,10 +349,10 @@ impl FilterImpl {
                 SpecialTokenScanResult::Partial {
                     idx: special_token_idx,
                 } => {
-                    if special_token_idx > 0 {
-                        if self.emit_handled_chunk_or_defer(Some(special_token_idx), &mut out) {
-                            return out;
-                        }
+                    if special_token_idx > 0
+                        && self.emit_handled_chunk_or_defer(Some(special_token_idx), &mut out)
+                    {
+                        return out;
                     }
                     break;
                 }
@@ -367,10 +367,8 @@ impl FilterImpl {
             }
 
             // No special token left to peel: emit under the current mode (respects `chunk_size`).
-            if !self.buf.is_empty() {
-                if self.emit_handled_chunk_or_defer(None, &mut out) {
-                    return out;
-                }
+            if !self.buf.is_empty() && self.emit_handled_chunk_or_defer(None, &mut out) {
+                return out;
             }
             break;
         }
@@ -754,7 +752,7 @@ mod tests {
 
     #[test]
     fn test_find_partial() {
-        let stops = vec!["<co: ".to_string(), "</co: ".to_string()];
+        let stops = ["<co: ".to_string(), "</co: ".to_string()];
 
         // Test full match
         match find_partial("hello <co: ", stops.iter()) {
@@ -785,7 +783,7 @@ mod tests {
     #[test]
     fn test_find_partial_utf8() {
         // This test ensures we don't slice in the middle of a UTF-8 character (we used to panic here).
-        let stops = vec!["RÈGLES".to_string()];
+        let stops = ["RÈGLES".to_string()];
         match find_partial("ÈÈÈÈÈÈÈR", stops.iter()) {
             PartialMatchResult::Partial { idx } => assert_eq!(idx, 14),
             PartialMatchResult::NoMatch | PartialMatchResult::Full { .. } => {
@@ -975,7 +973,7 @@ mod tests {
                     index: 0,
                     param_delta: Some(FilterToolParameter {
                         name: "q".into(),
-                        value_delta: "".into(),
+                        value_delta: String::new(),
                     }),
                     ..Default::default()
                 }),
@@ -1013,7 +1011,7 @@ mod tests {
         assert_eq!(result.tool_calls.len(), 1);
         assert_eq!(result.tool_calls[0].id, "0");
         assert_eq!(result.tool_calls[0].name, "search");
-        assert_eq!(result.tool_calls[0].arguments, r#""#);
+        assert_eq!(result.tool_calls[0].arguments, r"");
         assert_eq!(
             result.tool_calls[0].processed_params[0],
             FilterToolParameter {
@@ -1459,8 +1457,10 @@ mod tests {
 
         // Create filter with special tokens
         let mut filter = FilterImpl::new();
-        let mut options = FilterOptions::default();
-        options.stream_tool_actions = true; // Enable reasoning output
+        let mut options = FilterOptions {
+            stream_tool_actions: true, // Enable reasoning output
+            ..Default::default()
+        };
         options
             .special_token_map
             .insert("<|START|>".to_string(), FilterMode::PlainText);
@@ -1487,9 +1487,11 @@ mod tests {
 
         // Create filter with special tokens
         let mut filter = FilterImpl::new();
-        let mut options = FilterOptions::default();
-        options.stream_non_grounded_answer = true;
-        options.stream_tool_actions = true; // Enable reasoning output
+        let mut options = FilterOptions {
+            stream_non_grounded_answer: true,
+            stream_tool_actions: true, // Enable reasoning output
+            ..Default::default()
+        };
         options
             .special_token_map
             .insert("<answer>".to_string(), FilterMode::Answer);

@@ -75,7 +75,7 @@ fn parse_and_render_liquid(args: &Args) -> Result<()> {
     let liquid_templates_dir = &args.liquid_templates_dir;
 
     // Read the input config file
-    let input_content = fs::read_to_string(&liquid_in_file)
+    let input_content = fs::read_to_string(liquid_in_file)
         .with_context(|| format!("Failed to read input file: {:?}", liquid_in_file))?;
 
     let config: HashMap<String, LiquidTemplateConfig> = serde_yaml::from_str(&input_content)
@@ -162,7 +162,7 @@ fn parse_and_render_jinja(args: &Args) -> Result<()> {
     let jinja_in_file = &args.jinja_in_file;
     let jinja_templates_dir = &args.jinja_templates_dir;
 
-    let input_content = fs::read_to_string(&jinja_in_file)
+    let input_content = fs::read_to_string(jinja_in_file)
         .with_context(|| format!("Failed to read input file: {:?}", jinja_in_file))?;
 
     let config: HashMap<String, JinjaTemplateConfig> = serde_yaml::from_str(&input_content)
