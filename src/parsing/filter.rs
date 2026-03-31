@@ -585,44 +585,47 @@ impl FilterImpl {
     /// reducing the number of processing passes from `O(n_tokens)` to
     /// `O(n_special_tokens)`.
     pub fn process_full_text(&mut self, text: &str) -> FilterAggregatedResult {
-        let tokens: Vec<String> = self.special_token_map.keys().cloned().collect();
-        let mut all_outputs = Vec::new();
-        let mut pos = 0;
-
-        while pos < text.len() && !self.done {
-            let remaining = &text[pos..];
-
-            let mut best_idx = usize::MAX;
-            let mut best_len = 0;
-            for token in &tokens {
-                if let Some(idx) = remaining.find(token.as_str())
-                    && (idx < best_idx || (idx == best_idx && token.len() > best_len))
-                {
-                    best_idx = idx;
-                    best_len = token.len();
-                }
-            }
-
-            if best_idx == usize::MAX {
-                all_outputs.extend(self.write_text(remaining.as_bytes()));
-                pos = text.len();
-            } else {
-                let end = best_idx + best_len;
-                all_outputs.extend(self.write_text(&remaining.as_bytes()[..end]));
-                pos += end;
-            }
+        let o1 = self.write_decoded(text);
+        let o2 = self.flush_partials();
+        // Adds o1 and o2 together, concatenating content and reasoning, merging tool calls and citations
+        FilterAggregatedResult {
+            content: Self::concatenate_o_strings(&o1.content, &o2.content),
+            reasoning: Self::concatenate_o_strings(&o1.reasoning, &o2.reasoning),
+            tool_calls: Self::concatenate_o_vecs(&Some(o1.tool_calls), &Some(o2.tool_calls))
+                .unwrap_or_default(),
+            citations: Self::concatenate_o_vecs(&Some(o1.citations), &Some(o2.citations))
+                .unwrap_or_default(),
+            search_queries: Self::concatenate_o_vecs(&Some(o1.search_queries), &Some(o2.search_queries))
+                .unwrap_or_default(),
         }
+    }
 
-        self.done = true;
-        if !self.buf.is_empty()
-            && self.mode != FilterMode::InclusiveStop
-            && self.mode != FilterMode::ExclusiveStop
-        {
-            let buf_copy = std::mem::take(&mut self.buf);
-            let (o, _) = self.handle_token(self.mode, &buf_copy, true);
-            all_outputs.extend(o);
+    fn concatenate_o_strings(
+        s1: &Option<String>,
+        s2: &Option<String>,
+    ) -> Option<String> {
+        match (s1, s2) {
+            (Some(str1), Some(str2)) => Some(format!("{}{}", str1, str2)),
+            (Some(str1), None) => Some(str1.clone()),
+            (None, Some(str2)) => Some(str2.clone()),
+            (None, None) => None,
         }
-        aggregate(all_outputs)
+    }
+
+    fn concatenate_o_vecs<T: Clone>(
+        v1: &Option<Vec<T>>,
+        v2: &Option<Vec<T>>,
+    ) -> Option<Vec<T>> {
+        match (v1, v2) {
+            (Some(vec1), Some(vec2)) => {
+                let mut result = vec1.clone();
+                result.extend_from_slice(vec2);
+                Some(result)
+            }
+            (Some(vec1), None) => Some(vec1.clone()),
+            (None, Some(vec2)) => Some(vec2.clone()),
+            (None, None) => None,
+        }
     }
 }
 

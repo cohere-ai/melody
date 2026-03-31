@@ -184,7 +184,7 @@ mod tests {
     }
 
     fn run_filter_test(tt: FilterTestCase) {
-        let encoding = TOKENIZER.encode(tt.input, false).unwrap();
+        let encoding = TOKENIZER.encode(tt.input.clone(), false).unwrap();
         let tokens = encoding.get_ids();
 
         let mut text_chunks: Vec<String> = Vec::new();
@@ -208,7 +208,7 @@ mod tests {
             buffer.clear();
         }
 
-        let mut filter = crate::parsing::new_filter(tt.options);
+        let mut filter = crate::parsing::new_filter(tt.options.clone());
         for (i, chunk) in text_chunks.iter().enumerate() {
             let mut result = filter.write_decoded(chunk);
             if i == text_chunks.len() - 1 {
@@ -269,6 +269,45 @@ mod tests {
             "Test case '{}' (WriteDecoded) failed - citations not equal",
             tt.name
         );
+
+
+
+        // Also test parsing the entire text at once
+        let mut filter = crate::parsing::new_filter(tt.options);
+        let result = filter.process_full_text(&tt.input);
+        let mut converted_tool_calls: Vec<FilterToolCallDelta> = Vec::new();
+        for tc in &result.tool_calls {
+            converted_tool_calls.push(FilterToolCallDelta {
+                index: tc.index,
+                id: tc.id.clone(),
+                name: tc.name.clone(),
+                param_delta: None,
+                raw_param_delta: tc.arguments.clone(),
+            });
+        }
+        assert_eq!(
+            result.content.unwrap_or_default(),
+            tt.want_text,
+            "Test case '{}' (full parse) failed - text not equal",
+            tt.name
+        );
+        assert_eq!(
+            result.reasoning.unwrap_or_default(),
+            tt.want_thinking,
+            "Test case '{}' (full parse) failed - thinking not equal",
+            tt.name
+        );
+        assert_eq!(
+            converted_tool_calls, tt.want_tool_calls,
+            "Test case '{}' (full parse) failed - tool_calls not equal",
+            tt.name
+        );
+        assert_eq!(
+            result.citations, tt.want_citations,
+            "Test case '{}' (full parse) failed - citations not equal",
+            tt.name
+        );
+
     }
 
     #[test]
