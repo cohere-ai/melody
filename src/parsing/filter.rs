@@ -692,8 +692,7 @@ impl FilterImpl {
 
 impl Filter for FilterImpl {
     fn write_decoded(&mut self, decoded_token: &str) -> FilterAggregatedResult {
-        let outputs = self.write_text(decoded_token.as_bytes());
-        aggregate(outputs)
+        aggregate(self.write_text(decoded_token.as_bytes()))
     }
 
     fn flush_partials(&mut self) -> FilterAggregatedResult {
