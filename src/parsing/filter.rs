@@ -321,7 +321,9 @@ impl FilterImpl {
         // safe prefix when possible, leave the incomplete suffix buffered for the next call.
         loop {
             match self.detect_special_token() {
-                SpecialTokenScanResult::Partial { idx: special_token_idx } => {
+                SpecialTokenScanResult::Partial {
+                    idx: special_token_idx,
+                } => {
                     if special_token_idx > 0 {
                         self.num_tokens_in_chunk += 1;
 
@@ -669,9 +671,24 @@ impl FilterImpl {
         FilterAggregatedResult {
             content: Self::concatenate_o_strings(o1.content.as_ref(), o2.content.as_ref()),
             reasoning: Self::concatenate_o_strings(o1.reasoning.as_ref(), o2.reasoning.as_ref()),
-            search_queries: o1.search_queries.iter().chain(o2.search_queries.iter()).cloned().collect(),
-            tool_calls: o1.tool_calls.iter().chain(o2.tool_calls.iter()).cloned().collect(),
-            citations: o1.citations.iter().chain(o2.citations.iter()).cloned().collect(),
+            search_queries: o1
+                .search_queries
+                .iter()
+                .chain(o2.search_queries.iter())
+                .cloned()
+                .collect(),
+            tool_calls: o1
+                .tool_calls
+                .iter()
+                .chain(o2.tool_calls.iter())
+                .cloned()
+                .collect(),
+            citations: o1
+                .citations
+                .iter()
+                .chain(o2.citations.iter())
+                .cloned()
+                .collect(),
         }
     }
 
