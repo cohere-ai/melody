@@ -215,6 +215,24 @@ pub struct FilterImpl {
     pub(crate) done: bool,
 }
 
+struct SpecialTokenMatch {
+    idx: usize,
+    sequence: String,
+    decoded: String,
+}
+
+enum SpecialTokenScanResult {
+    NoMatch,
+    Partial,
+    Found(SpecialTokenMatch),
+}
+
+pub(crate) enum PartialMatchResult {
+    NoMatch,
+    Partial { idx: usize },
+    Full { idx: usize, sequence: String },
+}
+
 impl FilterImpl {
     pub(crate) fn new() -> Self {
         Self {
@@ -291,60 +309,16 @@ impl FilterImpl {
         }
 
         self.buf.extend_from_slice(text);
-        let mut special_token_idx = usize::MAX;
-        let mut found_seq = String::new();
-        let mut decoded_buf: Option<String> = None;
-
-        if self
-            .buf
-            .iter()
-            .any(|byte| self.special_token_start_bytes[usize::from(*byte)])
-        {
-            let decoded = String::from_utf8_lossy(&self.buf).into_owned();
-
-            // If is a partial special token, we need to wait for the next token.
-            let (idx, seq) = find_partial(&decoded, &mut self.special_token_map.keys());
-            if idx != usize::MAX && seq.is_empty() {
-                return Vec::new();
-            }
-
-            special_token_idx = idx;
-            found_seq = seq;
-            decoded_buf = Some(decoded);
-        }
-
         let mut out = Vec::new();
 
-        // If it is a whole special token, change the mode, remove the tokens and continue
-        if special_token_idx != usize::MAX && !found_seq.is_empty() {
-            let decoded = decoded_buf
-                .as_ref()
-                .expect("decoded buffer must exist when a special token is found");
-            let (o, new_mode, stop, valid_special) =
-                self.handle_special_token(decoded, special_token_idx, &found_seq, self.mode);
-            out.extend(o);
-
-            if valid_special {
-                if stop {
-                    self.buf.clear();
-                    self.done = true;
+        match self.detect_special_token() {
+            SpecialTokenScanResult::Partial => return Vec::new(),
+            SpecialTokenScanResult::Found(token_match) => {
+                if self.apply_special_token_match(&token_match, &mut out) {
                     return out;
                 }
-
-                // Before the special token, process the buffer with the old mode
-                let pre_special_token = &decoded[..special_token_idx];
-                if !pre_special_token.is_empty() {
-                    let (o, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), false);
-                    out.extend(o);
-                }
-
-                // Remove the special token and the text before
-                let remove_len = pre_special_token.len() + found_seq.len();
-                self.buf.drain(..remove_len);
-
-                // Change mode
-                self.mode = new_mode;
             }
+            SpecialTokenScanResult::NoMatch => {}
         }
 
         // Process buffer by mode
@@ -366,6 +340,65 @@ impl FilterImpl {
         }
 
         out
+    }
+
+    fn detect_special_token(&self) -> SpecialTokenScanResult {
+        if !self
+            .buf
+            .iter()
+            .any(|byte| self.special_token_start_bytes[usize::from(*byte)])
+        {
+            return SpecialTokenScanResult::NoMatch;
+        }
+
+        let decoded = String::from_utf8_lossy(&self.buf).into_owned();
+        match find_partial(&decoded, self.special_token_map.keys()) {
+            PartialMatchResult::NoMatch => SpecialTokenScanResult::NoMatch,
+            PartialMatchResult::Partial { .. } => SpecialTokenScanResult::Partial,
+            PartialMatchResult::Full { idx, sequence } => {
+                SpecialTokenScanResult::Found(SpecialTokenMatch {
+                    idx,
+                    sequence,
+                    decoded,
+                })
+            }
+        }
+    }
+
+    fn apply_special_token_match(
+        &mut self,
+        token_match: &SpecialTokenMatch,
+        out: &mut Vec<FilterOutput>,
+    ) -> bool {
+        let (o, new_mode, stop, valid_special) = self.handle_special_token(
+            &token_match.decoded,
+            token_match.idx,
+            &token_match.sequence,
+            self.mode,
+        );
+        out.extend(o);
+
+        if !valid_special {
+            return false;
+        }
+
+        if stop {
+            self.buf.clear();
+            self.done = true;
+            return true;
+        }
+
+        // `idx` is a byte offset produced by string search on `decoded`.
+        let pre_special_token = &token_match.decoded[..token_match.idx];
+        if !pre_special_token.is_empty() {
+            let (o, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), false);
+            out.extend(o);
+        }
+
+        let remove_len = pre_special_token.len() + token_match.sequence.len();
+        self.buf.drain(..remove_len);
+        self.mode = new_mode;
+        false
     }
 
     fn handle_token(
@@ -668,13 +701,16 @@ impl Filter for FilterImpl {
 pub(crate) fn find_partial<'a>(
     s: &str,
     stops: impl Iterator<Item = &'a String>,
-) -> (usize, String) {
-    let mut min_idx = usize::MAX;
+) -> PartialMatchResult {
+    let mut min_idx: Option<usize> = None;
 
     for stop in stops {
         // If we find the stop sequence, return the index and the stop sequence
         if let Some(idx) = s.find(stop) {
-            return (idx, stop.clone());
+            return PartialMatchResult::Full {
+                idx,
+                sequence: stop.clone(),
+            };
         }
         // Go through the substrings of the stop sequence
         'inner: for i in 0..stop.len() {
@@ -685,22 +721,19 @@ pub(crate) fn find_partial<'a>(
 
             if s.ends_with(suffix) {
                 let idx = s.len() - suffix.len();
-                if min_idx == usize::MAX || min_idx > idx {
-                    min_idx = idx;
+                if min_idx.is_none_or(|current_min_idx| current_min_idx > idx) {
+                    min_idx = Some(idx);
                 }
                 break;
             }
         }
     }
 
-    (
-        if min_idx == usize::MAX {
-            usize::MAX
-        } else {
-            min_idx
-        },
-        String::new(),
-    )
+    if let Some(idx) = min_idx {
+        PartialMatchResult::Partial { idx }
+    } else {
+        PartialMatchResult::NoMatch
+    }
 }
 
 #[cfg(test)]
@@ -714,27 +747,41 @@ mod tests {
         let stops = vec!["<co: ".to_string(), "</co: ".to_string()];
 
         // Test full match
-        let (idx, found) = find_partial("hello <co: ", stops.iter());
-        assert_eq!(idx, 6);
-        assert_eq!(found, "<co: ");
+        match find_partial("hello <co: ", stops.iter()) {
+            PartialMatchResult::Full { idx, sequence } => {
+                assert_eq!(idx, 6);
+                assert_eq!(sequence, "<co: ");
+            }
+            PartialMatchResult::NoMatch | PartialMatchResult::Partial { .. } => {
+                panic!("expected full match")
+            }
+        }
 
         // Test partial match
-        let (idx, found) = find_partial("hello <c", stops.iter());
-        assert_eq!(idx, 6);
-        assert_eq!(found, "");
+        match find_partial("hello <c", stops.iter()) {
+            PartialMatchResult::Partial { idx } => assert_eq!(idx, 6),
+            PartialMatchResult::NoMatch | PartialMatchResult::Full { .. } => {
+                panic!("expected partial match")
+            }
+        }
 
         // Test no match
-        let (idx, _) = find_partial("hello world", stops.iter());
-        assert_eq!(idx, usize::MAX);
+        assert!(matches!(
+            find_partial("hello world", stops.iter()),
+            PartialMatchResult::NoMatch
+        ));
     }
 
     #[test]
     fn test_find_partial_utf8() {
         // This test ensures we don't slice in the middle of a UTF-8 character (we used to panic here).
         let stops = vec!["RÈGLES".to_string()];
-        let (idx, found) = find_partial("ÈÈÈÈÈÈÈR", stops.iter());
-        assert_eq!(idx, 14);
-        assert_eq!(found, "");
+        match find_partial("ÈÈÈÈÈÈÈR", stops.iter()) {
+            PartialMatchResult::Partial { idx } => assert_eq!(idx, 14),
+            PartialMatchResult::NoMatch | PartialMatchResult::Full { .. } => {
+                panic!("expected partial UTF-8 match")
+            }
+        }
     }
 
     #[test]

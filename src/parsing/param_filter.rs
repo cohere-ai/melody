@@ -5,7 +5,7 @@
 //! (strings, objects, arrays) with proper JSON validation.
 
 use crate::parsing::action_filter::ActionMode;
-use crate::parsing::filter::{FilterImpl, find_partial};
+use crate::parsing::filter::{FilterImpl, PartialMatchResult, find_partial};
 use crate::parsing::types::FilterOutput;
 
 /// State machine for parsing parameter values.
@@ -71,11 +71,10 @@ impl FilterImpl {
     }
 
     fn handle_param_value_basic_type(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let (idx, _) = find_partial(s, ["}".to_string(), ",".to_string()].iter());
-
-        if idx == usize::MAX {
-            return self.send_param_value_chunk(s);
-        }
+        let idx = match find_partial(s, ["}".to_string(), ",".to_string()].iter()) {
+            PartialMatchResult::NoMatch => return self.send_param_value_chunk(s),
+            PartialMatchResult::Partial { idx } | PartialMatchResult::Full { idx, .. } => idx,
+        };
 
         let (out, _) = self.send_param_value_chunk(&s[..idx]);
         self.action_metadata.cur_param_state = ParamState::End;

@@ -5,7 +5,7 @@
 //! tool results.
 //!
 
-use crate::parsing::filter::{FilterImpl, find_partial};
+use crate::parsing::filter::{FilterImpl, PartialMatchResult, find_partial};
 use crate::parsing::types::{FilterCitation, FilterMode, FilterOutput, Source};
 
 // Citation marker constants
@@ -261,15 +261,11 @@ impl FilterImpl {
         end: &str,
         cmd3_citations: bool,
     ) -> (usize, usize, Vec<Source>) {
-        let (start_id, start_found) = find_partial(s, [start.to_string()].iter());
-
-        if start_id == usize::MAX {
-            return (usize::MAX, usize::MAX, Vec::new());
-        }
-
-        if start_found.is_empty() {
-            return (start_id, usize::MAX, Vec::new());
-        }
+        let start_id = match find_partial(s, [start.to_string()].iter()) {
+            PartialMatchResult::NoMatch => return (usize::MAX, usize::MAX, Vec::new()),
+            PartialMatchResult::Partial { idx } => return (idx, usize::MAX, Vec::new()),
+            PartialMatchResult::Full { idx, .. } => idx,
+        };
 
         let Some(end_id) = s[start_id + 1..].find(end) else {
             return (start_id, usize::MAX, Vec::new());
