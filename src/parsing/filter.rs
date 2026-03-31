@@ -666,40 +666,9 @@ impl FilterImpl {
     /// Combines [`Self::write_decoded`] and [`Self::flush_partials`] so buffered tail and final
     /// flush are both reflected in the returned aggregate.
     pub fn process_full_text(&mut self, text: &str) -> FilterAggregatedResult {
-        let o1 = self.write_decoded(text);
-        let o2 = self.flush_partials();
-        FilterAggregatedResult {
-            content: Self::concatenate_o_strings(o1.content.as_ref(), o2.content.as_ref()),
-            reasoning: Self::concatenate_o_strings(o1.reasoning.as_ref(), o2.reasoning.as_ref()),
-            search_queries: o1
-                .search_queries
-                .iter()
-                .chain(o2.search_queries.iter())
-                .cloned()
-                .collect(),
-            tool_calls: o1
-                .tool_calls
-                .iter()
-                .chain(o2.tool_calls.iter())
-                .cloned()
-                .collect(),
-            citations: o1
-                .citations
-                .iter()
-                .chain(o2.citations.iter())
-                .cloned()
-                .collect(),
-        }
-    }
-
-    // Used only to merge `content` / `reasoning` from the two aggregate halves in `process_full_text`.
-    fn concatenate_o_strings(s1: Option<&String>, s2: Option<&String>) -> Option<String> {
-        match (s1, s2) {
-            (Some(str1), Some(str2)) => Some(format!("{str1}{str2}")),
-            (Some(str1), None) => Some(str1.clone()),
-            (None, Some(str2)) => Some(str2.clone()),
-            (None, None) => None,
-        }
+        let decoded = self.write_decoded(text);
+        let flushed = self.flush_partials();
+        decoded.merge_chain(flushed)
     }
 }
 

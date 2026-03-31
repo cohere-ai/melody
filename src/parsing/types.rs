@@ -218,6 +218,34 @@ pub struct FilterAggregatedResult {
     pub search_queries: Vec<SearchQueryDelta>,
 }
 
+impl FilterAggregatedResult {
+    /// Concatenates two partial aggregates in stream order (e.g. decoded body then flush tail).
+    #[must_use]
+    pub fn merge_chain(self, other: Self) -> Self {
+        Self {
+            content: merge_optional_strings(self.content, other.content),
+            reasoning: merge_optional_strings(self.reasoning, other.reasoning),
+            search_queries: merge_vecs(self.search_queries, other.search_queries),
+            tool_calls: merge_vecs(self.tool_calls, other.tool_calls),
+            citations: merge_vecs(self.citations, other.citations),
+        }
+    }
+}
+
+fn merge_optional_strings(a: Option<String>, b: Option<String>) -> Option<String> {
+    match (a, b) {
+        (Some(a), Some(b)) => Some(a + &b),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
+    }
+}
+
+fn merge_vecs<T>(mut a: Vec<T>, b: Vec<T>) -> Vec<T> {
+    a.extend(b);
+    a
+}
+
 /// A tool call accumulated from one or more deltas.
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 #[derive(Debug, Clone, Default)]
