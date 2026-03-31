@@ -309,16 +309,17 @@ impl FilterImpl {
         self
     }
 
-    /// Applies [`chunk_size`] batching, then runs [`handle_token`] on a prefix of `buf` when the
-    /// chunk is ready. Assigns back to [`Self::buf`]. `input_len` is `Some(n)` to process the
-    /// first `n` bytes, or `None` to process the full buffer. Returns `true` if deferred (caller
-    /// should return from `write_text` without further work).
+    /// Applies [`chunk_size`] batching, then runs [`handle_token`] on a prefix of the buffer when
+    /// the chunk is ready. Takes [`Self::buf`] with [`std::mem::take`], then assigns back.
+    /// `input_len` is `Some(n)` to process the first `n` bytes, or `None` to process the full
+    /// buffer. Returns `true` if deferred (caller should return from `write_text` without further
+    /// work).
     fn emit_handled_chunk_or_defer(
         &mut self,
-        mut buf: Vec<u8>,
         input_len: Option<usize>,
         out: &mut Vec<FilterOutput>,
     ) -> bool {
+        let mut buf = std::mem::take(&mut self.buf);
         let input_len = input_len.unwrap_or_else(|| buf.len());
         self.num_tokens_in_chunk += 1;
         if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
@@ -350,11 +351,7 @@ impl FilterImpl {
                     idx: special_token_idx,
                 } => {
                     if special_token_idx > 0 {
-                        if self.emit_handled_chunk_or_defer(
-                            std::mem::take(&mut self.buf),
-                            Some(special_token_idx),
-                            &mut out,
-                        ) {
+                        if self.emit_handled_chunk_or_defer(Some(special_token_idx), &mut out) {
                             return out;
                         }
                     }
@@ -372,7 +369,7 @@ impl FilterImpl {
 
             // No special token left to peel: emit under the current mode (respects `chunk_size`).
             if !self.buf.is_empty() {
-                if self.emit_handled_chunk_or_defer(std::mem::take(&mut self.buf), None, &mut out) {
+                if self.emit_handled_chunk_or_defer(None, &mut out) {
                     return out;
                 }
             }
