@@ -11,11 +11,6 @@ use crate::parsing::types::{
 };
 use std::collections::HashMap;
 
-/// Multi-hop section markers ([`FilterOptions::handle_multi_hop`]). See
-/// [`FilterImpl::omit_multi_hop_marker_from_special_scan`].
-const MULTI_HOP_ANSWER_MARKER: &str = "Answer:";
-const MULTI_HOP_GROUNDED_ANSWER_MARKER: &str = "Grounded answer:";
-
 fn push_text(target: &mut Option<String>, text: &mut String) {
     match target {
         Some(s) => s.push_str(text),
@@ -388,25 +383,6 @@ impl FilterImpl {
         out
     }
 
-    /// Whether a multi-hop marker should be left out of [`find_partial`] for this mode. Only
-    /// [`MULTI_HOP_ANSWER_MARKER`] is omitted (in grounded or answer mode); [`MULTI_HOP_GROUNDED_ANSWER_MARKER`]
-    /// is always scanned. Other keys (e.g. `<|START_TEXT|>`) are never affected.
-    fn omit_multi_hop_marker_from_special_scan(token: &str, mode: FilterMode) -> bool {
-        if token == MULTI_HOP_GROUNDED_ANSWER_MARKER {
-            return false;
-        }
-        token == MULTI_HOP_ANSWER_MARKER
-            && (mode == FilterMode::GroundedAnswer || mode == FilterMode::Answer)
-    }
-
-    /// Keys passed to [`find_partial`]: [`Self::special_token_map`] minus multi-hop markers per
-    /// [`Self::omit_multi_hop_marker_from_special_scan`].
-    fn special_token_keys_for_scan(&self) -> impl Iterator<Item = &String> {
-        self.special_token_map.keys().filter(move |token| {
-            !Self::omit_multi_hop_marker_from_special_scan(token.as_str(), self.mode)
-        })
-    }
-
     /// If the buffer may contain a special token, decode and classify via [`find_partial`].
     fn detect_special_token(&self) -> SpecialTokenScanResult {
         if !self
@@ -418,7 +394,7 @@ impl FilterImpl {
         }
 
         let decoded = String::from_utf8_lossy(&self.buf).into_owned();
-        match find_partial(&decoded, self.special_token_keys_for_scan()) {
+        match find_partial(&decoded, self.special_token_map.keys()) {
             PartialMatchResult::NoMatch => SpecialTokenScanResult::NoMatch,
             PartialMatchResult::Partial { idx } => SpecialTokenScanResult::Partial { idx },
             PartialMatchResult::Full { idx, sequence } => {
@@ -497,8 +473,9 @@ impl FilterImpl {
     // - The new FilterMode to transition into
     // - A boolean indicating whether this token should trigger stopping the stream
     //
-    // [`MULTI_HOP_ANSWER_MARKER`] is omitted from scanning in grounded/answer mode
-    // ([`Self::special_token_keys_for_scan`]) so it never reaches here as a match in those modes.
+    // Tokens mapping to [`FilterMode::Answer`] are omitted from scanning in
+    // [`FilterMode::GroundedAnswer`] ([`Self::special_token_keys_for_scan`]), so they do not
+    // reach here as matches in that mode.
     fn handle_special_token(
         &mut self,
         s: &str,
@@ -1583,7 +1560,7 @@ mod tests {
     /// `Grounded answer:` must still be detected in the same `write_text` / `process_full_text`
     /// chunk (regression: do not emit the whole buffer as text and stop scanning).
     #[test]
-    fn test_process_full_text_grounded_literal_answer_then_cited_documents() {
+    fn test_process_full_text_grounded_literal_answer_then_grounded_answer() {
         use crate::parsing::options::FilterOptions;
 
         let mut filter = FilterImpl::new();
