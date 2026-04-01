@@ -320,21 +320,23 @@ impl FilterImpl {
     /// the chunk is ready. Takes [`Self::buf`] with [`std::mem::take`], then assigns back.
     /// `input_len` is `Some(n)` to process the first `n` bytes, or `None` to process the full
     /// buffer. Returns `true` if deferred (caller should return from `write_text` without further
-    /// work).
+    /// work). `eof_flush` skips deferral so the tail can be drained after the last `write_text`
+    /// (see [`Self::take_flush_tail_outputs`]).
     fn emit_handled_chunk_or_defer(
         &mut self,
         input_len: Option<usize>,
         out: &mut Vec<FilterOutput>,
+        eof_flush: bool,
     ) -> bool {
         let input_len = input_len.unwrap_or(self.buf.len());
         self.num_tokens_in_chunk += 1;
-        if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
+        if !eof_flush && self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
             return true;
         }
         // Take `buf` so the slice passed to `handle_token` does not borrow `self` (E0502).
         let mut buf = std::mem::take(&mut self.buf);
         let input = &buf[..input_len];
-        let (o, remove) = self.handle_token(self.mode, input, false);
+        let (o, remove) = self.handle_token(self.mode, input, eof_flush);
         out.extend(o);
         buf.drain(..remove);
         self.buf = buf;
@@ -343,6 +345,13 @@ impl FilterImpl {
     }
 
     pub(crate) fn write_text(&mut self, text: &[u8]) -> Vec<FilterOutput> {
+        self.write_text_internal(text, false)
+    }
+
+    /// Like [`Self::write_text`], but `eof_flush` is passed to [`Self::emit_handled_chunk_or_defer`]
+    /// so the final drain does not defer on [`Self::chunk_size`] (required for
+    /// [`Self::take_flush_tail_outputs`] / [`Self::process_full_text`]).
+    fn write_text_internal(&mut self, text: &[u8], eof_flush: bool) -> Vec<FilterOutput> {
         if self.done {
             return Vec::new();
         }
@@ -357,8 +366,23 @@ impl FilterImpl {
                 SpecialTokenScanResult::Partial {
                     idx: special_token_idx,
                 } => {
+                    // EOF: no more bytes will arrive; do not hold back a suffix that merely matches a
+                    // prefix of a special token (regression: flush must match `handle_token` on the
+                    // full buffer, e.g. `"hello <"` in thinking mode).
+                    if eof_flush {
+                        if !self.buf.is_empty()
+                            && self.emit_handled_chunk_or_defer(None, &mut out, eof_flush)
+                        {
+                            return out;
+                        }
+                        break;
+                    }
                     if special_token_idx > 0
-                        && self.emit_handled_chunk_or_defer(Some(special_token_idx), &mut out)
+                        && self.emit_handled_chunk_or_defer(
+                            Some(special_token_idx),
+                            &mut out,
+                            eof_flush,
+                        )
                     {
                         return out;
                     }
@@ -374,7 +398,7 @@ impl FilterImpl {
             }
 
             // No special token left to peel: emit under the current mode (respects `chunk_size`).
-            if !self.buf.is_empty() && self.emit_handled_chunk_or_defer(None, &mut out) {
+            if !self.buf.is_empty() && self.emit_handled_chunk_or_defer(None, &mut out, eof_flush) {
                 return out;
             }
             break;
@@ -634,18 +658,20 @@ impl FilterImpl {
 
 impl FilterImpl {
     /// Mark the stream finished and emit any buffered tail (same rules as [`Filter::flush_partials`]).
+    /// Uses [`Self::write_text_internal`] with `eof_flush` so special-token scanning and mode
+    /// transitions are applied; the old path called [`Self::handle_token`] on the raw buffer and
+    /// skipped that when [`Self::chunk_size`] had deferred output.
     fn take_flush_tail_outputs(&mut self) -> Vec<FilterOutput> {
-        self.done = true;
-        if !self.buf.is_empty()
+        let out = if !self.buf.is_empty()
             && self.mode != FilterMode::InclusiveStop
             && self.mode != FilterMode::ExclusiveStop
         {
-            let buf_copy = std::mem::take(&mut self.buf);
-            let (o, _remove) = self.handle_token(self.mode, &buf_copy, true);
-            o
+            self.write_text_internal(&[], true)
         } else {
             Vec::new()
-        }
+        };
+        self.done = true;
+        out
     }
 
     /// Feed all tokens through the filter and return a single result with fully accumulated tool calls.
@@ -1413,6 +1439,30 @@ mod tests {
         assert_eq!(full_text.content, process_full.content);
         assert_eq!(full_text.reasoning, process_full.reasoning);
         assert_eq!(full_text.citations, process_full.citations);
+    }
+
+    /// With `chunk_size > 1`, `write_text` defers emitting until the count is reached; the final
+    /// drain must still run special-token scanning (regression: tail was `handle_token` only).
+    #[test]
+    fn test_process_full_text_respects_special_tokens_with_chunk_size() {
+        let mut options = FilterOptions {
+            stream_tool_actions: true,
+            ..Default::default()
+        }
+        .with_chunk_size(10);
+        options
+            .special_token_map
+            .insert("<|START|>".to_string(), FilterMode::PlainText);
+        options
+            .special_token_map
+            .insert("<|REASON|>".to_string(), FilterMode::ToolReason);
+
+        let mut filter = new_filter(options);
+        let generation = "Hello <|START|>world<|REASON|>thinking";
+        let result = filter.process_full_text(generation);
+
+        assert_eq!(result.content, Some("Hello world".into()));
+        assert_eq!(result.reasoning, Some("thinking".into()));
     }
 
     #[test]
