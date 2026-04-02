@@ -5,6 +5,7 @@ ARG TARGETPLATFORM
 WORKDIR /workspace
 COPY ./src ./src
 COPY ./gen ./gen
+COPY ./benches ./benches
 COPY ./template_generation ./template_generation
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
