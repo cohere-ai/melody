@@ -1,0 +1,143 @@
+# Builds the same artifacts as `make release` (static libs for Go bindings) and
+# uploads them to the GitHub Release. Triggered when a release is published
+# (including releases created by `.github/workflows/auto-release.yml`).
+name: native library release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach artifacts to (e.g. v0.7.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.set.outputs.tag }}
+    steps:
+      - name: Set release tag
+        id: set
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  linux:
+    needs: [resolve-tag]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - docker_platform: linux/arm64
+            makefile_suffix: arm64
+          # Same platform string as `make release` / `release-linux-x86_64`
+          - docker_platform: linux/x86_64
+            makefile_suffix: x86_64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and extract Linux static library
+        run: |
+          set -eux
+          IMG="melody.linux-${{ matrix.makefile_suffix }}"
+          mkdir -p "artifacts/linux-${{ matrix.makefile_suffix }}"
+          docker buildx build \
+            --platform "${{ matrix.docker_platform }}" \
+            -f release/Dockerfile \
+            -t "$IMG" \
+            --load \
+            .
+          docker run --rm \
+            -v "$PWD/artifacts/linux-${{ matrix.makefile_suffix }}:/mnt" \
+            --entrypoint cp \
+            "$IMG" \
+            /workspace/libcohere_melody.linux.tar.gz \
+            /mnt/libcohere_melody.linux.tar.gz
+          mkdir -p artifacts/all
+          cp "artifacts/linux-${{ matrix.makefile_suffix }}/libcohere_melody.linux.tar.gz" \
+            "artifacts/all/libcohere_melody.linux-${{ matrix.makefile_suffix }}.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-lib-linux-${{ matrix.makefile_suffix }}
+          path: artifacts/all/libcohere_melody.linux-${{ matrix.makefile_suffix }}.tar.gz
+
+  darwin:
+    needs: [resolve-tag]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            suffix: aarch64
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            suffix: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Build and package Darwin static library
+        run: |
+          set -eux
+          cargo build --release --target "${{ matrix.target }}" --features tkzrs
+          mkdir -p "artifacts/darwin-${{ matrix.suffix }}"
+          cp "target/${{ matrix.target }}/release/libcohere_melody.a" "artifacts/darwin-${{ matrix.suffix }}/"
+          cd "artifacts/darwin-${{ matrix.suffix }}"
+          rm -f "libcohere_melody.darwin-${{ matrix.suffix }}.tar.gz"
+          tar -czf "libcohere_melody.darwin-${{ matrix.suffix }}.tar.gz" libcohere_melody.a
+          mkdir -p ../all
+          cp "libcohere_melody.darwin-${{ matrix.suffix }}.tar.gz" \
+            "../all/libcohere_melody.darwin-${{ matrix.suffix }}.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-lib-darwin-${{ matrix.suffix }}
+          path: artifacts/all/libcohere_melody.darwin-${{ matrix.suffix }}.tar.gz
+
+  upload-to-release:
+    name: Upload native lib artifacts to GitHub Release
+    needs: [resolve-tag, linux, darwin]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloaded
+          pattern: native-lib-*
+          merge-multiple: true
+      - name: Assemble release filenames (same as `make release`)
+        run: |
+          set -eux
+          mkdir -p artifacts/all
+          mv downloaded/libcohere_melody.*.tar.gz artifacts/all/
+          cd artifacts/all
+          cp libcohere_melody.darwin-aarch64.tar.gz libcohere_melody.darwin-arm64.tar.gz
+          cp libcohere_melody.linux-arm64.tar.gz libcohere_melody.linux-aarch64.tar.gz
+          cp libcohere_melody.linux-x86_64.tar.gz libcohere_melody.linux-amd64.tar.gz
+          ls -la
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ needs.resolve-tag.outputs.tag }}" artifacts/all/*.tar.gz --clobber
