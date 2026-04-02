@@ -4,8 +4,9 @@
 name: go library release
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["auto release"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
