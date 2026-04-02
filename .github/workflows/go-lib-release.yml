@@ -1,6 +1,6 @@
 # Builds the same artifacts as `make release` (static libs for Go bindings) and
-# uploads them to the GitHub Release. Triggered when a release is published
-# (including releases created by `.github/workflows/auto-release.yml`).
+# uploads them to the GitHub Release. Triggered when `auto release` completes
+# successfully (see `.github/workflows/auto-release.yml`) or via workflow_dispatch.
 name: go library release
 
 on:
@@ -19,21 +19,33 @@ permissions:
 
 jobs:
   resolve-tag:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.set.outputs.tag }}
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@v4
       - name: Set release tag
         id: set
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -eux
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            # workflow_run has no release payload; same approach as python-build-wheels.yml
+            TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           fi
 
   linux:
     needs: [resolve-tag]
+    if: needs.resolve-tag.outputs.tag != ''
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -77,6 +89,7 @@ jobs:
 
   darwin:
     needs: [resolve-tag]
+    if: needs.resolve-tag.outputs.tag != ''
     strategy:
       fail-fast: false
       matrix:
@@ -115,6 +128,7 @@ jobs:
   upload-to-release:
     name: Upload native lib artifacts to GitHub Release
     needs: [resolve-tag, linux, darwin]
+    if: needs.resolve-tag.outputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
