@@ -1,7 +1,7 @@
 # Builds the same artifacts as `make release` (static libs for Go bindings) and
 # uploads them to the GitHub Release. Triggered when a release is published
 # (including releases created by `.github/workflows/auto-release.yml`).
-name: native library release
+name: go library release
 
 on:
   release:
