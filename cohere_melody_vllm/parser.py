@@ -3,20 +3,44 @@
 Wraps the melody functionality into vLLM parsers for reasoning and tool calls.
 """
 
-from typing import Optional, Sequence, Union, TYPE_CHECKING
-from vllm.entrypoints.openai.protocol import (
-    ChatCompletionRequest,
-    ResponsesRequest,
-    DeltaMessage,
-    DeltaToolCall,
-    DeltaFunctionCall,
-    ExtractedToolCallInformation,
-    FunctionCall,
-    ToolCall,
-)
+from importlib.metadata import version as _get_version
+from typing import TYPE_CHECKING, Optional, Sequence, Union
+
+from packaging.version import Version as _Version
+
 from vllm.reasoning import ReasoningParser, ReasoningParserManager
 from vllm.tool_parsers import ToolParser, ToolParserManager
 from vllm.transformers_utils.tokenizer import AnyTokenizer
+
+# vllm > 0.14.1 reorganized OpenAI entrypoint imports (https://github.com/vllm-project/vllm/pull/32240)
+_VLLM_POST_0_14_1 = _Version(_get_version("vllm")) > _Version("0.14.1")
+if _VLLM_POST_0_14_1:
+    from vllm.entrypoints.openai.chat_completion.protocol import (  # ty: ignore[unresolved-import]
+        ChatCompletionRequest,
+    )
+    from vllm.entrypoints.openai.engine.protocol import (  # ty: ignore[unresolved-import]
+        DeltaFunctionCall,
+        DeltaMessage,
+        DeltaToolCall,
+        ExtractedToolCallInformation,
+        FunctionCall,
+        ToolCall,
+    )
+    from vllm.entrypoints.openai.responses.protocol import (  # ty: ignore[unresolved-import]
+        ResponsesRequest,
+    )
+else:
+    from vllm.entrypoints.openai.protocol import (  # ty: ignore[unresolved-import]
+        ChatCompletionRequest,
+        DeltaFunctionCall,
+        DeltaMessage,
+        DeltaToolCall,
+        ExtractedToolCallInformation,
+        FunctionCall,
+        ResponsesRequest,
+        ToolCall,
+    )
+
 
 try:
     from cohere_melody import PyFilter, PyFilterOptions  # type: ignore
@@ -122,7 +146,7 @@ class CohereCommand2ReasoningParser(ReasoningParser):
                 content_ids.extend(token_ids)
         return content_ids
 
-    def is_reasoning_end(self, input_ids: list[int]) -> bool:
+    def is_reasoning_end(self, input_ids: Sequence[int]) -> bool:
         end_token_id = self.model_tokenizer.convert_tokens_to_ids("<|END_THINKING|>")
         return any(input_id == end_token_id for input_id in reversed(input_ids))
 

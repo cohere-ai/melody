@@ -40,6 +40,9 @@ jobs:
 
   py-check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        vllm-version: ["0.14.1", "0.15.1"]
     steps:
       - uses: actions/checkout@v4
       - name: Build sdist
@@ -47,12 +50,12 @@ jobs:
         with:
           command: sdist
           args: --out dist
-      - name: ty
+      - name: ty (vllm==${{ matrix.vllm-version }})
         shell: bash
         run: |
           set -e
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install ty vllm==0.14.1
+          pip install ty vllm==${{ matrix.vllm-version }}
           pip install cohere_melody --find-links dist --force-reinstall
           ty check cohere_melody_vllm/
