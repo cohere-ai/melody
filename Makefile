@@ -5,10 +5,14 @@ ARCH := $(shell uname -m)
 #--------------------
 # GOLANG THINGS
 #--------------------
+MELODY_STATIC_LIB := ./target/release/libcohere_melody.a
+
+# `tkzrs` adds tokenizer FFI (`free_tokenizer`, etc.). A plain release build leaves them out,
+# but libcohere_melody.a still exists — so we probe the archive instead of only testing -e.
 check-build-with-tokenizers:
-	@if [ ! -e "./target/release/libcohere_melody.a" ]; then \
-  		$(MAKE) rust-build-with-tokenizers; \
-	fi;
+	@if [ ! -f "$(MELODY_STATIC_LIB)" ] || ! strings "$(MELODY_STATIC_LIB)" 2>/dev/null | grep -qF 'free_tokenizer'; then \
+		cargo build -p melody-parsing --release --features tkzrs; \
+	fi
 
 golang-bindings-test: check-build-with-tokenizers
 	go test -v -count=1 -race ./gobindings/...
