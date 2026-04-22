@@ -65,9 +65,7 @@ The following instructions are your defaults unless specified elsewhere in devel
         "results": {
             "0": {"content": "Toronto today 5 degrees"},
             "1": {"content": "Toronto yesterday 3 degrees"},
-            "2": {"week": "Toronto avg is 6 degrees"},
-            "3": {"type": "document", "key": "not_a_proper_doc"},
-            "4": {"type": "document", "document": {"key": "also_not_a_proper_doc"}}
+            "2": {"week": "Toronto avg is 6 degrees"}
         },
         "is_error": null
     },

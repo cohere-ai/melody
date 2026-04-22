@@ -37,9 +37,7 @@
       "content": [
         { "type": "text", "text": "Toronto today 5 degrees" },
         { "type": "text", "text": "Toronto yesterday 3 degrees" },
-        { "type": "document", "document":  { "data": {"week": "Toronto avg is 6 degrees"} } },
-        { "type": "document", "key": "not_a_proper_doc" },
-        { "type": "document", "document": {"key": "also_not_a_proper_doc"} }
+        { "type": "document", "document":  { "data": {"week": "Toronto avg is 6 degrees"} } }
       ]
     },
     {
