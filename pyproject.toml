@@ -4,6 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "cohere_melody"
+readme = "README.md"
 description = "Templating rendering and generation parsing for Cohere models"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -12,14 +13,16 @@ classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries",
 ]
 dynamic = ["version"]
 
 [project.urls]
+Homepage = "https://github.com/cohere-ai/melody"
 Repository = "https://github.com/cohere-ai/melody"
+Issues = "https://github.com/cohere-ai/melody/issues"
 
 [tool.maturin]
 features = ["pyo3/extension-module", "python_ffi"]
