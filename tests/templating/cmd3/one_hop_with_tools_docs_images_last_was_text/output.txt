@@ -62,7 +62,11 @@ The following instructions are your defaults unless specified elsewhere in devel
 - When asked to extract values from source material, use the exact form, separated by commas.
 - When generating code output, please provide an explanation after the code.
 - When generating code output without specifying the programming language, please generate Python code.
-- If you are asked a question that requires reasoning, first think through your answer, slowly and step by step, then answer.<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|>Can you check if I have any reminders for the week?<|IMG_PATCH|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>I will look through the document to address the users needs.<|END_THINKING|><|START_ACTION|>[
+- If you are asked a question that requires reasoning, first think through your answer, slowly and step by step, then answer.<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|><page_start>
+Hi, I will ask you a question after this image
+<page_end><|IMG_PATCH|><page_start>
+Can you check if I have any reminders for the week?
+<page_end><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|><|START_THINKING|>I will look through the document to address the users needs.<|END_THINKING|><|START_ACTION|>[
     {"tool_call_id": "0", "tool_name": "direct-injected-document", "parameters": {}}
 ]<|END_ACTION|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
     {
