@@ -3,7 +3,7 @@ module github.com/cohere-ai/melody
 go 1.25
 
 require (
-	github.com/buger/jsonparser v1.1.1
+	github.com/buger/jsonparser v1.1.2
 	github.com/mailru/easyjson v0.9.1
 	github.com/stretchr/testify v1.11.1
 )
