@@ -668,11 +668,12 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                         continue;
                     }
                     let tool_call: Map<String, Value> = serde_json::from_str(t_str)?;
+                    let tool_name = tool_call.get("tool_name").unwrap_or_default().as_str().unwrap_or_default();
                     *t = json!({
                         "id": tool_call.get("tool_call_id"),
                         "type": "function",
                         "function": {
-                            "name": tool_call.get("tool_name"),
+                            "name": json_escape_string(tool_name),
                             "arguments": tool_call.get("parameters")
                         }
                     });
