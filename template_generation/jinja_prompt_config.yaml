@@ -6,7 +6,10 @@ cmd3-v1:
       path: cmd3/chat_merged_template.jinja
 
 cmd3-v2:
-  path: cmd3/chat_merged_template.jinja
+  path: cmd3/chat_merged_template_v2.jinja
+  includes:
+    chat_merged_template.jinja:
+      path: cmd3/chat_merged_template.jinja
 
 cmd3-v3:
   path: cmd3/chat_merged_template_default_thinking.jinja
@@ -21,4 +24,13 @@ cmd3-v1-hf:
       path: cmd3/chat_merged_template.jinja
 
 cmd4-v1:
-  path: cmd4/chat_template.jinja
+  path: cmd4/cmd4-v1.jinja
+  includes:
+    chat_template.jinja:
+      path: cmd4/chat_template.jinja
+
+cmd4-v2:
+  path: cmd4/cmd4-v2.jinja
+  includes:
+    chat_template.jinja:
+      path: cmd4/chat_template.jinja

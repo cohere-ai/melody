@@ -1,4 +1,4 @@
-{%- set is_v2 = false -%}
+{%- set is_v2 = true -%}
 {%- set reasoning_effort_normalized = reasoning_effort | lower if reasoning_effort is not undefined and reasoning_effort else none -%}
 {%- set reasoning = reasoning if reasoning is not undefined else reasoning_effort_normalized != "none" -%}
 {%- set grounding = grounding | default("disabled") | upper %}

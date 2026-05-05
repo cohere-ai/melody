@@ -1,3 +1,5 @@
+{%- set reasoning_effort_normalized = reasoning_effort | lower if reasoning_effort is not undefined and reasoning_effort else none -%}
+{%- set reasoning = reasoning if reasoning is not undefined else reasoning_effort_normalized != "none" -%}
 {%- set grounding = grounding | default("disabled") | upper %}
 {%- set grounding_enabled = grounding == "ENABLED" %}
 {%- set tools_or_docs_exist = tools or documents %}
@@ -245,4 +247,4 @@ Your output should adhere to the following json schema:
 
 ]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|>
     {%- endif %}
-{%- endfor %}{%- if add_generation_prompt -%}<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{{ response_prefix }}{%- endif %}
+{%- endfor %}{%- if add_generation_prompt -%}<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{% if is_v2 %}{% if response_prefix %}{{ response_prefix }}{% else %}{% if reasoning %}<|START_THINKING|>{% else %}<|START_THINKING|><|END_THINKING|>{% endif %}{% endif %}{% else %}{{ response_prefix }}{% endif %}{%- endif %}
