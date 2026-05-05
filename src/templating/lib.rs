@@ -510,12 +510,48 @@ mod tests {
     }
 
     #[test]
-    fn test_render_cmd3_jinja_from_dir() {
+    fn test_render_cmd3_v1_jinja_from_dir() {
         for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v1") {
-            println!("Running cmd3 jinja test case: {}", test_name);
+            println!("Running cmd3 v1 jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            opts.template_jinja = CMD3V1_JINJA_TEMPLATE;
+            let rendered = render_cmd3(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd3_v1_hf_jinja_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v1_hf") {
+            println!("Running cmd3 v1 hf jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
             opts.template_jinja = CMD3V1_JINJA_HF_TEMPLATE;
+            let rendered = render_cmd3(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd3_v2_jinja_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v2") {
+            println!("Running cmd3 v2 jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            opts.template_jinja = CMD3V2_JINJA_TEMPLATE;
+            let rendered = render_cmd3(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd3_v3_jinja_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v3") {
+            println!("Running cmd3 v3 jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            opts.template_jinja = CMD3V3_JINJA_TEMPLATE;
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
