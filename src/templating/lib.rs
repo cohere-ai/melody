@@ -123,7 +123,9 @@ pub struct RenderCmd4Options<'a> {
 }
 
 static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.tmpl");
+static CMD4V2_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v2.tmpl");
 static CMD4V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v1.jinja");
+static CMD4V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v2.jinja");
 impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
@@ -179,12 +181,14 @@ impl CMD3JinjaTemplates {
 
 enum CMD4JinjaTemplates {
     CMD4V1,
+    CMD4V2,
 }
 
 impl CMD4JinjaTemplates {
     fn get_template(&self) -> &str {
         match *self {
             CMD4JinjaTemplates::CMD4V1 => CMD4V1_JINJA_TEMPLATE,
+            CMD4JinjaTemplates::CMD4V2 => CMD4V2_JINJA_TEMPLATE,
         }
     }
 }
@@ -195,6 +199,7 @@ impl FromStr for CMD4JinjaTemplates {
     fn from_str(o: &str) -> Result<Self, Self::Err> {
         match o {
             "cmd4-v1" => Ok(Self::CMD4V1),
+            "cmd4-v2" => Ok(Self::CMD4V2),
             _ => Err(MelodyError::TemplateValidation(format!(
                 "unknown template id: {o}"
             ))),

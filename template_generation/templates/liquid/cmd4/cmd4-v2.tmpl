@@ -3,6 +3,11 @@
   {%- assign tools_exist = true %}
 {%- endif %}
 
+{%- assign reasoning_enabled = false %}
+{%- if reasoning_options and reasoning_options.enabled %}
+  {%- assign reasoning_enabled = true %}
+{%- endif %}
+
 {%- assign skip_thinking = false %}
 {%- assign documents_exist = false %}
 {%- assign render_docs = false %}
