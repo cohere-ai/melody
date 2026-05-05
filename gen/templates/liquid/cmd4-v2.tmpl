@@ -3,9 +3,11 @@
   {%- assign tools_exist = true %}
 {%- endif %}
 
-{%- assign reasoning_enabled = false %}
-{%- if reasoning_options and reasoning_options.enabled %}
-  {%- assign reasoning_enabled = true %}
+{%- assign reasoning_enabled = true %}
+{%- if reasoning_options %}
+  {%- unless reasoning_options.enabled %}
+    {%- assign reasoning_enabled = false %}
+  {%- endunless %}
 {%- endif %}
 
 {%- assign skip_thinking = false %}

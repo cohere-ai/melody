@@ -1,0 +1,17 @@
+{
+  "platform_instruction": "",
+  "dev_instruction": "",
+  "response_prefix": "something<|START_THINKING|>",
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    }
+  ],
+  "reasoning_type": "enabled"
+}

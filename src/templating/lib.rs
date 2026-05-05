@@ -125,6 +125,7 @@ pub struct RenderCmd4Options<'a> {
 }
 
 static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.tmpl");
+#[allow(dead_code)] // this is used in tests below
 static CMD4V2_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v2.tmpl");
 static CMD4V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v1.jinja");
 static CMD4V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v2.jinja");
@@ -521,6 +522,18 @@ mod tests {
     }
 
     #[test]
+    fn test_render_cmd4_v2_jinja_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("jinja/cmd4_v2") {
+            println!("Running cmd4 v2 jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            opts.template_jinja = CMD4V2_JINJA_TEMPLATE;
+            let rendered = render_cmd4(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
     fn test_render_cmd3_jinja_from_liquid_dir() {
         for (test_name, input_json, expected) in read_test_cases("cmd3") {
             println!("Running cmd3 jinja liquid test case: {}", test_name);
@@ -561,6 +574,33 @@ mod tests {
             println!("Running cmd4 jinja liquid test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
+            let rendered = render_cmd4(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd4_v2_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("cmd4_v2") {
+            println!("Running cmd4 v2 test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            if test_name != "template_provided" {
+                opts.template = CMD4V2_TEMPLATE;
+            }
+            let rendered = render_cmd4(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd4_v2_jinja_from_liquid_dir() {
+        for (test_name, input_json, expected) in read_test_cases("cmd4_v2") {
+            println!("Running cmd4 v2 jinja liquid test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            if test_name != "template_provided" {
+                opts.template_jinja = CMD4V2_JINJA_TEMPLATE
+            }
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }

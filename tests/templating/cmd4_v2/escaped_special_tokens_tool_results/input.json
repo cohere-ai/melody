@@ -1,0 +1,48 @@
+{
+  "platform_instruction": "",
+  "dev_instruction": "",
+  "escaped_special_tokens": {
+    "<|something|>": "\\<\\|something\\|\\>"
+  },
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "I will use the GetReminders tool to check if the user has any reminders."
+        }
+      ],
+      "tool_calls": [
+        {
+          "id": "2",
+          "name": "GetReminders",
+          "parameters": "{}"
+        }
+      ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "2",
+      "content": [
+        {
+          "type": "document",
+          "document": {
+            "reminder_id": "59-80bc",
+            "task": "<|something|> to do"
+          }
+        }
+      ]
+    }
+  ],
+  "reasoning_type": "enabled"
+}

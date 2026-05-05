@@ -1,0 +1,24 @@
+{
+  "dev_instruction": "",
+  "messages": [
+    {
+      "role": "System",
+      "content": [
+        {
+          "type": "text",
+          "text": "This is a system message"
+        }
+      ]
+    },
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hello"
+        }
+      ]
+    }
+  ],
+  "reasoning_type": "enabled"
+}

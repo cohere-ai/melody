@@ -1,0 +1,16 @@
+{
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Can you check if I have any reminders for the week?"
+        }
+      ]
+    }
+  ],
+  "additional_template_fields": {
+    "reasoning_effort": "none"
+  }
+}
