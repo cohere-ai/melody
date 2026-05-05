@@ -617,6 +617,7 @@ type RenderCmd4Options struct {
 	Documents                []orderedjson.Object `json:"documents,omitempty"`
 	AvailableTools           []Tool               `json:"available_tools,omitempty"`
 	Grounding                *Grounding           `json:"grounding,omitempty"` // optional
+	ReasoningType            *ReasoningType       `json:"reasoning_type,omitempty"`
 	ResponsePrefix           *string              `json:"response_prefix,omitempty"`
 	JSONSchema               *string              `json:"json_schema,omitempty"`
 	JSONMode                 bool                 `json:"json_mode,omitempty"`
@@ -970,6 +971,13 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		hasGround = C.bool(true)
 	}
 
+	var cReason C.CReasoningType
+	var hasReason C.bool
+	if opts.ReasoningType != nil {
+		cReason = reasoningTypeToC(*opts.ReasoningType)
+		hasReason = C.bool(true)
+	}
+
 	additionalFields := jsonCString(&a, opts.AdditionalTemplateFields)
 	escapedTokens := jsonCString(&a, opts.EscapedSpecialTokens)
 
@@ -985,6 +993,8 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		available_tools_len:             cToolsLen,
 		grounding:                       cGround,
 		has_grounding:                   hasGround,
+		reasoning_type:                  cReason,
+		has_reasoning_type:              hasReason,
 		json_mode:                       C.bool(opts.JSONMode),
 		additional_template_fields_json: additionalFields,
 		escaped_special_tokens_json:     escapedTokens,

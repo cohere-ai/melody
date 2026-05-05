@@ -816,6 +816,7 @@ pub(crate) fn add_jinja_substitutions_common(
     substitutions: &mut Map<String, Value>,
     json_mode: bool,
     json_schema: &Option<String>,
+    reasoning_type: &Option<ReasoningType>,
 ) {
     // TODO The next two substitutions should be configurable if used with vllm
     substitutions.insert("add_generation_prompt".to_string(), Value::Bool(true));
@@ -830,6 +831,11 @@ pub(crate) fn add_jinja_substitutions_common(
             .unwrap_or_default()
             .clone(),
     );
+
+    if reasoning_type.is_some() {
+        let reasoning_enabled = matches!(reasoning_type, Some(ReasoningType::Enabled));
+        substitutions.insert("reasoning".to_string(), Value::Bool(reasoning_enabled));
+    }
 
     if json_mode || json_schema.is_some() {
         let mut json_val = json!({"type": "json_object"});
@@ -857,10 +863,6 @@ pub(crate) fn add_jinja_substitutions_cmd3(
         .is_none_or(|v| *v != CitationQuality::Off)
     {
         substitutions.insert("enable_citations".to_string(), json!(true));
-    }
-    if opts.reasoning_type.is_some() {
-        let reasoning_enabled = matches!(opts.reasoning_type, Some(ReasoningType::Enabled));
-        substitutions.insert("reasoning".to_string(), Value::Bool(reasoning_enabled));
     }
 }
 

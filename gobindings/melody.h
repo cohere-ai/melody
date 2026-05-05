@@ -142,6 +142,8 @@ typedef struct {
     size_t available_tools_len;
     CGrounding grounding;
     bool has_grounding;
+    CReasoningType reasoning_type;
+    bool has_reasoning_type;
     const char* response_prefix;
     const char* json_schema;
     bool json_mode;

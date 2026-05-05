@@ -1053,6 +1053,10 @@ pub struct CRenderCmd4Options {
     pub grounding: CGrounding,
     /// Whether grounding is set
     pub has_grounding: bool,
+    /// Reasoning type enum
+    pub reasoning_type: CReasoningType,
+    /// Whether reasoning type is set
+    pub has_reasoning_type: bool,
     /// Response prefix as a null-terminated C string
     pub response_prefix: *const c_char,
     /// JSON schema as a null-terminated C string
@@ -1454,6 +1458,9 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
     };
     if opts.has_grounding {
         rs_opts.grounding = Some(map_grounding(opts.grounding));
+    }
+    if opts.has_reasoning_type {
+        rs_opts.reasoning_type = Some(map_reasoning_type(opts.reasoning_type));
     }
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
     let template_jinja = unsafe { CStr::from_ptr(opts.template_jinja).to_str().unwrap() };

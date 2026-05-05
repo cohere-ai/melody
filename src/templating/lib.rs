@@ -110,6 +110,8 @@ pub struct RenderCmd4Options<'a> {
     pub available_tools: Vec<Tool>,
     /// Grounding configuration.
     pub grounding: Option<Grounding>,
+    /// Reasoning/thinking mode configuration.
+    pub reasoning_type: Option<ReasoningType>,
     /// Optional prefix for the response.
     pub response_prefix: Option<String>,
     /// Optional JSON schema for structured output.
@@ -139,6 +141,7 @@ impl Default for RenderCmd4Options<'_> {
             documents: Vec::new(),
             available_tools: Vec::new(),
             grounding: Some(Grounding::Enabled),
+            reasoning_type: None,
             response_prefix: None,
             json_schema: None,
             json_mode: false,
@@ -303,7 +306,12 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
     if opts.use_jinja {
-        add_jinja_substitutions_common(&mut substitutions, opts.json_mode, &opts.json_schema);
+        add_jinja_substitutions_common(
+            &mut substitutions,
+            opts.json_mode,
+            &opts.json_schema,
+            &opts.reasoning_type,
+        );
         add_jinja_substitutions_cmd3(&mut substitutions, opts);
 
         let mut active_template = opts.template_jinja;
@@ -379,6 +387,17 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
             .map_or(Value::Null, |g| Value::String(g.as_str().to_string())),
     );
     substitutions.insert(
+        "reasoning_options".to_string(),
+        Value::Object({
+            let mut m = Map::new();
+            m.insert(
+                "enabled".to_string(),
+                Value::Bool(matches!(opts.reasoning_type, Some(ReasoningType::Enabled))),
+            );
+            m
+        }),
+    );
+    substitutions.insert(
         "response_prefix".to_string(),
         opts.response_prefix
             .clone()
@@ -391,7 +410,12 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
     if opts.use_jinja {
-        add_jinja_substitutions_common(&mut substitutions, opts.json_mode, &opts.json_schema);
+        add_jinja_substitutions_common(
+            &mut substitutions,
+            opts.json_mode,
+            &opts.json_schema,
+            &opts.reasoning_type,
+        );
         add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
         let mut active_template = opts.template_jinja;
