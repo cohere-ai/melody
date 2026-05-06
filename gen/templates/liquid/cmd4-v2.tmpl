@@ -4,10 +4,8 @@
 {%- endif %}
 
 {%- assign reasoning_enabled = true %}
-{%- if reasoning_options %}
-  {%- unless reasoning_options.enabled %}
-    {%- assign reasoning_enabled = false %}
-  {%- endunless %}
+{%- if reasoning_options and reasoning_options.enabled == false %}
+  {%- assign reasoning_enabled = false %}
 {%- endif %}
 
 {%- assign skip_thinking = false %}

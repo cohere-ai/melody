@@ -248,4 +248,4 @@ Your output should adhere to the following json schema:
 
 ]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|>
     {%- endif %}
-{%- endfor %}{%- if add_generation_prompt -%}<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{% if is_v2 %}{% if response_prefix %}{{ response_prefix }}{% else %}{% if reasoning %}<|START_THINKING|>{% else %}<|START_THINKING|><|END_THINKING|>{% endif %}{% endif %}{% else %}{{ response_prefix }}{% endif %}{%- endif %}
+{%- endfor %}{%- if add_generation_prompt -%}<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{% if is_v2 %}{% if reasoning %}<|START_THINKING|>{% else %}<|START_THINKING|><|END_THINKING|>{% endif %}{% else %}{{ response_prefix }}{% endif %}{%- endif %}
