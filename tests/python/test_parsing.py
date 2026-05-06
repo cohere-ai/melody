@@ -152,7 +152,7 @@ class TestPyFilterOptions:
         opts = PyFilterOptions().cmd4()
         f = PyFilter(opts)
         result = f.write_decoded("Hello")
-        assert result.content == "Hello"
+        assert result.reasoning == "Hello"
 
     def test_rag_option(self):
         """Test rag() builder method."""
