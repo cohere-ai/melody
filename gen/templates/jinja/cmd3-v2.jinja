@@ -1,5 +1,4 @@
-{%- set reasoning_effort_normalized = reasoning_effort | lower if reasoning_effort is not undefined and reasoning_effort else none -%}
-{%- set reasoning = reasoning if reasoning is not undefined else reasoning_effort_normalized != "none" -%}
+{%- set reasoning = reasoning if reasoning is not undefined else (false if reasoning_effort is defined and reasoning_effort | lower == "none" else true) -%}
 {%- set reasoning = reasoning if reasoning is not undefined else true -%}
 {%- set reasoning_v1 = reasoning_v1 if reasoning_v1 else false -%}
 {%- set skip_thinking = skip_thinking if skip_thinking is not undefined else (not reasoning and not reasoning_v1) -%}
