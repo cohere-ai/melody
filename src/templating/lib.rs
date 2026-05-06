@@ -278,17 +278,19 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
             .as_ref()
             .map_or(Value::Null, |s| Value::String(s.as_str().to_string())),
     );
-    substitutions.insert(
-        "reasoning_options".to_string(),
-        Value::Object({
-            let mut m = Map::new();
-            m.insert(
-                "enabled".to_string(),
-                Value::Bool(matches!(opts.reasoning_type, Some(ReasoningType::Enabled))),
-            );
-            m
-        }),
-    );
+    if opts.reasoning_type.is_some() {
+        substitutions.insert(
+            "reasoning_options".to_string(),
+            Value::Object({
+                let mut m = Map::new();
+                m.insert(
+                    "enabled".to_string(),
+                    Value::Bool(matches!(opts.reasoning_type, Some(ReasoningType::Enabled))),
+                );
+                m
+            }),
+        );
+    }
     substitutions.insert("skip_preamble".to_string(), Value::Bool(opts.skip_preamble));
     substitutions.insert(
         "skip_thinking".to_string(),
@@ -387,17 +389,19 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
             .as_ref()
             .map_or(Value::Null, |g| Value::String(g.as_str().to_string())),
     );
-    substitutions.insert(
-        "reasoning_options".to_string(),
-        Value::Object({
-            let mut m = Map::new();
-            m.insert(
-                "enabled".to_string(),
-                Value::Bool(matches!(opts.reasoning_type, Some(ReasoningType::Enabled))),
-            );
-            m
-        }),
-    );
+    if opts.reasoning_type.is_some() {
+        substitutions.insert(
+            "reasoning_options".to_string(),
+            Value::Object({
+                let mut m = Map::new();
+                m.insert(
+                    "enabled".to_string(),
+                    Value::Bool(matches!(opts.reasoning_type, Some(ReasoningType::Enabled))),
+                );
+                m
+            }),
+        );
+    }
     substitutions.insert(
         "response_prefix".to_string(),
         opts.response_prefix
