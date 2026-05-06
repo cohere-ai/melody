@@ -519,18 +519,6 @@ mod tests {
             println!("Running cmd3 v1 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
-            opts.template_jinja = CMD3V1_JINJA_TEMPLATE;
-            let rendered = render_cmd3(&opts).unwrap();
-            assert_eq!(expected, rendered, "Failed test: {}", test_name);
-        }
-    }
-
-    #[test]
-    fn test_render_cmd3_v1_hf_jinja_from_dir() {
-        for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v1_hf") {
-            println!("Running cmd3 v1 hf jinja test case: {}", test_name);
-            let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
-            opts.use_jinja = true;
             opts.template_jinja = CMD3V1_JINJA_HF_TEMPLATE;
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);

@@ -1,4 +1,3 @@
 {%- set thinking_default_val = "I will assist the user with their request." -%}
-{%- set reasoning_effort_normalized = reasoning_effort | lower if reasoning_effort is not undefined and reasoning_effort else none -%}
-{%- set reasoning = reasoning if reasoning is not undefined else reasoning_effort_normalized != "none" -%}
+{%- set reasoning = reasoning if reasoning is not undefined else (false if reasoning_effort is defined and reasoning_effort | lower == "none" else true) -%}
 {% include "chat_merged_template.jinja" %}
