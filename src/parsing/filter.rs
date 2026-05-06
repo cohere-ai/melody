@@ -1134,6 +1134,18 @@ mod tests {
     }
 
     #[test]
+    fn test_process_full_text_cmd4_implicit_reasoning_then_text() {
+        let mut f = make_cmd4_filter();
+        let text = "Plan first.\
+                     <|END_THINKING|>\
+                     <|START_TEXT|>Final answer.\
+                     <|END_TEXT|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Plan first.".into()));
+        assert_eq!(result.content, Some("Final answer.".into()));
+    }
+
+    #[test]
     fn test_process_full_text_cmd4_start_response_also_works() {
         let mut f = make_cmd4_filter();
         let text = "<|START_THINKING|>Think.\
@@ -1190,6 +1202,15 @@ mod tests {
         let mut f = make_cmd3_filter();
         let text = "<|START_THINKING|><|END_THINKING|><|START_RESPONSE|>Content.<|END_RESPONSE|>";
         let result = f.process_full_text(text);
+        assert_eq!(result.content, Some("Content.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_cmd4_empty_implicit_thinking_prefix() {
+        let mut f = make_cmd4_filter();
+        let text = "<|START_THINKING|><|END_THINKING|><|START_TEXT|>Content.<|END_TEXT|>";
+        let result = f.process_full_text(text);
+        assert!(result.reasoning.is_none());
         assert_eq!(result.content, Some("Content.".into()));
     }
 
@@ -1359,6 +1380,20 @@ mod tests {
         let opts = FilterOptions::default().cmd4().stream_tool_actions();
         let mut f = new_filter(opts);
         let text = "<|START_THINKING|>I should search.\
+                     <|END_THINKING|>\
+                     <|START_ACTION|>\n[{\"tool_call_id\": \"call_0\", \"tool_name\": \"web_search\", \"parameters\": {\"query\": \"test\"}}]\
+                     <|END_ACTION|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("I should search.".into()));
+        assert!(!result.tool_calls.is_empty());
+        assert_eq!(result.tool_calls[0].name, "web_search");
+    }
+
+    #[test]
+    fn test_process_full_text_cmd4_implicit_reasoning_then_tool_action() {
+        let opts = FilterOptions::default().cmd4().stream_tool_actions();
+        let mut f = new_filter(opts);
+        let text = "I should search.\
                      <|END_THINKING|>\
                      <|START_ACTION|>\n[{\"tool_call_id\": \"call_0\", \"tool_name\": \"web_search\", \"parameters\": {\"query\": \"test\"}}]\
                      <|END_ACTION|>";
