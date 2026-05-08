@@ -646,6 +646,21 @@ mod tests {
         assert_eq!(docs[1].tool_result_indices, vec![0]);
     }
 
+    /// Repro without touching `cur_citation_byte_index`: `get_partial_citation_text` stores
+    /// `s.len() - start_first_id` (suffix **length**) as the continuation offset. That equals `6`
+    /// for the minimal opening-only buffer `"<co: >"` (`start_idx == end_idx`, empty partial body).
+    /// On the next parse, that stale `6` is reused as a **byte index** into `"🌈中<co: 2,1>x"`, where
+    /// byte `6` is the last UTF-8 byte of `中` (not a char boundary).
+    #[test]
+    fn test_get_partial_citation_text_char_boundary_panic_from_suffix_length_state() {
+        let mut filter = FilterImpl::new();
+        filter.stream_non_grounded_answer = false;
+
+        let _ = filter.parse_citations("<co: >", FilterMode::GroundedAnswer);
+
+        let _ = filter.parse_citations("🌈中<co: 2,1>x", FilterMode::GroundedAnswer);
+    }
+
     #[test]
     fn test_convert_string_to_int_list() {
         assert_eq!(convert_string_to_int_list("0"), vec![0]);
