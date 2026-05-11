@@ -66,11 +66,3 @@ cmd4-v1:
       path: cmd4/vars/grounding_preamble.tmpl
     document_injector_tool:
       path: cmd4/vars/document_injector_tool.tmpl
-
-cmd4-v2:
-  path: cmd4/cmd4-v2.tmpl
-  variables:
-    grounding_preamble:
-      path: cmd4/vars/grounding_preamble.tmpl
-    document_injector_tool:
-      path: cmd4/vars/document_injector_tool.tmpl
