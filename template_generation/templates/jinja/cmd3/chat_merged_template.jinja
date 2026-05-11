@@ -1,4 +1,3 @@
-{%- set reasoning = reasoning if reasoning is not undefined else true -%}
 {%- set reasoning_v1 = reasoning_v1 if reasoning_v1 else false -%}
 {%- set skip_thinking = skip_thinking if skip_thinking is not undefined else (not reasoning and not reasoning_v1) -%}
 {%- set thinking_default_val = thinking_default_val | default(None) -%}
