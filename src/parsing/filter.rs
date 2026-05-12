@@ -395,6 +395,25 @@ impl FilterImpl {
             out.extend(o);
         }
 
+        match new_mode {
+            FilterMode::GroundedAnswer => {
+                self.cur_text_index = 0;
+                self.cur_text_byte_index = 0;
+                self.cur_citation_byte_index = None;
+                if self.stream_non_grounded_answer {
+                    self.left_trimmed = true;
+                }
+            }
+            FilterMode::ToolReason => {
+                self.cur_text_index = 0;
+                self.cur_text_byte_index = 0;
+                self.cur_citation_byte_index = None;
+                self.left_trimmed = true;
+                self.right_trimmed = true;
+            }
+            _ => {}
+        }
+
         let remove_len = pre_special_token.len() + token_match.sequence.len();
         self.buf.drain(..remove_len);
         self.mode = new_mode;
@@ -463,16 +482,11 @@ impl FilterImpl {
                 let out = self.handle_exclusive_stop(s, idx);
                 (out, new_mode, true, true)
             }
-            FilterMode::GroundedAnswer => {
-                self.cur_text_index = 0;
-                if self.stream_non_grounded_answer {
-                    self.left_trimmed = true;
-                }
-                (Vec::new(), new_mode, false, true)
-            }
-            FilterMode::ToolReason => {
-                self.left_trimmed = true;
-                self.right_trimmed = true;
+            FilterMode::GroundedAnswer | FilterMode::ToolReason => {
+                // Citation / text index resets happen in `apply_special_token_match`
+                // *after* pre-token bytes are flushed with `handle_token`, so
+                // `cur_citation_byte_index` remains valid through the final
+                // `GroundedAnswer` / `ToolReason` chunk before the delimiter.
                 (Vec::new(), new_mode, false, true)
             }
             FilterMode::Answer | FilterMode::SearchQuery => {
@@ -1119,6 +1133,41 @@ mod tests {
         let result = f.process_full_text(text);
         assert_eq!(result.reasoning, Some("Let me think about this.".into()));
         assert_eq!(result.content, Some("Here is the answer.".into()));
+    }
+
+    /// Partial cmd3 citation spans two `process_full` chunks and completes in the same
+    /// buffer as `<|END_THINKING|>`. Citation byte index must survive until that
+    /// pre-token flush; resetting it too early duplicates the citation body in
+    /// aggregated reasoning.
+    ///
+    /// Each `write_text` call handles at most one special-token match, so chunks
+    /// are split so every delimiter sits in its own final `process_full` segment.
+    #[test]
+    fn test_streaming_partial_cmd3_citation_flush_before_end_thinking() {
+        let mut f = make_cmd3_filter();
+        let chunks = vec![
+            "<|START_THINKING|>".to_string(),
+            "pre <co>ci".to_string(),
+            "tation</co: 0:[0]><|END_THINKING|>".to_string(),
+            "<|START_RESPONSE|>out".to_string(),
+            "<|END_RESPONSE|>".to_string(),
+        ];
+        let result = f.process_full(&chunks);
+        assert_eq!(result.reasoning.as_deref(), Some("pre citation"));
+        assert_eq!(result.content.as_deref(), Some("out"));
+    }
+
+    // test_citation_start_in_thinking_bug is a regression test for old behavior where citation state wasn't reset between modes causing parsing bugs.
+    #[test]
+    fn test_citation_start_in_thinking_bug() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_THINKING|>I will use some <co> tags to make citations<|END_THINKING|><|START_RESPONSE|>here is a <co>citation</co: 0:[0]>!!!<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert_eq!(
+            result.reasoning,
+            Some("I will use some  tags to make citations".into())
+        );
+        assert_eq!(result.content, Some("here is a citation!!!".into()));
     }
 
     #[test]

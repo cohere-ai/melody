@@ -35,7 +35,6 @@ go.work.sum
 rust/target/
 target/
 **/*.rs.bk
-Cargo.lock
 artifacts
 
 # OS
