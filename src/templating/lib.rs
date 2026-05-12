@@ -387,19 +387,6 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
             .as_ref()
             .map_or(Value::Null, |g| Value::String(g.as_str().to_string())),
     );
-    if opts.reasoning_type.is_some() {
-        substitutions.insert(
-            "reasoning_options".to_string(),
-            Value::Object({
-                let mut m = Map::new();
-                m.insert(
-                    "enabled".to_string(),
-                    Value::Bool(matches!(opts.reasoning_type, Some(ReasoningType::Enabled))),
-                );
-                m
-            }),
-        );
-    }
     substitutions.insert(
         "response_prefix".to_string(),
         opts.response_prefix
