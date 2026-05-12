@@ -1132,7 +1132,10 @@ mod tests {
         let mut f = make_cmd3_filter();
         let text = "<|START_THINKING|>I will use some <co> tags to make citations<|END_THINKING|><|START_RESPONSE|>here is a <co>citation</co: 0:[0]>!!!<|END_RESPONSE|>";
         let result = f.process_full_text(text);
-        assert_eq!(result.reasoning, Some("I will use some  tags to make citations".into()));
+        assert_eq!(
+            result.reasoning,
+            Some("I will use some  tags to make citations".into())
+        );
         assert_eq!(result.content, Some("here is a citation!!!".into()));
     }
 
