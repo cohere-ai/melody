@@ -25,12 +25,6 @@ cmd3-v1-hf:
 
 cmd4-v1:
   path: cmd4/cmd4-v1.jinja
-  includes:
-    chat_template.jinja:
-      path: cmd4/chat_template.jinja
 
 cmd4-v2:
   path: cmd4/cmd4-v2.jinja
-  includes:
-    chat_template.jinja:
-      path: cmd4/chat_template.jinja

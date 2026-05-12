@@ -1,4 +1,3 @@
-{%- set generation_prompt_mode = "thinking" -%}
 {%- set reasoning = reasoning if reasoning is not undefined else (false if reasoning_effort is defined and reasoning_effort | lower == "none" else true) -%}
 {%- set grounding = grounding | default("disabled") | upper %}
 {%- set grounding_enabled = grounding == "ENABLED" %}
@@ -247,4 +246,4 @@ Your output should adhere to the following json schema:
 
 ]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|>
     {%- endif %}
-{%- endfor %}{%- if add_generation_prompt -%}<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{% if generation_prompt_mode == "thinking" %}{% if reasoning %}<|START_THINKING|>{% else %}<|START_THINKING|><|END_THINKING|>{% endif %}{% else %}{{ response_prefix }}{% endif %}{%- endif %}
+{%- endfor %}{%- if add_generation_prompt -%}<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{% if reasoning %}<|START_THINKING|>{% else %}<|START_THINKING|><|END_THINKING|>{% endif %}{%- endif %}
