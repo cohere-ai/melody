@@ -465,12 +465,17 @@ impl FilterImpl {
             }
             FilterMode::GroundedAnswer => {
                 self.cur_text_index = 0;
+                self.cur_text_byte_index = 0;
+                self.cur_citation_byte_index = None;
                 if self.stream_non_grounded_answer {
                     self.left_trimmed = true;
                 }
                 (Vec::new(), new_mode, false, true)
             }
             FilterMode::ToolReason => {
+                self.cur_text_index = 0;
+                self.cur_text_byte_index = 0;
+                self.cur_citation_byte_index = None;
                 self.left_trimmed = true;
                 self.right_trimmed = true;
                 (Vec::new(), new_mode, false, true)
@@ -1119,6 +1124,16 @@ mod tests {
         let result = f.process_full_text(text);
         assert_eq!(result.reasoning, Some("Let me think about this.".into()));
         assert_eq!(result.content, Some("Here is the answer.".into()));
+    }
+
+    // test_citation_start_in_thinking_bug is a regression test for old behavior where citation state wasn't reset between modes causing parsing bugs.
+    #[test]
+    fn test_citation_start_in_thinking_bug() {
+        let mut f = make_cmd3_filter();
+        let text = "<|START_THINKING|>I will use some <co> tags to make citations<|END_THINKING|><|START_RESPONSE|>here is a <co>citation</co: 0:[0]>!!!<|END_RESPONSE|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("I will use some  tags to make citations".into()));
+        assert_eq!(result.content, Some("here is a citation!!!".into()));
     }
 
     #[test]
