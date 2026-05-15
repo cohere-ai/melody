@@ -990,6 +990,7 @@ version = "0.8.0"
 dependencies = [
  "divan",
  "env_logger",
+ "indexmap",
  "libc",
  "liquid",
  "log",
