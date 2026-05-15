@@ -227,6 +227,16 @@ enum SpecialTokenScanResult {
     Found(SpecialTokenMatch),
 }
 
+/// Outcome of trying to apply a matched special token.
+enum SpecialTokenOutcome {
+    /// The token was consumed: buffer drained, mode updated. Keep scanning.
+    Consumed,
+    /// The match was rejected.
+    Rejected,
+    /// An inclusive/exclusive stop token fired; the filter is done.
+    Stop,
+}
+
 #[derive(Debug)]
 pub(crate) enum PartialMatchResult {
     NoMatch,
@@ -321,12 +331,18 @@ impl FilterImpl {
         loop {
             match self.detect_special_token() {
                 SpecialTokenScanResult::Partial => return out,
+                SpecialTokenScanResult::NoMatch => break,
                 SpecialTokenScanResult::Found(token_match) => {
-                    if self.apply_special_token_match(&token_match, &mut out) {
-                        return out;
+                    match self.apply_special_token_match(&token_match, &mut out) {
+                        SpecialTokenOutcome::Consumed => {}
+                        SpecialTokenOutcome::Stop => return out,
+                        // Rejected matches (e.g. `Answer:` while already in
+                        // GroundedAnswer) leave buf and mode untouched, so
+                        // rescanning would loop forever on the same hit.
+                        // Fall through to plain buffer processing.
+                        SpecialTokenOutcome::Rejected => break,
                     }
                 }
-                SpecialTokenScanResult::NoMatch => break,
             }
         }
 
@@ -378,7 +394,7 @@ impl FilterImpl {
         &mut self,
         token_match: &SpecialTokenMatch,
         out: &mut Vec<FilterOutput>,
-    ) -> bool {
+    ) -> SpecialTokenOutcome {
         let (o, new_mode, stop, valid_special) = self.handle_special_token(
             &token_match.decoded,
             token_match.idx,
@@ -388,13 +404,13 @@ impl FilterImpl {
         out.extend(o);
 
         if !valid_special {
-            return false;
+            return SpecialTokenOutcome::Rejected;
         }
 
         if stop {
             self.buf.clear();
             self.done = true;
-            return true;
+            return SpecialTokenOutcome::Stop;
         }
 
         // `idx` is a byte offset produced by string search on `decoded`.
@@ -426,7 +442,7 @@ impl FilterImpl {
         let remove_len = pre_special_token.len() + token_match.sequence.len();
         self.buf.drain(..remove_len);
         self.mode = new_mode;
-        false
+        SpecialTokenOutcome::Consumed
     }
 
     fn handle_token(
@@ -1703,6 +1719,28 @@ mod tests {
         assert_eq!(
             content_mask,
             vec![false, false, false, false, false, false, false, true, false]
+        );
+    }
+
+    /// Test when ``handle_special_token`` rejects a match via the
+    /// ``not_special`` rule (e.g. ``Answer:`` seen while already in
+    /// ``GroundedAnswer`` mode), ``apply_special_token_match`` returns false
+    /// without mutating the buffer or the mode. The streaming loop must
+    /// detect this and fall through to plain buffer processing otherwise
+    /// ``detect_special_token`` keeps returning the same ``Found`` result on
+    /// every iteration loops forever.
+    #[test]
+    fn test_write_decoded_rejected_special_token_does_not_loop() {
+        let mut f = new_filter(FilterOptions::default().handle_rag());
+
+        f.write_decoded("Grounded answer:");
+        // ``Answer:`` here is *not* a valid transition (already in
+        // GroundedAnswer); it must be emitted as part of the grounded text.
+        let r = f.write_decoded(" the Answer: is 42.");
+        let content = r.content.unwrap_or_default();
+        assert!(
+            content.contains("Answer:"),
+            "expected the rejected ``Answer:`` to be emitted as content, got {content:?}",
         );
     }
 }
