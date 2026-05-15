@@ -4,7 +4,7 @@
 
 use crate::parsing::filter::FilterImpl;
 use crate::parsing::types::FilterMode;
-use indexmap::IndexMap;
+use std::collections::HashMap;
 
 /// Configuration builder for creating filters.
 ///
@@ -32,7 +32,7 @@ pub struct FilterOptions {
     pub(crate) inclusive_stops: Vec<String>,
     pub(crate) exclusive_stops: Vec<String>,
     pub(crate) chunk_size: usize,
-    pub(crate) special_token_map: IndexMap<String, FilterMode>,
+    pub(crate) special_token_map: HashMap<String, FilterMode>,
     pub(crate) default_mode: FilterMode,
     pub(crate) stream_non_grounded_answer: bool,
     pub(crate) stream_tool_actions: bool,
@@ -49,7 +49,7 @@ impl Default for FilterOptions {
             inclusive_stops: Vec::new(),
             exclusive_stops: Vec::new(),
             chunk_size: 1,
-            special_token_map: IndexMap::new(),
+            special_token_map: HashMap::new(),
             default_mode: FilterMode::PlainText,
             stream_non_grounded_answer: false,
             stream_tool_actions: false,
@@ -463,8 +463,8 @@ impl FilterOptions {
     /// ```
     #[must_use]
     pub fn no_tools(mut self) -> Self {
-        self.special_token_map.shift_remove("<|START_ACTION|>");
-        self.special_token_map.shift_remove("<|END_ACTION|>");
+        self.special_token_map.remove("<|START_ACTION|>");
+        self.special_token_map.remove("<|END_ACTION|>");
         self
     }
 
@@ -488,7 +488,7 @@ impl FilterOptions {
     /// ```
     #[must_use]
     pub fn remove_token(mut self, token: &str) -> Self {
-        self.special_token_map.shift_remove(token);
+        self.special_token_map.remove(token);
         self
     }
 }

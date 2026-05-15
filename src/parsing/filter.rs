@@ -9,7 +9,6 @@ use crate::parsing::types::{
     AccumulatedToolCall, FilterAggregatedResult, FilterMode, FilterOutput, FilterSearchQueryDelta,
     SearchQueryDelta,
 };
-use indexmap::IndexMap;
 use std::collections::HashMap;
 
 fn push_text(target: &mut Option<String>, text: &mut String) {
@@ -182,7 +181,7 @@ pub struct FilterImpl {
 
     // Mode and special token configuration
     pub(crate) default_mode: FilterMode,
-    pub(crate) special_token_map: IndexMap<String, FilterMode>,
+    pub(crate) special_token_map: HashMap<String, FilterMode>,
     pub(crate) special_token_start_bytes: [bool; 256],
     pub(crate) stream_non_grounded_answer: bool,
     pub(crate) stream_tool_actions: bool,
@@ -241,7 +240,7 @@ impl FilterImpl {
             left_trimmed: false,
             right_trimmed: false,
             default_mode: FilterMode::PlainText,
-            special_token_map: IndexMap::new(),
+            special_token_map: HashMap::new(),
             special_token_start_bytes: [false; 256],
             stream_non_grounded_answer: false,
             stream_tool_actions: false,
@@ -718,6 +717,9 @@ impl Filter for FilterImpl {
 /// present, otherwise a ``Partial`` if the tail of ``s`` is a non-empty
 /// prefix of some stop (so the caller can buffer until the next chunk
 /// completes it), otherwise ``NoMatch``.
+///
+/// Iteration order of ``stops`` does not affect the output as long as no
+/// stop is a prefix of another (true for all current callers).
 pub(crate) fn find_partial<'a>(
     s: &str,
     stops: impl Iterator<Item = &'a String>,
