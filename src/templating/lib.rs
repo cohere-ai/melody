@@ -127,6 +127,7 @@ pub struct RenderCmd4Options<'a> {
 static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.tmpl");
 static CMD4V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v1.jinja");
 static CMD4V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v2.jinja");
+static CMD4HF_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-hf.jinja");
 impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
@@ -184,6 +185,7 @@ impl CMD3JinjaTemplates {
 enum CMD4JinjaTemplates {
     CMD4V1,
     CMD4V2,
+    CMD4HF,
 }
 
 impl CMD4JinjaTemplates {
@@ -191,6 +193,7 @@ impl CMD4JinjaTemplates {
         match *self {
             CMD4JinjaTemplates::CMD4V1 => CMD4V1_JINJA_TEMPLATE,
             CMD4JinjaTemplates::CMD4V2 => CMD4V2_JINJA_TEMPLATE,
+            CMD4JinjaTemplates::CMD4HF => CMD4HF_JINJA_TEMPLATE,
         }
     }
 }
@@ -202,6 +205,7 @@ impl FromStr for CMD4JinjaTemplates {
         match o {
             "cmd4-v1" => Ok(Self::CMD4V1),
             "cmd4-v2" => Ok(Self::CMD4V2),
+            "cmd4_hf" | "cmd4-hf" => Ok(Self::CMD4HF),
             _ => Err(MelodyError::TemplateValidation(format!(
                 "unknown template id: {o}"
             ))),
@@ -600,6 +604,32 @@ mod tests {
             opts.use_jinja = true;
             if test_name != "template_provided" {
                 opts.template_jinja = CMD4V2_JINJA_TEMPLATE;
+            }
+            let rendered = render_cmd4(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd4_hf_jinja_from_dir() {
+        for (test_name, input_json, expected) in read_test_cases("jinja/cmd4_hf") {
+            println!("Running cmd4 hf jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            opts.template_jinja = CMD4HF_JINJA_TEMPLATE;
+            let rendered = render_cmd4(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    #[test]
+    fn test_render_cmd4_hf_jinja_from_liquid_dir() {
+        for (test_name, input_json, expected) in read_test_cases("cmd4_hf") {
+            println!("Running cmd4 hf jinja liquid test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            if test_name != "template_provided" {
+                opts.template_jinja = CMD4HF_JINJA_TEMPLATE;
             }
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);

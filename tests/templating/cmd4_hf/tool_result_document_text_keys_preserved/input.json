@@ -1,0 +1,47 @@
+{
+  "platform_instruction": "",
+  "dev_instruction": "",
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "What is 2 + 2?"
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "I will use the Calculator tool to calculate 2 + 2."
+        }
+      ],
+      "tool_calls": [
+        {
+          "id": "calculator_0",
+          "name": "calculator",
+          "parameters": "{\"expression\": \"2 + 2\"}"
+        }
+      ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "calculator_0",
+      "content": [
+        {
+          "type": "document",
+          "document": {
+            "type": "text",
+            "text": "some_text",
+            "some_key": "some_value",
+            "another_key": "another_value"
+          }
+        }
+      ]
+    }
+  ],
+  "reasoning_type": "enabled"
+}
