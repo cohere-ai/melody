@@ -348,9 +348,7 @@ impl FilterImpl {
         let (chunk_end, consumed, is_final) = match find_partial(s, stops.iter()) {
             PartialMatchResult::NoMatch => (s.len(), s.len(), false),
             PartialMatchResult::Partial { idx } => (idx, idx, false),
-            PartialMatchResult::Full { idx, sequence } => {
-                (idx, idx + sequence.len(), true)
-            }
+            PartialMatchResult::Full { idx, sequence } => (idx, idx + sequence.len(), true),
         };
 
         let mut out = self.emit_cofl_param_value_chunk(&s[..chunk_end], is_final);
@@ -382,11 +380,7 @@ impl FilterImpl {
     /// `stream_processed_params` is set, otherwise as a `raw_param_delta`.
     /// Only one of the two streams is populated, matching the JSON action
     /// parser's convention.
-    fn emit_cofl_param_value_chunk(
-        &mut self,
-        chunk: &str,
-        is_final: bool,
-    ) -> Vec<FilterOutput> {
+    fn emit_cofl_param_value_chunk(&mut self, chunk: &str, is_final: bool) -> Vec<FilterOutput> {
         if !self.stream_tool_actions {
             return Vec::new();
         }
@@ -448,10 +442,7 @@ mod tests {
 
     #[test]
     fn test_extract_attr_basic() {
-        assert_eq!(
-            extract_attr(r#"id="0" name="search""#, "id"),
-            Some("0")
-        );
+        assert_eq!(extract_attr(r#"id="0" name="search""#, "id"), Some("0"));
         assert_eq!(
             extract_attr(r#"id="0" name="search""#, "name"),
             Some("search")
@@ -593,8 +584,7 @@ mod tests {
     #[test]
     fn test_parse_cofl_actions_string_value_escapes_quotes_and_backslash() {
         let mut f = fresh_filter();
-        let input =
-            r#"<cofl:tool_call id="0" name="echo"><cofl:tool_param name="q" string="true">she said "hi" \o/</cofl:tool_param></cofl:tool_call>"#;
+        let input = r#"<cofl:tool_call id="0" name="echo"><cofl:tool_param name="q" string="true">she said "hi" \o/</cofl:tool_param></cofl:tool_call>"#;
         let (out, consumed) = f.parse_cofl_actions(input);
 
         assert_eq!(consumed, input.len());
@@ -606,7 +596,10 @@ mod tests {
             .collect();
         // Parse the synthesized JSON: the raw value should decode back to the original string.
         let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
-        assert_eq!(parsed["q"], serde_json::Value::String("she said \"hi\" \\o/".to_string()));
+        assert_eq!(
+            parsed["q"],
+            serde_json::Value::String("she said \"hi\" \\o/".to_string())
+        );
     }
 
     #[test]
@@ -623,7 +616,8 @@ mod tests {
     #[test]
     fn test_parse_cofl_actions_partial_value_streams_chunk() {
         let mut f = fresh_filter();
-        let prefix = r#"<cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">"#;
+        let prefix =
+            r#"<cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">"#;
         let _ = f.parse_cofl_actions(prefix);
 
         // A partial value (no close tag yet) should stream what we have.
@@ -637,8 +631,7 @@ mod tests {
         assert_eq!(raw, "hello");
 
         // The remainder of the value plus the close tag completes the param.
-        let (out, consumed) =
-            f.parse_cofl_actions(" world</cofl:tool_param></cofl:tool_call>");
+        let (out, consumed) = f.parse_cofl_actions(" world</cofl:tool_param></cofl:tool_call>");
         assert!(consumed > 0);
         let raw: String = out
             .iter()
@@ -651,7 +644,8 @@ mod tests {
     #[test]
     fn test_parse_cofl_actions_partial_close_tag_held_in_buffer() {
         let mut f = fresh_filter();
-        let prefix = r#"<cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">"#;
+        let prefix =
+            r#"<cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">"#;
         let _ = f.parse_cofl_actions(prefix);
 
         // Buffer ends mid-close-tag. The streamed value must stop before
