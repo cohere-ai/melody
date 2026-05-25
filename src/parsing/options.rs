@@ -39,6 +39,9 @@ pub struct FilterOptions {
     pub(crate) stream_processed_params: bool,
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
+    /// When set, [`FilterMode::ToolAction`] is parsed with the cofl-tagged
+    /// parser (cmd5 format) rather than the JSON action parser.
+    pub(crate) cofl_tool_action: bool,
 }
 
 impl Default for FilterOptions {
@@ -56,6 +59,7 @@ impl Default for FilterOptions {
             stream_processed_params: false,
             has_tool_call_id: false,
             cmd3_citations: false,
+            cofl_tool_action: false,
         }
     }
 }
@@ -168,6 +172,65 @@ impl FilterOptions {
             .insert("<|START_ACTION|>".to_string(), FilterMode::ToolAction);
         self.special_token_map
             .insert("<|END_ACTION|>".to_string(), FilterMode::Ignore);
+        self.special_token_map
+            .insert("<|START_RESPONSE|>".to_string(), FilterMode::GroundedAnswer);
+        self.special_token_map
+            .insert("<|END_RESPONSE|>".to_string(), FilterMode::Ignore);
+        self
+    }
+
+    /// Configure for Cohere Command 5 model format.
+    ///
+    /// Command 5 keeps the same text / thinking delimiters as Command 4
+    /// (`<|START_TEXT|>`, `<|END_TEXT|>`, `<|START_THINKING|>`,
+    /// `<|END_THINKING|>`) but replaces the JSON `<|START_ACTION|>` block
+    /// with an XML-like, cofl-tagged tool-call section:
+    ///
+    /// ```text
+    /// <cofl:tool_calls>
+    ///   <cofl:tool_call id="0" name="search">
+    ///     <cofl:tool_param name="query" string="true">hello</cofl:tool_param>
+    ///   </cofl:tool_call>
+    /// </cofl:tool_calls>
+    /// ```
+    ///
+    /// This preset enables:
+    /// - Cofl-tagged tool action parsing (see [`super::cofl_filter`])
+    /// - Grounded answer parsing with cmd3-style citations
+    /// - Tool action streaming
+    /// - Right trimming
+    /// - Tool call ID support
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::parsing::{FilterOptions, new_filter};
+    ///
+    /// let options = FilterOptions::new().cmd5();
+    /// let mut filter = new_filter(options);
+    /// ```
+    #[must_use]
+    pub fn cmd5(mut self) -> Self {
+        // Cmd5 generation prompts include the thinking start token, so
+        // parsing starts in thinking mode (matches cmd4 behaviour).
+        self.default_mode = FilterMode::ToolReason;
+        self.right_trimmed = true;
+        self.has_tool_call_id = true;
+        self.cmd3_citations = true;
+        self.stream_tool_actions = true;
+        self.cofl_tool_action = true;
+        self.special_token_map
+            .insert("<|START_TEXT|>".to_string(), FilterMode::GroundedAnswer);
+        self.special_token_map
+            .insert("<|END_TEXT|>".to_string(), FilterMode::Ignore);
+        self.special_token_map
+            .insert("<|START_THINKING|>".to_string(), FilterMode::ToolReason);
+        self.special_token_map
+            .insert("<|END_THINKING|>".to_string(), FilterMode::GroundedAnswer);
+        self.special_token_map
+            .insert("<cofl:tool_calls>".to_string(), FilterMode::ToolAction);
+        self.special_token_map
+            .insert("</cofl:tool_calls>".to_string(), FilterMode::Ignore);
         self.special_token_map
             .insert("<|START_RESPONSE|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
@@ -449,8 +512,9 @@ impl FilterOptions {
 
     /// Disable tool call parsing by removing the action tokens.
     ///
-    /// Removes `<|START_ACTION|>` and `<|END_ACTION|>` from the special token map
-    /// so the filter treats tool call markup as plain text.
+    /// Removes `<|START_ACTION|>` / `<|END_ACTION|>` (cmd3/cmd4) and
+    /// `<cofl:tool_calls>` / `</cofl:tool_calls>` (cmd5) from the special
+    /// token map so the filter treats tool call markup as plain text.
     ///
     /// # Examples
     ///
@@ -465,6 +529,8 @@ impl FilterOptions {
     pub fn no_tools(mut self) -> Self {
         self.special_token_map.remove("<|START_ACTION|>");
         self.special_token_map.remove("<|END_ACTION|>");
+        self.special_token_map.remove("<cofl:tool_calls>");
+        self.special_token_map.remove("</cofl:tool_calls>");
         self
     }
 

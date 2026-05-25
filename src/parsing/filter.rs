@@ -4,6 +4,7 @@
 //! and extracts structured information, as well as aggregation functions for efficient interop.
 
 use crate::parsing::action_filter::FilterAction;
+use crate::parsing::cofl_filter::FilterCoflAction;
 use crate::parsing::options::FilterOptions;
 use crate::parsing::types::{
     AccumulatedToolCall, FilterAggregatedResult, FilterMode, FilterOutput, FilterSearchQueryDelta,
@@ -196,6 +197,7 @@ pub struct FilterImpl {
     pub(crate) cur_text_byte_index: usize,
     pub(crate) cur_citation_byte_index: Option<usize>,
     pub(crate) action_metadata: FilterAction,
+    pub(crate) cofl_action_metadata: FilterCoflAction,
 
     // Search query tracking
     pub(crate) curr_search_query_idx: usize,
@@ -204,6 +206,9 @@ pub struct FilterImpl {
     // Format flags
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
+    /// Use the cofl-tagged parser (cmd5) for [`FilterMode::ToolAction`]
+    /// instead of the JSON action parser.
+    pub(crate) cofl_tool_action: bool,
 
     // Chunking configuration
     pub(crate) chunk_size: usize,
@@ -261,10 +266,12 @@ impl FilterImpl {
             cur_text_byte_index: 0,
             cur_citation_byte_index: None,
             action_metadata: FilterAction::new(),
+            cofl_action_metadata: FilterCoflAction::new(),
             curr_search_query_idx: 0,
             sent_curr_index: false,
             has_tool_call_id: false,
             cmd3_citations: false,
+            cofl_tool_action: false,
             chunk_size: 1,
             num_tokens_in_chunk: 0,
             buf: Vec::new(),
@@ -282,6 +289,7 @@ impl FilterImpl {
         self.stream_processed_params = options.stream_processed_params;
         self.has_tool_call_id = options.has_tool_call_id;
         self.cmd3_citations = options.cmd3_citations;
+        self.cofl_tool_action = options.cofl_tool_action;
         self.default_mode = options.default_mode;
         self.mode = options.default_mode;
 
@@ -459,7 +467,11 @@ impl FilterImpl {
             FilterMode::Ignore | FilterMode::NextSearchQuery => (Vec::new(), 0),
             FilterMode::ToolAction => {
                 let s = String::from_utf8_lossy(bstr);
-                self.parse_actions(&s)
+                if self.cofl_tool_action {
+                    self.parse_cofl_actions(&s)
+                } else {
+                    self.parse_actions(&s)
+                }
             }
             FilterMode::GroundedAnswer | FilterMode::ToolReason => {
                 self.process_grounded_text(bstr, after_last_token, mode)
@@ -1166,6 +1178,14 @@ mod tests {
         new_filter(FilterOptions::default().cmd4().no_tools())
     }
 
+    fn make_cmd5_filter() -> FilterImpl {
+        new_filter(FilterOptions::default().cmd5())
+    }
+
+    fn make_cmd5_no_tools_filter() -> FilterImpl {
+        new_filter(FilterOptions::default().cmd5().no_tools())
+    }
+
     #[test]
     fn test_process_full_text_cmd3_thinking_and_response() {
         let mut f = make_cmd3_filter();
@@ -1720,6 +1740,77 @@ mod tests {
             content_mask,
             vec![false, false, false, false, false, false, false, true, false]
         );
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_thinking_and_text() {
+        let mut f = make_cmd5_no_tools_filter();
+        let text = "<|START_THINKING|>Let me think.\
+                     <|END_THINKING|>\
+                     <|START_TEXT|>Here is the answer.\
+                     <|END_TEXT|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Let me think.".into()));
+        assert_eq!(result.content, Some("Here is the answer.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_tool_call_with_string_param() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>I should search.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="call_0" name="web_search"><cofl:tool_param name="query" string="true">test</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("I should search.".into()));
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_0");
+        assert_eq!(result.tool_calls[0].name, "web_search");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"query": "test"}"#);
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_tool_call_mixed_param_types() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>thinking<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="DeleteReminder"><cofl:tool_param name="reminder_id" string="true">12-abc</cofl:tool_param><cofl:tool_param name="force" string="false">true</cofl:tool_param><cofl:tool_param name="limit" string="false">3</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "DeleteReminder");
+        assert_eq!(
+            result.tool_calls[0].arguments,
+            r#"{"reminder_id": "12-abc", "force": true, "limit": 3}"#
+        );
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_multiple_tool_calls() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>parallel<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="GetReminders"></cofl:tool_call><cofl:tool_call id="1" name="GetTodos"><cofl:tool_param name="filter" string="true">open</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 2);
+        assert_eq!(result.tool_calls[0].id, "0");
+        assert_eq!(result.tool_calls[0].name, "GetReminders");
+        assert_eq!(result.tool_calls[0].arguments, "{}");
+        assert_eq!(result.tool_calls[1].id, "1");
+        assert_eq!(result.tool_calls[1].name, "GetTodos");
+        assert_eq!(result.tool_calls[1].arguments, r#"{"filter": "open"}"#);
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_matches_streaming_process_full() {
+        let text = r#"<|START_THINKING|>think.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">hello</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+
+        let mut f1 = make_cmd5_filter();
+        let r_full_text = f1.process_full_text(text);
+        let mut f2 = make_cmd5_filter();
+        let r_full = f2.process_full(&chunks);
+
+        assert_eq!(r_full_text.reasoning, r_full.reasoning);
+        assert_eq!(r_full_text.tool_calls.len(), r_full.tool_calls.len());
+        assert_eq!(
+            r_full_text.tool_calls[0].arguments,
+            r_full.tool_calls[0].arguments
+        );
+        assert_eq!(r_full_text.tool_calls[0].name, r_full.tool_calls[0].name);
+        assert_eq!(r_full_text.tool_calls[0].id, r_full.tool_calls[0].id);
     }
 
     /// Test when ``handle_special_token`` rejects a match via the

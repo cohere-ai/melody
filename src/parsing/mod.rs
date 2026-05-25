@@ -5,6 +5,7 @@
 
 mod action_filter;
 mod citations_filter;
+mod cofl_filter;
 mod filter;
 mod options;
 mod param_filter;
