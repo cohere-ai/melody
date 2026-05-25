@@ -1,0 +1,15 @@
+{
+  "platform_instruction": "Custom platform instruction with no tools.",
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hello"
+        }
+      ]
+    }
+  ],
+  "reasoning_type": "enabled"
+}

@@ -34,3 +34,6 @@ cmd4-hf:
   includes:
     cmd4-v2.jinja:
       path: cmd4/cmd4-v2.jinja
+
+cmd5:
+  path: cmd5/cmd5.jinja

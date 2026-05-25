@@ -128,6 +128,8 @@ static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.
 static CMD4V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v1.jinja");
 static CMD4V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v2.jinja");
 static CMD4HF_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-hf.jinja");
+#[allow(dead_code)] // this is used in a test below
+static CMD5_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd5.jinja");
 impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
@@ -442,8 +444,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    fn read_test_cases(version: &str) -> Vec<(String, Value, String)> {
-        let mut cases = vec![];
+    fn templating_test_dir(version: &str) -> std::path::PathBuf {
         let cur_file = file!();
         let cur_dir = Path::new(cur_file)
             .parent()
@@ -452,7 +453,20 @@ mod tests {
             .unwrap()
             .parent()
             .unwrap();
-        let test_dir = cur_dir.join("tests/templating").join(version);
+        cur_dir.join("tests/templating").join(version)
+    }
+
+    /// Iterates the fixtures in `tests/templating/<version>`. Each entry yields
+    /// the test name, parsed `input.json`, the contents of `output.txt` (empty
+    /// string if the file does not yet exist), and the path to `output.txt`.
+    ///
+    /// Test cases without an `output.txt` will fail their assertions, signaling
+    /// that the fixture needs to be generated. The `regenerate_*_fixtures`
+    /// helpers below reuse this function and ignore the (possibly empty)
+    /// output contents, writing fresh output to `output_path`.
+    fn read_test_cases(version: &str) -> Vec<(String, Value, String, std::path::PathBuf)> {
+        let mut cases = vec![];
+        let test_dir = templating_test_dir(version);
         if !test_dir.exists() {
             panic!("Test directory {:?} does not exist.", test_dir);
         }
@@ -462,12 +476,16 @@ mod tests {
             if path.is_dir() {
                 let input_path = path.join("input.json");
                 let output_path = path.join("output.txt");
-                if input_path.exists() && output_path.exists() {
+                if input_path.exists() {
                     let input = fs::read_to_string(&input_path).unwrap();
                     let input_json: Value = serde_json::from_str(&input).unwrap();
-                    let output = fs::read_to_string(&output_path).unwrap();
+                    let output = if output_path.exists() {
+                        fs::read_to_string(&output_path).unwrap()
+                    } else {
+                        String::new()
+                    };
                     let test_name = path.file_name().unwrap().to_string_lossy().to_string();
-                    cases.push((test_name, input_json, output));
+                    cases.push((test_name, input_json, output, output_path));
                 }
             }
         }
@@ -476,7 +494,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd3_from_dir() {
-        for (test_name, input_json, expected) in read_test_cases("cmd3") {
+        for (test_name, input_json, expected, _) in read_test_cases("cmd3") {
             println!("Running cmd3 test case: {}", test_name);
             let opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             let rendered = render_cmd3(&opts).unwrap();
@@ -486,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd3v3_from_dir() {
-        for (test_name, input_json, expected) in read_test_cases("cmd3_v3") {
+        for (test_name, input_json, expected, _) in read_test_cases("cmd3_v3") {
             println!("Running cmd3v3 test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             if test_name != "template_provided" {
@@ -504,7 +522,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd3_v1_jinja_from_dir() {
-        for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v1") {
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd3_v1") {
             println!("Running cmd3 v1 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -516,7 +534,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd3_v2_jinja_from_dir() {
-        for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v2") {
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd3_v2") {
             println!("Running cmd3 v2 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -528,7 +546,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd3_v3_jinja_from_dir() {
-        for (test_name, input_json, expected) in read_test_cases("jinja/cmd3_v3") {
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd3_v3") {
             println!("Running cmd3 v3 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -540,7 +558,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd4_v2_jinja_from_dir() {
-        for (test_name, input_json, expected) in read_test_cases("jinja/cmd4_v2") {
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd4_v2") {
             println!("Running cmd4 v2 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -552,7 +570,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd3_jinja_from_liquid_dir() {
-        for (test_name, input_json, expected) in read_test_cases("cmd3") {
+        for (test_name, input_json, expected, _) in read_test_cases("cmd3") {
             println!("Running cmd3 jinja liquid test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -563,7 +581,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd3v3_jinja_from_liquid_dir() {
-        for (test_name, input_json, expected) in read_test_cases("cmd3_v3") {
+        for (test_name, input_json, expected, _) in read_test_cases("cmd3_v3") {
             println!("Running cmd3v3 jinja liquid test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -577,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd4_from_dir() {
-        for (test_name, input_json, expected) in read_test_cases("cmd4") {
+        for (test_name, input_json, expected, _) in read_test_cases("cmd4") {
             println!("Running cmd4 test case: {}", test_name);
             let opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             let rendered = render_cmd4(&opts).unwrap();
@@ -587,7 +605,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd4_jinja_from_liquid_dir() {
-        for (test_name, input_json, expected) in read_test_cases("cmd4") {
+        for (test_name, input_json, expected, _) in read_test_cases("cmd4") {
             println!("Running cmd4 jinja liquid test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -598,7 +616,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd4_v2_jinja_from_liquid_dir() {
-        for (test_name, input_json, expected) in read_test_cases("cmd4_v2") {
+        for (test_name, input_json, expected, _) in read_test_cases("cmd4_v2") {
             println!("Running cmd4 v2 jinja liquid test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -612,7 +630,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd4_hf_jinja_from_dir() {
-        for (test_name, input_json, expected) in read_test_cases("jinja/cmd4_hf") {
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd4_hf") {
             println!("Running cmd4 hf jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -624,7 +642,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd4_hf_jinja_from_liquid_dir() {
-        for (test_name, input_json, expected) in read_test_cases("cmd4_hf") {
+        for (test_name, input_json, expected, _) in read_test_cases("cmd4_hf") {
             println!("Running cmd4 hf jinja liquid test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
@@ -633,6 +651,55 @@ mod tests {
             }
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
+        }
+    }
+
+    fn render_cmd5_from_input(input_json: &Value) -> String {
+        let mut opts = deserialize::<_, RenderCmd4Options>(input_json).unwrap();
+        opts.use_jinja = true;
+        opts.template_jinja = CMD5_JINJA_TEMPLATE;
+        render_cmd4(&opts).unwrap()
+    }
+
+    #[test]
+    fn test_render_cmd5_jinja_from_dir() {
+        let mut ran_any = false;
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd5") {
+            println!("Running cmd5 jinja test case: {}", test_name);
+            let rendered = render_cmd5_from_input(&input_json);
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+            ran_any = true;
+        }
+        assert!(
+            ran_any,
+            "no cmd5 jinja test fixtures were found in tests/templating/jinja/cmd5"
+        );
+    }
+
+    /// Helper test that rewrites every `output.txt` under `tests/templating/jinja/cmd5`
+    /// from the current cmd5 template output. It is `#[ignore]`d so it never runs as
+    /// part of `cargo test`; opt in by running:
+    ///
+    /// ```bash
+    /// cargo test -p melody-parsing regenerate_cmd5_jinja_fixtures -- --ignored --nocapture
+    /// ```
+    ///
+    /// Use this after intentional changes to `cmd5.jinja` or after adding new
+    /// `input.json` cases to bootstrap the matching `output.txt`.
+    #[test]
+    #[ignore = "fixture regenerator; run on demand via `--ignored`"]
+    fn regenerate_cmd5_jinja_fixtures() {
+        let cases = read_test_cases("jinja/cmd5");
+        assert!(
+            !cases.is_empty(),
+            "no cmd5 jinja input fixtures were found in tests/templating/jinja/cmd5"
+        );
+        for (test_name, input_json, _, output_path) in cases {
+            let rendered = render_cmd5_from_input(&input_json);
+            let bytes_written = rendered.len();
+            fs::write(&output_path, &rendered)
+                .unwrap_or_else(|e| panic!("failed to write {output_path:?} for {test_name}: {e}"));
+            println!("Wrote fixture: {test_name} ({bytes_written} bytes)");
         }
     }
 }
