@@ -1794,6 +1794,28 @@ mod tests {
     }
 
     #[test]
+    fn test_process_full_text_cmd5_processed_params_mode() {
+        // When stream_processed_params is enabled the raw_param_delta
+        // stream is suppressed and the structured `processed_params` are
+        // populated instead, mirroring action_filter behaviour.
+        let opts = FilterOptions::default().cmd5().stream_processed_params();
+        let mut f = new_filter(opts);
+        let text = r#"<|START_THINKING|>thinking<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="DeleteReminder"><cofl:tool_param name="reminder_id" string="true">12-abc</cofl:tool_param><cofl:tool_param name="force" string="false">true</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "DeleteReminder");
+        // raw arguments stream is empty in processed mode.
+        assert_eq!(result.tool_calls[0].arguments, "");
+        // processed params should reflect the JSON-shaped values.
+        let params = &result.tool_calls[0].processed_params;
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0].name, "reminder_id");
+        assert_eq!(params[0].value_delta, "\"12-abc\"");
+        assert_eq!(params[1].name, "force");
+        assert_eq!(params[1].value_delta, "true");
+    }
+
+    #[test]
     fn test_process_full_text_cmd5_matches_streaming_process_full() {
         let text = r#"<|START_THINKING|>think.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">hello</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();

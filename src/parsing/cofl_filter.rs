@@ -227,53 +227,66 @@ impl FilterImpl {
         let mut out = Vec::new();
 
         if self.stream_tool_actions {
-            // Append to the per-tool-call raw_param_delta accumulator,
-            // synthesizing a JSON object as we go.
-            let raw_prefix = if self.cofl_action_metadata.raw_object_opened {
-                format!(", \"{}\": ", json_escape_string_content(&name))
-            } else {
-                self.cofl_action_metadata.raw_object_opened = true;
-                format!("{{\"{}\": ", json_escape_string_content(&name))
-            };
-            out.push(FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: self.cofl_action_metadata.cur_tool_call_index,
-                    raw_param_delta: raw_prefix,
-                    ..Default::default()
-                }),
-                ..Default::default()
-            });
-
-            // Announce the new parameter with an empty value, mirroring the
-            // JSON parser's behaviour (see action_filter::send_param_name_chunk).
-            out.push(FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: self.cofl_action_metadata.cur_tool_call_index,
-                    param_delta: Some(FilterToolParameter {
-                        name: name.clone(),
-                        value_delta: String::new(),
-                    }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            });
-
-            // For string-valued params, emit the opening `"` eagerly so the
-            // value-streaming code path can simply append escaped chunks
-            // without tracking quote state.
-            if is_string {
+            // Mirror the JSON action parser: emit either processed
+            // `param_delta`s OR a synthesized `raw_param_delta` stream,
+            // never both. The choice is driven by `stream_processed_params`.
+            if self.stream_processed_params {
+                // Announce the new parameter with an empty value, matching
+                // action_filter::send_param_name_chunk.
                 out.push(FilterOutput {
                     tool_call_delta: Some(FilterToolCallDelta {
                         index: self.cofl_action_metadata.cur_tool_call_index,
-                        raw_param_delta: "\"".to_string(),
                         param_delta: Some(FilterToolParameter {
                             name: name.clone(),
-                            value_delta: "\"".to_string(),
+                            value_delta: String::new(),
                         }),
                         ..Default::default()
                     }),
                     ..Default::default()
                 });
+                // For string-valued params, emit the opening `"` eagerly so
+                // the value-streaming code path can simply append escaped
+                // chunks without tracking quote state.
+                if is_string {
+                    out.push(FilterOutput {
+                        tool_call_delta: Some(FilterToolCallDelta {
+                            index: self.cofl_action_metadata.cur_tool_call_index,
+                            param_delta: Some(FilterToolParameter {
+                                name: name.clone(),
+                                value_delta: "\"".to_string(),
+                            }),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    });
+                }
+            } else {
+                // Append to the per-tool-call raw_param_delta accumulator,
+                // synthesizing a JSON object as we go.
+                let raw_prefix = if self.cofl_action_metadata.raw_object_opened {
+                    format!(", \"{}\": ", json_escape_string_content(&name))
+                } else {
+                    self.cofl_action_metadata.raw_object_opened = true;
+                    format!("{{\"{}\": ", json_escape_string_content(&name))
+                };
+                out.push(FilterOutput {
+                    tool_call_delta: Some(FilterToolCallDelta {
+                        index: self.cofl_action_metadata.cur_tool_call_index,
+                        raw_param_delta: raw_prefix,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                });
+                if is_string {
+                    out.push(FilterOutput {
+                        tool_call_delta: Some(FilterToolCallDelta {
+                            index: self.cofl_action_metadata.cur_tool_call_index,
+                            raw_param_delta: "\"".to_string(),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    });
+                }
             }
         }
 
@@ -294,10 +307,12 @@ impl FilterImpl {
     ) -> (Vec<FilterOutput>, usize) {
         let mut out = Vec::new();
 
-        if self.stream_tool_actions {
-            // Close out the JSON object we have been building for
-            // raw_param_delta. Empty-parameter tool calls still need a `{}`
-            // so downstream consumers see well-formed JSON.
+        // Only the raw stream needs a closing brace. The processed-params
+        // stream is naturally closed by the absence of further `param_delta`s
+        // for this tool call's index.
+        if self.stream_tool_actions && !self.stream_processed_params {
+            // Empty-parameter tool calls still need a `{}` so downstream
+            // consumers see well-formed JSON.
             let closing = if self.cofl_action_metadata.raw_object_opened {
                 "}"
             } else {
@@ -362,6 +377,11 @@ impl FilterImpl {
     /// because every JSON escape we emit (`\"`, `\\`, `\n`, `\uXXXX`, ...)
     /// is produced from exactly one input character, so splitting at any
     /// UTF-8 character boundary still concatenates back to valid JSON.
+    ///
+    /// The chunk is emitted as a `param_delta` when
+    /// `stream_processed_params` is set, otherwise as a `raw_param_delta`.
+    /// Only one of the two streams is populated, matching the JSON action
+    /// parser's convention.
     fn emit_cofl_param_value_chunk(
         &mut self,
         chunk: &str,
@@ -384,16 +404,25 @@ impl FilterImpl {
             return Vec::new();
         }
 
-        vec![FilterOutput {
-            tool_call_delta: Some(FilterToolCallDelta {
+        let tool_call_delta = if self.stream_processed_params {
+            FilterToolCallDelta {
                 index: self.cofl_action_metadata.cur_tool_call_index,
-                raw_param_delta: delta.clone(),
                 param_delta: Some(FilterToolParameter {
                     name: self.cofl_action_metadata.cur_param_name.clone(),
                     value_delta: delta,
                 }),
                 ..Default::default()
-            }),
+            }
+        } else {
+            FilterToolCallDelta {
+                index: self.cofl_action_metadata.cur_tool_call_index,
+                raw_param_delta: delta,
+                ..Default::default()
+            }
+        };
+
+        vec![FilterOutput {
+            tool_call_delta: Some(tool_call_delta),
             ..Default::default()
         }]
     }
@@ -408,6 +437,12 @@ mod tests {
         let mut filter = FilterImpl::new();
         filter.stream_tool_actions = true;
         filter.cofl_tool_action = true;
+        filter
+    }
+
+    fn fresh_processed_filter() -> FilterImpl {
+        let mut filter = fresh_filter();
+        filter.stream_processed_params = true;
         filter
     }
 
@@ -472,7 +507,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_cofl_actions_single_string_param() {
+    fn test_parse_cofl_actions_single_string_param_raw_mode() {
         let mut f = fresh_filter();
         let input = r#"<cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">hello</cofl:tool_param></cofl:tool_call>"#;
         let (out, consumed) = f.parse_cofl_actions(input);
@@ -486,7 +521,31 @@ mod tests {
             .collect();
         assert_eq!(raw, r#"{"q": "hello"}"#);
 
-        // processed_params: aggregated value should be the JSON-encoded string.
+        // In raw mode no param_delta should be emitted at all.
+        let any_param_delta = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .any(|d| d.param_delta.is_some());
+        assert!(!any_param_delta);
+    }
+
+    #[test]
+    fn test_parse_cofl_actions_single_string_param_processed_mode() {
+        let mut f = fresh_processed_filter();
+        let input = r#"<cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">hello</cofl:tool_param></cofl:tool_call>"#;
+        let (out, consumed) = f.parse_cofl_actions(input);
+
+        assert_eq!(consumed, input.len());
+
+        // In processed mode no raw_param_delta should be emitted.
+        let raw: String = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .map(|d| d.raw_param_delta.as_str())
+            .collect();
+        assert!(raw.is_empty(), "unexpected raw_param_delta: {raw:?}");
+
+        // Aggregated value_delta should be the JSON-encoded string.
         let value: String = out
             .iter()
             .filter_map(|o| o.tool_call_delta.as_ref())
