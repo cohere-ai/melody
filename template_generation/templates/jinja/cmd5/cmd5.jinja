@@ -10,14 +10,15 @@
 {%- set convert_first_system_msg = convert_first_system_msg | default(true) -%}
 {%- set skip_thinking = skip_thinking | default(false) -%}
 {{ bos_token }}
-{%- macro print_tool_param_value(value) -%}
-{{ value|tojson }}
-{%- endmacro -%}
 {%- macro render_tool_call_params(arguments) -%}
 {%- if arguments is string -%}
 {%- else -%}
 {%- for param_name, param_value in arguments|items -%}
-<cofl:tool_param name="{{ param_name }}">{{ print_tool_param_value(param_value) }}</cofl:tool_param>
+{%- if param_value is string -%}
+<cofl:tool_param name="{{ param_name }}" string="true">{{ param_value }}</cofl:tool_param>
+{%- else -%}
+<cofl:tool_param name="{{ param_name }}" string="false">{{ param_value|tojson }}</cofl:tool_param>
+{%- endif -%}
 {%- endfor -%}
 {%- endif -%}
 {%- endmacro -%}
