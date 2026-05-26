@@ -116,3 +116,19 @@ func TestTemplating_RenderCMD4_DirCases_Jinja(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplating_RenderCMD5_DirCases(t *testing.T) {
+	t.Parallel()
+	cases := readTemplatingTestCases(t, "jinja/cmd5")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var opts RenderCmd5Options
+			err := json.Unmarshal(tc.input, &opts)
+			require.NoError(t, err)
+			got, err := RenderCMD5(opts)
+			require.NoError(t, err)
+			require.Equal(t, tc.output, got)
+		})
+	}
+}

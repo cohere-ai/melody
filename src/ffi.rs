@@ -28,7 +28,9 @@ use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };
-use crate::templating::{RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4};
+use crate::templating::{
+    RenderCmd3Options, RenderCmd4Options, RenderCmd5Options, render_cmd3, render_cmd4, render_cmd5,
+};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -1022,6 +1024,13 @@ pub struct CRenderCmd3Options {
     pub escaped_special_tokens_json: *const c_char,
 }
 
+/// C-compatible struct for CMD5 render options.
+///
+/// CMD5 shares its option schema with CMD4, so `CRenderCmd5Options` is a type
+/// alias for `CRenderCmd4Options`. The `melody_render_cmd5` function delegates
+/// to the CMD5 jinja template internally.
+pub type CRenderCmd5Options = CRenderCmd4Options;
+
 /// C-compatible struct for CMD4 render options.
 #[repr(C)]
 pub struct CRenderCmd4Options {
@@ -1549,6 +1558,54 @@ pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> 
         }
         let rust_opts = unsafe { convert_cmd4_options(&*opts) };
         match render_cmd4(&rust_opts) {
+            Ok(s) => {
+                let result = CString::new(s)
+                    .unwrap_or_else(|_| CString::new("result contained null bytes").unwrap())
+                    .into_raw();
+                Box::into_raw(Box::new(CRenderResult {
+                    result,
+                    error: std::ptr::null_mut(),
+                }))
+            }
+            Err(e) => {
+                let error = CString::new(e.to_string())
+                    .unwrap_or_else(|_| CString::new("error message contained null bytes").unwrap())
+                    .into_raw();
+                Box::into_raw(Box::new(CRenderResult {
+                    result: std::ptr::null_mut(),
+                    error,
+                }))
+            }
+        }
+    }))
+}
+
+/// Renders CMD5 template and returns a struct with result or error.
+///
+/// CMD5 shares its option layout with CMD4 (`CRenderCmd5Options` is a typedef
+/// alias for `CRenderCmd4Options`); only the underlying jinja template differs.
+///
+/// # Safety
+/// Caller must free return value with `melody_render_result_free`.
+///
+/// # Returns
+/// Returns a result struct with either the rendered output or an error message.
+/// If a panic occurs, returns a result struct with an error describing the panic.
+#[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
+pub unsafe extern "C" fn melody_render_cmd5(opts: *const CRenderCmd5Options) -> *mut CRenderResult {
+    catch_panic_render_result(AssertUnwindSafe(|| {
+        if opts.is_null() {
+            let err = CString::new("null options pointer")
+                .unwrap_or_else(|_| CString::new("null options").unwrap())
+                .into_raw();
+            return Box::into_raw(Box::new(CRenderResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }));
+        }
+        let rust_opts: RenderCmd5Options = unsafe { convert_cmd4_options(&*opts) };
+        match render_cmd5(&rust_opts) {
             Ok(s) => {
                 let result = CString::new(s)
                     .unwrap_or_else(|_| CString::new("result contained null bytes").unwrap())
