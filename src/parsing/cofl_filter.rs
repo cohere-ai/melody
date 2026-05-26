@@ -603,13 +603,13 @@ mod tests {
             .map(|d| d.raw_param_delta.as_str())
             .collect();
         // The synthesized JSON should use every escape variant we support.
-        assert_eq!(
-            raw,
-            r#"{"q": "she said \"hi\" \\o/\n\r\t\b\f\u0001"}"#
-        );
+        assert_eq!(raw, r#"{"q": "she said \"hi\" \\o/\n\r\t\b\f\u0001"}"#);
         // And the synthesized JSON should decode back to the original bytes.
         let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
-        assert_eq!(parsed["q"], serde_json::Value::String(raw_value.to_string()));
+        assert_eq!(
+            parsed["q"],
+            serde_json::Value::String(raw_value.to_string())
+        );
     }
 
     #[test]
