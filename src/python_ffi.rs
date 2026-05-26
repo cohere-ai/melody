@@ -1,12 +1,12 @@
 //! Python bindings for the Melody parsing library.
 //!
-//! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4` for templating.
+//! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4`/`render_cmd5` for templating.
 
 use crate::parsing::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use crate::templating::{
-    RenderCmd3Options, RenderCmd4Options, render_cmd3 as rust_render_cmd3,
-    render_cmd4 as rust_render_cmd4,
+    RenderCmd3Options, RenderCmd4Options, RenderCmd5Options, render_cmd3 as rust_render_cmd3,
+    render_cmd4 as rust_render_cmd4, render_cmd5 as rust_render_cmd5,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -344,6 +344,32 @@ fn render_cmd4(config: PyDictValue) -> PyResult<String> {
     rust_render_cmd4(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
 }
 
+/// Render a Command 5 format prompt.
+///
+/// CMD5 accepts the same configuration as CMD4 (see `render_cmd4`); the
+/// difference is the underlying Jinja template that is used.
+///
+/// # Arguments
+///
+/// * `config` - Dict with rendering options (same shape as `render_cmd4`).
+///
+/// # Returns
+///
+/// The rendered prompt string.
+///
+/// # Example
+///
+/// ```python
+/// render_cmd5({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
+/// ```
+#[pyfunction]
+#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts owned values
+fn render_cmd5(config: PyDictValue) -> PyResult<String> {
+    let opts: RenderCmd5Options = serde_path_to_error::deserialize(&config.0)
+        .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
+    rust_render_cmd5(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
+}
+
 #[pymodule]
 fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOptions>()?;
@@ -353,6 +379,7 @@ fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SearchQueryDelta>()?;
     m.add_function(wrap_pyfunction!(render_cmd3, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
+    m.add_function(wrap_pyfunction!(render_cmd5, m)?)?;
     Ok(())
 }
 
@@ -393,6 +420,27 @@ mod tests {
         let opts: RenderCmd4Options = serde_path_to_error::deserialize(&value).unwrap();
         let result = rust_render_cmd4(&opts);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_cmd5_empty() {
+        let json = r#"{"messages": []}"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts: RenderCmd5Options = serde_path_to_error::deserialize(&value).unwrap();
+        let result = rust_render_cmd5(&opts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_cmd5_with_message() {
+        let json = r#"{
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "Hello!"}]}]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts: RenderCmd5Options = serde_path_to_error::deserialize(&value).unwrap();
+        let result = rust_render_cmd5(&opts).unwrap();
+        assert!(result.contains("USER"));
+        assert!(result.contains("Hello!"));
     }
 
     #[test]

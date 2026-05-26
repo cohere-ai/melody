@@ -22,7 +22,9 @@ pub struct RenderCmd3Options<'a> {
     pub template_id: Option<String>,
     /// Template string to use for rendering.
     pub template: &'a str,
-    /// Jinja template string
+    /// Jinja template string. An empty string is treated as "caller did not
+    /// provide a template" and the renderer falls back to the family default
+    /// (e.g. `CMD3V1_JINJA_TEMPLATE` for cmd3).
     pub template_jinja: &'a str,
     /// Whether to use jinja template
     pub use_jinja: bool,
@@ -67,7 +69,7 @@ impl Default for RenderCmd3Options<'_> {
             messages: Vec::new(),
             template_id: None,
             template: CMD3V1_TEMPLATE,
-            template_jinja: CMD3V1_JINJA_TEMPLATE,
+            template_jinja: "",
             use_jinja: false,
             dev_instruction: None,
             documents: Vec::new(),
@@ -96,7 +98,10 @@ pub struct RenderCmd4Options<'a> {
     pub template_id: Option<String>,
     /// Template string to use for rendering.
     pub template: &'a str,
-    /// Jinja template string
+    /// Jinja template string. An empty string is treated as "caller did not
+    /// provide a template" and the renderer falls back to the family default
+    /// for the function being called (`CMD4V1_JINJA_TEMPLATE` for cmd4,
+    /// `CMD5_JINJA_TEMPLATE` for cmd5).
     pub template_jinja: &'a str,
     /// Whether to use jinja template
     pub use_jinja: bool,
@@ -128,7 +133,6 @@ static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.
 static CMD4V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v1.jinja");
 static CMD4V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v2.jinja");
 static CMD4HF_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-hf.jinja");
-#[allow(dead_code)] // this is used in a test below
 static CMD5_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd5.jinja");
 impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
@@ -136,7 +140,7 @@ impl Default for RenderCmd4Options<'_> {
             messages: Vec::new(),
             template_id: None,
             template: CMD4V1_TEMPLATE,
-            template_jinja: CMD4V1_JINJA_TEMPLATE,
+            template_jinja: "",
             use_jinja: false,
             dev_instruction: None,
             platform_instruction: None,
@@ -208,6 +212,38 @@ impl FromStr for CMD4JinjaTemplates {
             "cmd4-v1" => Ok(Self::CMD4V1),
             "cmd4-v2" => Ok(Self::CMD4V2),
             "cmd4_hf" | "cmd4-hf" => Ok(Self::CMD4HF),
+            _ => Err(MelodyError::TemplateValidation(format!(
+                "unknown template id: {o}"
+            ))),
+        }
+    }
+}
+
+/// Options for cmd5 rendering.
+///
+/// CMD5 uses the same option fields as CMD4 (developer/platform instruction,
+/// tools, documents, grounding, reasoning, json mode, etc.), so this is a
+/// type alias rather than a separate struct.
+pub type RenderCmd5Options<'a> = RenderCmd4Options<'a>;
+
+enum CMD5JinjaTemplates {
+    CMD5,
+}
+
+impl CMD5JinjaTemplates {
+    fn get_template(&self) -> &'static str {
+        match *self {
+            CMD5JinjaTemplates::CMD5 => CMD5_JINJA_TEMPLATE,
+        }
+    }
+}
+
+impl FromStr for CMD5JinjaTemplates {
+    type Err = MelodyError;
+
+    fn from_str(o: &str) -> Result<Self, Self::Err> {
+        match o {
+            "cmd5" => Ok(Self::CMD5),
             _ => Err(MelodyError::TemplateValidation(format!(
                 "unknown template id: {o}"
             ))),
@@ -321,7 +357,11 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         );
         add_jinja_substitutions_cmd3(&mut substitutions, opts);
 
-        let mut active_template = opts.template_jinja;
+        let mut active_template = if opts.template_jinja.is_empty() {
+            CMD3V1_JINJA_TEMPLATE
+        } else {
+            opts.template_jinja
+        };
         let template_enum: CMD3JinjaTemplates;
         if let Some(template_id) = opts.template_id.as_ref() {
             template_enum = CMD3JinjaTemplates::from_str(template_id)?;
@@ -414,7 +454,11 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
         );
         add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
-        let mut active_template = opts.template_jinja;
+        let mut active_template = if opts.template_jinja.is_empty() {
+            CMD4V1_JINJA_TEMPLATE
+        } else {
+            opts.template_jinja
+        };
         let template_enum: CMD4JinjaTemplates;
         if let Some(template_id) = opts.template_id.as_ref() {
             template_enum = CMD4JinjaTemplates::from_str(template_id)?;
@@ -433,6 +477,42 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
 
         Ok(template.render(&liquid::object!(&substitutions))?)
     }
+}
+
+/// Renders a CMD5 format prompt from the given options.
+///
+/// CMD5 shares its option schema with CMD4 (`RenderCmd5Options` is a type alias
+/// for `RenderCmd4Options`). This function differs from `render_cmd4` only in
+/// that it defaults to the CMD5 jinja template and resolves `template_id` values
+/// against the CMD5 template registry. Jinja rendering is always used (the CMD5
+/// template family has no liquid variant).
+///
+/// Template selection priority (mirrors `render_cmd4`):
+/// 1. `opts.template_id` if set, resolved against the CMD5 registry.
+/// 2. `opts.template_jinja` if non-empty (caller supplied a custom template).
+/// 3. `CMD5_JINJA_TEMPLATE` as the default.
+///
+/// # Errors
+///
+/// Returns a `MelodyError` if:
+/// - JSON serialization of documents fails
+/// - Template parsing fails
+/// - Template rendering fails
+pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyError> {
+    let mut active_opts: RenderCmd5Options<'a> = opts.clone();
+    active_opts.use_jinja = true;
+
+    if let Some(template_id) = opts.template_id.as_ref() {
+        let template_enum = CMD5JinjaTemplates::from_str(template_id)?;
+        active_opts.template_jinja = template_enum.get_template();
+        active_opts.template_id = None;
+    } else if active_opts.template_jinja.is_empty() {
+        // Pin the cmd5 default before delegating to `render_cmd4`, whose own
+        // empty-string fallback would otherwise pick the cmd4 default.
+        active_opts.template_jinja = CMD5_JINJA_TEMPLATE;
+    }
+
+    render_cmd4(&active_opts)
 }
 
 #[cfg(test)]
@@ -655,10 +735,8 @@ mod tests {
     }
 
     fn render_cmd5_from_input(input_json: &Value) -> String {
-        let mut opts = deserialize::<_, RenderCmd4Options>(input_json).unwrap();
-        opts.use_jinja = true;
-        opts.template_jinja = CMD5_JINJA_TEMPLATE;
-        render_cmd4(&opts).unwrap()
+        let opts = deserialize::<_, RenderCmd5Options>(input_json).unwrap();
+        render_cmd5(&opts).unwrap()
     }
 
     #[test]
@@ -673,6 +751,23 @@ mod tests {
         assert!(
             ran_any,
             "no cmd5 jinja test fixtures were found in tests/templating/jinja/cmd5"
+        );
+    }
+
+    #[test]
+    fn test_render_cmd5_preserves_custom_template_jinja() {
+        // Sentinel template that does not depend on any of the cmd5 substitutions so
+        // we can prove the caller-supplied `template_jinja` is what actually got rendered.
+        let custom_template = "CUSTOM_CMD5_TEMPLATE_OUTPUT";
+        let opts = RenderCmd5Options {
+            use_jinja: true,
+            template_jinja: custom_template,
+            ..RenderCmd5Options::default()
+        };
+        let rendered = render_cmd5(&opts).unwrap();
+        assert_eq!(
+            rendered, custom_template,
+            "render_cmd5 must use the caller-supplied template_jinja instead of CMD5_JINJA_TEMPLATE"
         );
     }
 
