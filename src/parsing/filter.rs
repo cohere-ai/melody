@@ -1793,6 +1793,40 @@ mod tests {
         assert_eq!(result.tool_calls[1].arguments, r#"{"filter": "open"}"#);
     }
 
+    /// Rainbow emoji (U+1F308) is a 4-byte UTF-8 sequence. It must round-trip
+    /// through both `string="true"` parameters (where the body is JSON-escaped
+    /// per character) and `string="false"` parameters (where the body is
+    /// emitted verbatim as a JSON literal). Streaming the same input one char
+    /// at a time must produce the same aggregated arguments.
+    #[test]
+    fn test_process_full_text_cmd5_tool_call_with_emoji_params() {
+        let text = r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="send"><cofl:tool_param name="message" string="true">Hello 🌈 world! ☕</cofl:tool_param><cofl:tool_param name="tags" string="false">["🌈", "🦄"]</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+
+        let mut f = make_cmd5_filter();
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "0");
+        assert_eq!(result.tool_calls[0].name, "send");
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["message"], "Hello 🌈 world! ☕");
+        assert_eq!(parsed["tags"], serde_json::json!(["🌈", "🦄"]));
+
+        // Streaming character-by-character (which splits the buffer at every
+        // codepoint, including ones in the middle of the cofl tag bodies)
+        // must produce the same aggregated arguments. This guards against
+        // the per-chunk JSON escaping in `emit_cofl_param_value_chunk`
+        // accidentally splitting a multi-byte UTF-8 emoji.
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+        let mut f2 = make_cmd5_filter();
+        let streamed = f2.process_full(&chunks);
+        assert_eq!(
+            streamed.tool_calls[0].arguments,
+            result.tool_calls[0].arguments
+        );
+    }
+
     #[test]
     fn test_process_full_text_cmd5_processed_params_mode() {
         // When stream_processed_params is enabled the raw_param_delta
