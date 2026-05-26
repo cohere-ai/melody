@@ -1869,6 +1869,101 @@ mod tests {
         assert_eq!(r_full_text.tool_calls[0].id, r_full.tool_calls[0].id);
     }
 
+    /// An empty `string="true"` parameter body must still produce a valid
+    /// JSON string (`""`), with both the opening and closing `"` emitted.
+    #[test]
+    fn test_process_full_text_cmd5_empty_string_param_value() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="set_note"><cofl:tool_param name="note" string="true"></cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].arguments, r#"{"note": ""}"#);
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["note"], "");
+    }
+
+    /// A `string="true"` parameter body containing `<` and `>` characters
+    /// that do not form a `</cofl:tool_param>` close tag must be emitted
+    /// verbatim. This guards against `find_partial` false-positively
+    /// stopping at every stray `<`.
+    #[test]
+    fn test_process_full_text_cmd5_string_param_value_with_angle_brackets() {
+        let mut f = make_cmd5_filter();
+        let snippet = "if (a < b) { return <T>(); }";
+        let text = format!(
+            r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run_code"><cofl:tool_param name="snippet" string="true">{snippet}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#
+        );
+        let result = f.process_full_text(&text);
+        assert_eq!(result.tool_calls.len(), 1);
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["snippet"], snippet);
+    }
+
+    /// cmd5 generation prompts include `<|START_THINKING|>`, so the
+    /// reasoning block can be implicit (no explicit start token) and the
+    /// stream may begin directly with reasoning text terminated by
+    /// `<|END_THINKING|>`. Mirrors the cmd4 implicit-reasoning test.
+    #[test]
+    fn test_process_full_text_cmd5_implicit_reasoning_then_tool_call() {
+        let mut f = make_cmd5_filter();
+        let text = r#"Plan first.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="call_0" name="web_search"><cofl:tool_param name="query" string="true">test</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Plan first.".into()));
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_0");
+        assert_eq!(result.tool_calls[0].name, "web_search");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"query": "test"}"#);
+    }
+
+    /// With `no_tools()` the `<cofl:tool_calls>` / `</cofl:tool_calls>`
+    /// wrappers are removed from the special-token map, so cofl markup
+    /// must pass through as plain content rather than transitioning into
+    /// `ToolAction` mode.
+    ///
+    /// `no_tools` is for vllm where parsing happens in two phases.
+    /// In the first phase (reasoning extraction) the tool calls
+    /// must be passed through as plain text so the second phase
+    // (tool call parsing) can parse them regularly.
+    #[test]
+    fn test_process_full_text_cmd5_no_tools_treats_cofl_as_plain_text() {
+        let mut f = make_cmd5_no_tools_filter();
+        let cofl = r#"<cofl:tool_calls><cofl:tool_call id="0" name="x"></cofl:tool_call></cofl:tool_calls>"#;
+        let text = format!("<|START_THINKING|>think<|END_THINKING|>{cofl}");
+        let result = f.process_full_text(&text);
+        assert_eq!(result.reasoning, Some("think".into()));
+        let content = result.content.expect("expected cofl markup as content");
+        assert!(
+            content.contains("<cofl:tool_calls>"),
+            "opening wrapper missing from content: {content:?}",
+        );
+        assert!(
+            content.contains(r#"<cofl:tool_call id="0" name="x">"#),
+            "inner tool_call markup missing from content: {content:?}",
+        );
+        assert!(
+            content.contains("</cofl:tool_calls>"),
+            "closing wrapper missing from content: {content:?}",
+        );
+        assert!(result.tool_calls.is_empty());
+    }
+
+    /// An empty `<cofl:tool_calls></cofl:tool_calls>` block (no inner tool
+    /// calls) must produce zero tool calls and no stray content. The body
+    /// dispatcher in `BeforeToolCall` mode never sees any input here
+    /// because the closing wrapper is consumed by the surrounding
+    /// special-token state machine.
+    #[test]
+    fn test_process_full_text_cmd5_empty_tool_calls_block() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("think".into()));
+        assert!(result.tool_calls.is_empty());
+        assert!(result.content.is_none());
+    }
+
     /// Test when ``handle_special_token`` rejects a match via the
     /// ``not_special`` rule (e.g. ``Answer:`` seen while already in
     /// ``GroundedAnswer`` mode), ``apply_special_token_match`` returns false

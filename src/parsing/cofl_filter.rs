@@ -581,11 +581,19 @@ mod tests {
         );
     }
 
+    /// Exercises every branch of [`json_escape_string_content`]: the named
+    /// short escapes (`\"`, `\\`, `\n`, `\r`, `\t`, `\b`, `\f`) plus a
+    /// generic `\uXXXX` escape for a control char without a dedicated form
+    /// (`U+0001`). The synthesized raw JSON must parse back to the exact
+    /// original byte sequence.
     #[test]
-    fn test_parse_cofl_actions_string_value_escapes_quotes_and_backslash() {
+    fn test_parse_cofl_actions_string_value_escapes_special_chars() {
         let mut f = fresh_filter();
-        let input = r#"<cofl:tool_call id="0" name="echo"><cofl:tool_param name="q" string="true">she said "hi" \o/</cofl:tool_param></cofl:tool_call>"#;
-        let (out, consumed) = f.parse_cofl_actions(input);
+        let raw_value = "she said \"hi\" \\o/\n\r\t\x08\x0c\x01";
+        let input = format!(
+            r#"<cofl:tool_call id="0" name="echo"><cofl:tool_param name="q" string="true">{raw_value}</cofl:tool_param></cofl:tool_call>"#
+        );
+        let (out, consumed) = f.parse_cofl_actions(&input);
 
         assert_eq!(consumed, input.len());
 
@@ -594,12 +602,14 @@ mod tests {
             .filter_map(|o| o.tool_call_delta.as_ref())
             .map(|d| d.raw_param_delta.as_str())
             .collect();
-        // Parse the synthesized JSON: the raw value should decode back to the original string.
-        let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
+        // The synthesized JSON should use every escape variant we support.
         assert_eq!(
-            parsed["q"],
-            serde_json::Value::String("she said \"hi\" \\o/".to_string())
+            raw,
+            r#"{"q": "she said \"hi\" \\o/\n\r\t\b\f\u0001"}"#
         );
+        // And the synthesized JSON should decode back to the original bytes.
+        let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
+        assert_eq!(parsed["q"], serde_json::Value::String(raw_value.to_string()));
     }
 
     #[test]
