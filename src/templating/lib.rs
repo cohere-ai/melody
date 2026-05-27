@@ -499,7 +499,19 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
 /// - Template parsing fails
 /// - Template rendering fails
 pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyError> {
+    // CMD5 is jinja-only. Reject explicit liquid-template requests regardless of
+    // entry point (Rust API, Python, or FFI after option conversion). An empty
+    // FFI `template` pointer leaves the CMD4 liquid default on the struct; that
+    // unused default is not treated as a caller-provided liquid template.
+    if !opts.use_jinja && opts.template != CMD4V1_TEMPLATE {
+        return Err(MelodyError::TemplateValidation(
+            "CMD5 does not support liquid templates; use template_jinja or template_id instead"
+                .to_string(),
+        ));
+    }
+
     let mut active_opts: RenderCmd5Options<'a> = opts.clone();
+    // Honor caller `template_jinja` even when `use_jinja` is false.
     active_opts.use_jinja = true;
 
     if let Some(template_id) = opts.template_id.as_ref() {
@@ -768,6 +780,32 @@ mod tests {
         assert_eq!(
             rendered, custom_template,
             "render_cmd5 must use the caller-supplied template_jinja instead of CMD5_JINJA_TEMPLATE"
+        );
+    }
+
+    #[test]
+    fn test_render_cmd5_preserves_custom_template_jinja_without_use_jinja_flag() {
+        let custom_template = "CUSTOM_CMD5_TEMPLATE_OUTPUT";
+        let opts = RenderCmd5Options {
+            use_jinja: false,
+            template_jinja: custom_template,
+            ..RenderCmd5Options::default()
+        };
+        let rendered = render_cmd5(&opts).unwrap();
+        assert_eq!(rendered, custom_template);
+    }
+
+    #[test]
+    fn test_render_cmd5_rejects_liquid_template() {
+        let opts = RenderCmd5Options {
+            use_jinja: false,
+            template: "{% for msg in messages %}{{ msg }}{% endfor %}",
+            ..RenderCmd5Options::default()
+        };
+        let err = render_cmd5(&opts).unwrap_err();
+        assert!(
+            err.to_string().contains("does not support liquid templates"),
+            "unexpected error: {err}"
         );
     }
 
