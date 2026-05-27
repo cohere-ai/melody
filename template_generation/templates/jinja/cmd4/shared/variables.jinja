@@ -1,0 +1,10 @@
+{%- set grounding = grounding | default("disabled") | upper %}
+{%- set grounding_enabled = grounding == "ENABLED" %}
+{%- set tools_or_docs_exist = tools or documents %}
+{%- set render_tools_section = true %}
+{%- set render_grounding = grounding_enabled and tools_or_docs_exist %}
+{%- set render_platform_instruction_override = true if platform_instruction_override else false %}
+{%- set has_developer_instruction = developer_instruction or developer_instruction == "" %}
+{%- set render_developer_instruction = true if developer_instruction else false %}
+{%- set convert_first_system_msg = convert_first_system_msg | default(true) -%}
+{%- set skip_thinking = skip_thinking | default(false) -%}
