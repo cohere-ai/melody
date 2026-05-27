@@ -804,7 +804,8 @@ mod tests {
         };
         let err = render_cmd5(&opts).unwrap_err();
         assert!(
-            err.to_string().contains("does not support liquid templates"),
+            err.to_string()
+                .contains("does not support liquid templates"),
             "unexpected error: {err}"
         );
     }

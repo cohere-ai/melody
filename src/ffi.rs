@@ -1694,7 +1694,8 @@ mod tests {
         let rust_opts = unsafe { convert_cmd4_options(&opts) };
         let err = render_cmd5(&rust_opts).unwrap_err();
         assert!(
-            err.to_string().contains("does not support liquid templates"),
+            err.to_string()
+                .contains("does not support liquid templates"),
             "unexpected error: {err}"
         );
     }
