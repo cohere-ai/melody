@@ -210,6 +210,8 @@ Your output should adhere to the following json schema:
                     <|START_THINKING|>{{ message.tool_plan }}<|END_THINKING|>
                 {%- elif message.thinking or (message.content and message.content[0].type == "thinking") -%}
                     <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
+                {%- else -%}
+                    <|START_THINKING|><|END_THINKING|>
                 {%- endif %}
             {%- endif %}<cofl:tool_calls>
             {%- for tc in message.tool_calls -%}
@@ -218,8 +220,12 @@ Your output should adhere to the following json schema:
             {%- endfor -%}
 </cofl:tool_calls><|END_OF_TURN_TOKEN|>
         {%- else -%}
-            {% if (message.thinking or (message.content and message.content[0].type == "thinking")) and not skip_thinking -%}
-                <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
+            {% if not skip_thinking -%}
+                {% if message.thinking or (message.content and message.content[0].type == "thinking") -%}
+                    <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
+                {%- else -%}
+                    <|START_THINKING|><|END_THINKING|>
+                {%- endif -%}
             {%- endif -%}
             {{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
         {%- endif %}

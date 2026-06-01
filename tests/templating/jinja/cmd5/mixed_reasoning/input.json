@@ -1,0 +1,109 @@
+{
+  "grounding": "disabled",
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Look up alpha."
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "I should call the tool."
+        }
+      ],
+      "tool_calls": [
+        {
+          "id": "0",
+          "name": "Lookup",
+          "parameters": "{\"query\": \"alpha\"}"
+        }
+      ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "0",
+      "content": [
+        {
+          "type": "document",
+          "document": {
+            "answer": "42"
+          }
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "The tool returned 42."
+        },
+        {
+          "type": "text",
+          "text": "The lookup result is 42."
+        }
+      ]
+    },
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "What is the capital of France?"
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "Paris is the capital of France."
+        }
+      ]
+    },
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "What is the capital of Germany?"
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "The capital of Germany is Berlin."
+        },
+        {
+          "type": "text",
+          "text": "Berlin is the capital of Germany."
+        }
+      ]
+    }
+  ],
+  "available_tools": [
+    {
+      "name": "Lookup",
+      "description": "Lookup test tool.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string"}
+        },
+        "required": ["query"]
+      }
+    }
+  ],
+  "reasoning_type": "enabled"
+}
