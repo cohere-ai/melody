@@ -115,7 +115,11 @@
     {%- endif %}
 {%- endmacro %}
 {%- macro print_thinking(msg) %}
-    {%- if msg.thinking -%}
+    {%- if msg.reasoning -%}
+{{ msg.reasoning }}
+    {%- elif msg.reasoning_content -%}
+{{ msg.reasoning_content }}
+    {%- elif msg.thinking -%}
 {{ msg.thinking }}
     {%- elif msg.content and msg.content[0].thinking -%}
 {{ msg.content[0].thinking }}
@@ -214,7 +218,7 @@ Your output should adhere to the following json schema:
             {% if not skip_thinking %}
                 {% if message.tool_plan -%}
                     <|START_THINKING|>{{ message.tool_plan }}<|END_THINKING|>
-                {%- elif message.thinking or (message.content and message.content[0].type == "thinking") -%}
+                {%- elif message.reasoning or message.reasoning_content or message.thinking or (message.content and message.content[0].type == "thinking") -%}
                     <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
                 {%- endif %}
             {%- endif %}<|START_ACTION|>[
@@ -226,7 +230,7 @@ Your output should adhere to the following json schema:
 
 ]<|END_ACTION|><|END_OF_TURN_TOKEN|>
         {%- else -%}
-            {% if (message.thinking or (message.content and message.content[0].type == "thinking")) and not skip_thinking -%}
+            {% if (message.reasoning or message.reasoning_content or message.thinking or (message.content and message.content[0].type == "thinking")) and not skip_thinking -%}
                 <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
             {%- endif -%}
             {{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
