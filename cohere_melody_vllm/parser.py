@@ -30,7 +30,7 @@ if _VLLM_POST_0_14_1:
         ResponsesRequest,
     )
 else:
-    from vllm.entrypoints.openai.protocol import (  # ty: ignore[unresolved-import]
+    from vllm.entrypoints.openai.protocol import (
         ChatCompletionRequest,
         DeltaFunctionCall,
         DeltaMessage,
@@ -43,7 +43,7 @@ else:
 
 
 try:
-    from cohere_melody import PyFilter, PyFilterOptions  # type: ignore
+    from cohere_melody import PyFilter, PyFilterOptions
 
 except ModuleNotFoundError:
     raise RuntimeError("The compiled melody bindings are not available.")
