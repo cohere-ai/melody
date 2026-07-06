@@ -678,12 +678,15 @@ mod tests {
             .cmd3()
             .with_document_ids(vec![
                 vec!["doc-a".to_string(), "doc-b".to_string()],
-                vec!["res-x".to_string(), "res-y".to_string(), "res-z".to_string()],
+                vec![
+                    "res-x".to_string(),
+                    "res-y".to_string(),
+                    "res-z".to_string(),
+                ],
             ]);
         let mut filter = crate::parsing::new_filter(opts);
 
-        let text =
-            "<|START_RESPONSE|>The answer is <co>here</co: 0:[1],1:[0,2]>.<|END_RESPONSE|>";
+        let text = "<|START_RESPONSE|>The answer is <co>here</co: 0:[1],1:[0,2]>.<|END_RESPONSE|>";
         let result = filter.process_full_text(text);
 
         assert_eq!(result.citations.len(), 1);
@@ -712,8 +715,7 @@ mod tests {
             .with_document_ids(vec![vec!["doc-a".to_string()]]);
         let mut filter = crate::parsing::new_filter(opts);
 
-        let text =
-            "<|START_RESPONSE|>x<co>y</co: 0:[0,5],1:[0]>.<|END_RESPONSE|>";
+        let text = "<|START_RESPONSE|>x<co>y</co: 0:[0,5],1:[0]>.<|END_RESPONSE|>";
         let result = filter.process_full_text(text);
 
         assert_eq!(result.citations.len(), 1);
@@ -724,10 +726,7 @@ mod tests {
             citation.sources[0].document_ids,
             vec!["doc-a".to_string(), String::new()]
         );
-        assert_eq!(
-            citation.sources[1].document_ids,
-            vec![String::new()]
-        );
+        assert_eq!(citation.sources[1].document_ids, vec![String::new()]);
     }
 
     #[test]
@@ -735,10 +734,8 @@ mod tests {
         let mut filter = FilterImpl::new();
         filter.cmd3_citations = true;
 
-        let (output, _) = filter.parse_citations(
-            "x<co>y</co: 0:[0,1]>",
-            FilterMode::GroundedAnswer,
-        );
+        let (output, _) =
+            filter.parse_citations("x<co>y</co: 0:[0,1]>", FilterMode::GroundedAnswer);
 
         let output = output.unwrap();
         assert_eq!(output.citations.len(), 1);
@@ -758,10 +755,8 @@ mod tests {
             .stream_non_grounded_answer();
         let mut filter = crate::parsing::new_filter(opts);
 
-        let (output, _) = filter.parse_citations(
-            "hello <co: 2,1>foo</co: 2,1>",
-            FilterMode::GroundedAnswer,
-        );
+        let (output, _) =
+            filter.parse_citations("hello <co: 2,1>foo</co: 2,1>", FilterMode::GroundedAnswer);
         let output = output.unwrap();
         assert_eq!(output.citations.len(), 1);
         assert_eq!(output.citations[0].sources.len(), 1);

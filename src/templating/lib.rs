@@ -804,7 +804,7 @@ mod tests {
 
     #[test]
     fn test_render_cmd3_detailed_pipes_into_parser() {
-        use crate::parsing::{FilterOptions, new_filter, Filter};
+        use crate::parsing::{Filter, FilterOptions, new_filter};
 
         let json = r#"{
             "messages": [],

@@ -1409,8 +1409,7 @@ unsafe fn convert_csource(source: &CSource) -> Source {
         Vec::new()
     };
 
-    let document_ids: Vec<String> = if !source.document_ids.is_null()
-        && source.document_ids_len > 0
+    let document_ids: Vec<String> = if !source.document_ids.is_null() && source.document_ids_len > 0
     {
         unsafe { slice::from_raw_parts(source.document_ids, source.document_ids_len) }
             .iter()
