@@ -3,6 +3,8 @@
 //! This module contains types for representing messages, roles, content,
 //! and various configuration options used in prompt rendering.
 
+#[cfg(feature = "python_ffi")]
+use pyo3::prelude::*;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
@@ -305,4 +307,33 @@ pub struct Message {
     /// Citations in this message.
     #[serde(default)]
     pub citations: Vec<FilterCitation>,
+}
+
+/// Rendered prompt plus the lookup tables that describe how the templating
+/// engine numbered documents and tool calls.
+///
+/// The two lookup tables are aligned with the numeric axes the parser emits
+/// inside citations:
+///
+/// - `document_ids[tool_call_index][tool_result_index]` yields the `id` field
+///   of the document that was placed at that position in the prompt, or an
+///   empty string if the source document had no `id` field.
+/// - `tool_call_ids[tool_call_index]` yields the original `tool_call_id`
+///   string that was assigned to the corresponding index, or an empty string
+///   when that index is the reserved bucket for the top-level `documents`
+///   array (which has no natural `tool_call_id`).
+///
+/// Passing `document_ids` straight into
+/// [`crate::parsing::FilterOptions::with_document_ids`] configures the
+/// streaming parser to populate `Source::document_ids` back out of citations.
+#[cfg_attr(feature = "python_ffi", pyclass(get_all))]
+#[derive(Debug, Clone, PartialEq)]
+pub struct RenderOutput {
+    /// The rendered prompt string.
+    pub prompt: String,
+    /// Two-dimensional lookup table from citation coordinates back to
+    /// original document identifiers.
+    pub document_ids: Vec<Vec<String>>,
+    /// Original `tool_call_id` string for each `tool_call_index`.
+    pub tool_call_ids: Vec<String>,
 }

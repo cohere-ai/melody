@@ -116,3 +116,125 @@ func TestTemplating_RenderCMD4_DirCases_Jinja(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplating_RenderCMD3Detailed_TopLevelDocs(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`{
+		"messages": [
+			{"role": "user", "content": [{"type": "text", "text": "Hi"}]}
+		],
+		"documents": [
+			{"id": "doc-a", "title": "A"},
+			{"id": "doc-b", "title": "B"},
+			{"title": "C-no-id"}
+		]
+	}`)
+	var opts RenderCmd3Options
+	require.NoError(t, json.Unmarshal(input, &opts))
+
+	out, err := RenderCMD3Detailed(opts)
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	require.Contains(t, out.Prompt, "Hi", "prompt should render")
+	require.Equal(t, []string{""}, out.ToolCallIDs)
+	require.Equal(t, [][]string{{"doc-a", "doc-b", ""}}, out.DocumentIDs)
+}
+
+func TestTemplating_RenderCMD3Detailed_ToolCallDocs(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`{
+		"messages": [
+			{"role": "user", "content": [{"type": "text", "text": "Search"}]},
+			{
+				"role": "chatbot",
+				"content": [],
+				"tool_calls": [
+					{"id": "call_1", "name": "search", "parameters": "{}"},
+					{"id": "call_2", "name": "search", "parameters": "{}"}
+				]
+			},
+			{
+				"role": "tool",
+				"tool_call_id": "call_1",
+				"content": [
+					{"type": "document", "document": {"id": "res-x", "text": "hit1"}},
+					{"type": "document", "document": {"id": "res-y", "text": "hit2"}}
+				]
+			},
+			{
+				"role": "tool",
+				"tool_call_id": "call_2",
+				"content": [
+					{"type": "document", "document": {"id": "res-z", "text": "hit3"}}
+				]
+			}
+		]
+	}`)
+	var opts RenderCmd3Options
+	require.NoError(t, json.Unmarshal(input, &opts))
+
+	out, err := RenderCMD3Detailed(opts)
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	require.Equal(t, []string{"call_1", "call_2"}, out.ToolCallIDs)
+	require.Equal(t, [][]string{{"res-x", "res-y"}, {"res-z"}}, out.DocumentIDs)
+}
+
+func TestTemplating_RenderCMD3Detailed_RoundTripThroughParser(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`{
+		"messages": [],
+		"documents": [
+			{"id": "doc-a"},
+			{"id": "doc-b"},
+			{"id": "doc-c"}
+		]
+	}`)
+	var opts RenderCmd3Options
+	require.NoError(t, json.Unmarshal(input, &opts))
+
+	out, err := RenderCMD3Detailed(opts)
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	require.Equal(t, [][]string{{"doc-a", "doc-b", "doc-c"}}, out.DocumentIDs)
+
+	// Feed the returned lookup table into the parser.
+	f := NewFilter(HandleMultiHopCmd3(), WithDocumentIDs(out.DocumentIDs))
+	require.NotNil(t, f)
+	result, err := f.WriteDecoded(
+		"<|START_RESPONSE|>foo <co>bar</co: 0:[0,2]><|END_RESPONSE|>",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.Citations, 1)
+	src := result.Citations[0].Sources[0]
+	require.Equal(t, uint(0), src.ToolCallIndex)
+	require.Equal(t, []uint{0, 2}, src.ToolResultIndices)
+	require.Equal(t, []string{"doc-a", "doc-c"}, src.DocumentIDs)
+}
+
+func TestTemplating_RenderCMD4Detailed_TopLevelDocs(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`{
+		"messages": [
+			{"role": "user", "content": [{"type": "text", "text": "Hi"}]}
+		],
+		"documents": [
+			{"id": "doc-a"},
+			{"id": "doc-b"}
+		]
+	}`)
+	var opts RenderCmd4Options
+	require.NoError(t, json.Unmarshal(input, &opts))
+
+	out, err := RenderCMD4Detailed(opts)
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	require.Contains(t, out.Prompt, "Hi")
+	require.Equal(t, []string{""}, out.ToolCallIDs)
+	require.Equal(t, [][]string{{"doc-a", "doc-b"}}, out.DocumentIDs)
+}

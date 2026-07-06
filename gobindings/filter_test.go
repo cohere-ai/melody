@@ -64,7 +64,7 @@ func TestFilter_Command3(t *testing.T) {
 			name: "command 3 with document ID resolution",
 			options: []melody.FilterOption{
 				melody.HandleMultiHopCmd3(),
-				melody.WithDocumentIDMap([][]string{
+				melody.WithDocumentIDs([][]string{
 					{"doc-a", "doc-b", "doc-c"},
 					{"res-x", "res-y", "res-z", "res-w", "res-v"},
 				}),

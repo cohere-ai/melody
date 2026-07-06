@@ -205,8 +205,9 @@ pub struct FilterImpl {
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
 
-    // Citation ID resolution
-    pub(crate) document_id_map: Vec<Vec<String>>,
+    // Citation ID resolution: parallel to `Source::document_ids` shape, but
+    // holds all rows indexed by `tool_call_index`.
+    pub(crate) document_ids: Vec<Vec<String>>,
 
     // Chunking configuration
     pub(crate) chunk_size: usize,
@@ -257,7 +258,7 @@ impl FilterImpl {
             sent_curr_index: false,
             has_tool_call_id: false,
             cmd3_citations: false,
-            document_id_map: Vec::new(),
+            document_ids: Vec::new(),
             chunk_size: 1,
             num_tokens_in_chunk: 0,
             buf: Vec::new(),
@@ -275,7 +276,7 @@ impl FilterImpl {
         self.stream_processed_params = options.stream_processed_params;
         self.has_tool_call_id = options.has_tool_call_id;
         self.cmd3_citations = options.cmd3_citations;
-        self.document_id_map = options.document_id_map;
+        self.document_ids = options.document_ids;
         self.default_mode = options.default_mode;
         self.mode = options.default_mode;
 

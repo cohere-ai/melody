@@ -170,31 +170,31 @@ func (opts *FilterOptions) RemoveToken(token string) *FilterOptions {
 	return opts
 }
 
-// WithDocumentIDMap configures the document ID mapping used by the parser to
-// resolve citation indices back to their original document identifiers.
+// WithDocumentIDs configures the document ID lookup table used by the parser
+// to resolve citation indices back to their original document identifiers.
 //
 // The outer slice is indexed by tool_call_index and the inner slice by
-// tool_result_index, so docIDs[i][j] is the original document identifier for
-// the prompt position (tool_call_index=i, tool_result_index=j). Out-of-bounds
-// lookups resolve to an empty string in Source.DocumentIDs.
-func (opts *FilterOptions) WithDocumentIDMap(docIDs [][]string) *FilterOptions {
+// tool_result_index, so documentIDs[i][j] is the original document identifier
+// for the prompt position (tool_call_index=i, tool_result_index=j).
+// Out-of-bounds lookups resolve to an empty string in Source.DocumentIDs.
+func (opts *FilterOptions) WithDocumentIDs(documentIDs [][]string) *FilterOptions {
 	if opts.ptr == nil {
 		return opts
 	}
 
-	rowsLen := len(docIDs)
+	rowsLen := len(documentIDs)
 	if rowsLen == 0 {
-		C.melody_filter_options_with_document_id_map(opts.ptr, nil, nil, 0)
+		C.melody_filter_options_with_document_ids(opts.ptr, nil, nil, 0)
 		return opts
 	}
 
 	total := 0
-	for _, row := range docIDs {
+	for _, row := range documentIDs {
 		total += len(row)
 	}
 
 	rowLens := make([]C.size_t, rowsLen)
-	for i, row := range docIDs {
+	for i, row := range documentIDs {
 		rowLens[i] = C.size_t(len(row))
 	}
 
@@ -202,7 +202,7 @@ func (opts *FilterOptions) WithDocumentIDMap(docIDs [][]string) *FilterOptions {
 	if total > 0 {
 		flat = make([]*C.char, total)
 		idx := 0
-		for _, row := range docIDs {
+		for _, row := range documentIDs {
 			for _, id := range row {
 				flat[idx] = C.CString(id)
 				idx++
@@ -221,7 +221,7 @@ func (opts *FilterOptions) WithDocumentIDMap(docIDs [][]string) *FilterOptions {
 	if total > 0 {
 		idsPtr = (**C.char)(unsafe.Pointer(&flat[0]))
 	}
-	C.melody_filter_options_with_document_id_map(
+	C.melody_filter_options_with_document_ids(
 		opts.ptr,
 		idsPtr,
 		(*C.size_t)(unsafe.Pointer(&rowLens[0])),
@@ -952,17 +952,15 @@ func buildCMessages(a *cAllocator, msgs []Message) (*C.CMessage, C.size_t) {
 	return base, C.size_t(n)
 }
 
-// RenderCMD3 renders CMD3 using the Rust templating engine via FFI.
-func RenderCMD3(opts RenderCmd3Options) (string, error) {
-	var a cAllocator
-	defer a.FreeAll()
+// buildCRenderCmd3Options converts a RenderCmd3Options to the C option struct,
+// allocating C-side buffers through the provided allocator. The returned
+// struct references those buffers, so callers must keep the allocator alive
+// until they finish using the struct.
+func buildCRenderCmd3Options(a *cAllocator, opts RenderCmd3Options) C.CRenderCmd3Options {
+	cMsgs, cMsgsLen := buildCMessages(a, opts.Messages)
+	cDocs, cDocsLen := buildCDocuments(a, opts.Documents)
+	cTools, cToolsLen := buildCTools(a, opts.AvailableTools)
 
-	// Build nested arrays
-	cMsgs, cMsgsLen := buildCMessages(&a, opts.Messages)
-	cDocs, cDocsLen := buildCDocuments(&a, opts.Documents)
-	cTools, cToolsLen := buildCTools(&a, opts.AvailableTools)
-
-	// Optional enums with presence flags
 	var cSafety C.CSafetyMode
 	var hasSafety C.bool
 	if opts.SafetyMode != nil {
@@ -984,11 +982,9 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 		hasReason = C.bool(true)
 	}
 
-	// Optional strings
-	additionalFields := jsonCString(&a, opts.AdditionalTemplateFields)
-	escapedTokens := jsonCString(&a, opts.EscapedSpecialTokens)
+	additionalFields := jsonCString(a, opts.AdditionalTemplateFields)
+	escapedTokens := jsonCString(a, opts.EscapedSpecialTokens)
 
-	// Build options struct (lives on Go stack; nested buffers are C-allocated)
 	cOpts := C.CRenderCmd3Options{
 		messages:                        cMsgs,
 		messages_len:                    cMsgsLen,
@@ -1023,31 +1019,14 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 	if opts.JSONSchema != nil {
 		cOpts.json_schema = a.CString(*opts.JSONSchema)
 	}
-
-	// Call into Rust
-	res := C.melody_render_cmd3(&cOpts)
-	if res == nil {
-		return "", errors.New("melody_render_cmd3 returned null result struct")
-	}
-	defer C.melody_render_result_free(res)
-
-	if res.result != nil {
-		return C.GoString(res.result), nil
-	}
-	if res.error != nil {
-		return "", errors.New(C.GoString(res.error))
-	}
-	return "", errors.New("melody_render_cmd3 returned neither result nor error")
+	return cOpts
 }
 
-// RenderCMD4 renders CMD4 using the Rust templating engine via FFI.
-func RenderCMD4(opts RenderCmd4Options) (string, error) {
-	var a cAllocator
-	defer a.FreeAll()
-
-	cMsgs, cMsgsLen := buildCMessages(&a, opts.Messages)
-	cDocs, cDocsLen := buildCDocuments(&a, opts.Documents)
-	cTools, cToolsLen := buildCTools(&a, opts.AvailableTools)
+// buildCRenderCmd4Options mirrors buildCRenderCmd3Options for CMD4.
+func buildCRenderCmd4Options(a *cAllocator, opts RenderCmd4Options) C.CRenderCmd4Options {
+	cMsgs, cMsgsLen := buildCMessages(a, opts.Messages)
+	cDocs, cDocsLen := buildCDocuments(a, opts.Documents)
+	cTools, cToolsLen := buildCTools(a, opts.AvailableTools)
 
 	var cGround C.CGrounding
 	var hasGround C.bool
@@ -1063,8 +1042,8 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		hasReason = C.bool(true)
 	}
 
-	additionalFields := jsonCString(&a, opts.AdditionalTemplateFields)
-	escapedTokens := jsonCString(&a, opts.EscapedSpecialTokens)
+	additionalFields := jsonCString(a, opts.AdditionalTemplateFields)
+	escapedTokens := jsonCString(a, opts.EscapedSpecialTokens)
 
 	cOpts := C.CRenderCmd4Options{
 		messages:                        cMsgs,
@@ -1100,6 +1079,56 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 	if opts.JSONSchema != nil {
 		cOpts.json_schema = a.CString(*opts.JSONSchema)
 	}
+	return cOpts
+}
+
+// RenderCMD3 renders CMD3 using the Rust templating engine via FFI.
+func RenderCMD3(opts RenderCmd3Options) (string, error) {
+	var a cAllocator
+	defer a.FreeAll()
+
+	cOpts := buildCRenderCmd3Options(&a, opts)
+
+	// Call into Rust
+	res := C.melody_render_cmd3(&cOpts)
+	if res == nil {
+		return "", errors.New("melody_render_cmd3 returned null result struct")
+	}
+	defer C.melody_render_result_free(res)
+
+	if res.result != nil {
+		return C.GoString(res.result), nil
+	}
+	if res.error != nil {
+		return "", errors.New(C.GoString(res.error))
+	}
+	return "", errors.New("melody_render_cmd3 returned neither result nor error")
+}
+
+// RenderCMD3Detailed renders CMD3 and additionally returns the identifier
+// lookup tables that describe how the templating engine numbered documents
+// and tool calls. Feed RenderOutput.DocumentIDs into
+// FilterOptions.WithDocumentIDs so the parser can resolve citation indices
+// back into original document IDs.
+func RenderCMD3Detailed(opts RenderCmd3Options) (*RenderOutput, error) {
+	var a cAllocator
+	defer a.FreeAll()
+
+	cOpts := buildCRenderCmd3Options(&a, opts)
+	res := C.melody_render_cmd3_detailed(&cOpts)
+	if res == nil {
+		return nil, errors.New("melody_render_cmd3_detailed returned null result struct")
+	}
+	defer C.melody_render_output_free(res)
+	return convertCRenderOutputResponse(res)
+}
+
+// RenderCMD4 renders CMD4 using the Rust templating engine via FFI.
+func RenderCMD4(opts RenderCmd4Options) (string, error) {
+	var a cAllocator
+	defer a.FreeAll()
+
+	cOpts := buildCRenderCmd4Options(&a, opts)
 
 	res := C.melody_render_cmd4(&cOpts)
 	if res == nil {
@@ -1114,4 +1143,72 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		return "", errors.New(C.GoString(res.error))
 	}
 	return "", errors.New("melody_render_cmd4 returned neither result nor error")
+}
+
+// RenderCMD4Detailed renders CMD4 and additionally returns the identifier
+// lookup tables that describe how the templating engine numbered documents
+// and tool calls. See RenderCMD3Detailed for how to use the returned tables.
+func RenderCMD4Detailed(opts RenderCmd4Options) (*RenderOutput, error) {
+	var a cAllocator
+	defer a.FreeAll()
+
+	cOpts := buildCRenderCmd4Options(&a, opts)
+	res := C.melody_render_cmd4_detailed(&cOpts)
+	if res == nil {
+		return nil, errors.New("melody_render_cmd4_detailed returned null result struct")
+	}
+	defer C.melody_render_output_free(res)
+	return convertCRenderOutputResponse(res)
+}
+
+// convertCRenderOutputResponse reads a C render output response (owned by the
+// caller) into a Go RenderOutput. The C strings are copied via C.GoString, so
+// the caller is free to call C.melody_render_output_free once this returns.
+func convertCRenderOutputResponse(res *C.CRenderOutputResponse) (*RenderOutput, error) {
+	if res.error != nil {
+		return nil, errors.New(C.GoString(res.error))
+	}
+	if res.result == nil {
+		return nil, errors.New("melody render returned neither result nor error")
+	}
+
+	out := &RenderOutput{}
+	if res.result.prompt != nil {
+		out.Prompt = C.GoString(res.result.prompt)
+	}
+
+	toolCallIDsLen := int(res.result.tool_call_ids_len)
+	out.ToolCallIDs = make([]string, toolCallIDsLen)
+	if toolCallIDsLen > 0 && res.result.tool_call_ids != nil {
+		toolCallIDsSlice := unsafe.Slice(res.result.tool_call_ids, toolCallIDsLen)
+		for i, p := range toolCallIDsSlice {
+			if p != nil {
+				out.ToolCallIDs[i] = C.GoString(p)
+			}
+		}
+	}
+
+	out.DocumentIDs = make([][]string, toolCallIDsLen)
+	if toolCallIDsLen > 0 && res.result.document_id_row_lens != nil {
+		rowLens := unsafe.Slice(res.result.document_id_row_lens, toolCallIDsLen)
+		flatLen := int(res.result.document_ids_flat_len)
+		var flat []*C.char
+		if flatLen > 0 && res.result.document_ids_flat != nil {
+			flat = unsafe.Slice(res.result.document_ids_flat, flatLen)
+		}
+		cursor := 0
+		for i := 0; i < toolCallIDsLen; i++ {
+			rl := int(rowLens[i])
+			row := make([]string, rl)
+			for j := 0; j < rl; j++ {
+				idx := cursor + j
+				if idx < len(flat) && flat[idx] != nil {
+					row[j] = C.GoString(flat[idx])
+				}
+			}
+			out.DocumentIDs[i] = row
+			cursor += rl
+		}
+	}
+	return out, nil
 }

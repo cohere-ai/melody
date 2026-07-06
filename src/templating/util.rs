@@ -1,6 +1,6 @@
 use crate::errors::MelodyError;
 use crate::parsing::types::FilterCitation;
-use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
+use crate::templating::types::{ContentType, Document, Message, Role, Tool, ToolCall};
 use crate::templating::{
     CitationQuality, Content, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options,
 };
@@ -238,6 +238,92 @@ fn escape_document_special_tokens(
         .collect()
 }
 
+/// Pull the string `id` field out of a document, defaulting to an empty string
+/// when absent. Used to build [`PromptIds`] so the parser can resolve
+/// citation indices back to original document identifiers.
+fn extract_doc_id(d: &Document) -> String {
+    d.get("id")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// Extract a document `id` from a `Content` block (only `Document` content
+/// items carry one). Non-document content items produce an empty string so the
+/// index alignment with the template's `tool_results.documents` array is
+/// preserved.
+fn extract_content_id(c: &Content) -> String {
+    if c.content_type == ContentType::Document {
+        return c
+            .document
+            .as_ref()
+            .and_then(|obj| obj.get("id"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+    }
+    String::new()
+}
+
+/// Identifier lookup tables produced by [`messages_to_template`] that mirror
+/// how the templating engine numbered documents and tool calls.
+///
+/// The two vectors are aligned with the numeric axes the parser emits inside
+/// citations:
+///
+/// - `document_ids[tool_call_index][tool_result_index]` yields the `id` field
+///   of the document that was placed at that position in the prompt (empty
+///   string when the source document had no `id`).
+/// - `tool_call_ids[tool_call_index]` yields the original `tool_call_id`
+///   string, or an empty string for the reserved bucket that holds the
+///   top-level `documents` array (index `0` when that array is non-empty).
+///
+/// The two vectors always have the same length.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct PromptRenderIds {
+    pub tool_call_ids: Vec<String>,
+    pub document_ids: Vec<Vec<String>>,
+}
+
+impl PromptRenderIds {
+    /// Initialise the tables, reserving `tool_call_index = 0` for the
+    /// top-level `documents` bucket when it is non-empty.
+    fn new(top_level_documents: &[Document]) -> Self {
+        let mut ids = Self::default();
+        if !top_level_documents.is_empty() {
+            ids.tool_call_ids.push(String::new());
+            ids.document_ids
+                .push(top_level_documents.iter().map(extract_doc_id).collect());
+        }
+        ids
+    }
+
+    /// Number of `tool_call_index` slots currently assigned. Used by callers
+    /// as the "next index" when adding a new tool call.
+    fn len(&self) -> usize {
+        self.tool_call_ids.len()
+    }
+
+    /// Record a newly-assigned tool call (whether from a `Tool` message or an
+    /// assistant `tool_calls` entry) and return the index it received.
+    fn push_tool_call(&mut self, tool_call_id: &str) -> usize {
+        let idx = self.tool_call_ids.len();
+        self.tool_call_ids.push(tool_call_id.to_string());
+        self.document_ids.push(Vec::new());
+        idx
+    }
+
+    /// Append the document `id` for each content item of a `Tool` message to
+    /// the slot previously assigned to that tool call.
+    fn push_tool_message_contents(&mut self, idx: usize, content: &[Content]) {
+        if let Some(row) = self.document_ids.get_mut(idx) {
+            for c in content {
+                row.push(extract_content_id(c));
+            }
+        }
+    }
+}
+
 pub(crate) fn docs_to_template(
     documents: &[Map<String, Value>],
     special_token_map: &BTreeMap<String, String>,
@@ -414,15 +500,18 @@ fn tool_content_item_to_template(
     }
 }
 
-// Convert messages to template
+// Convert messages to template. Returns both the rendered messages and the
+// identifier lookup tables that describe how tool calls / documents were
+// numbered so callers can hand them straight to the parser without duplicating
+// the walk.
 #[allow(clippy::too_many_lines)] //TODO: Refactor this function to reduce its length.
 pub(crate) fn messages_to_template(
     messages: &[Message],
-    docs_present: bool,
+    documents: &[Document],
     special_token_map: &BTreeMap<String, String>,
-) -> Result<Vec<Value>, MelodyError> {
+) -> Result<(Vec<Value>, PromptRenderIds), MelodyError> {
     let mut template_messages: Vec<TemplateMessage> = Vec::new();
-    let mut running_tool_call_idx = usize::from(docs_present);
+    let mut prompt_ids = PromptRenderIds::new(documents);
     let mut tool_call_id_to_tool_result_idx = BTreeMap::new();
     let mut tool_call_id_to_prompt_id = BTreeMap::new();
 
@@ -433,11 +522,7 @@ pub(crate) fn messages_to_template(
             })?;
             let tool_call_template_id = *tool_call_id_to_prompt_id
                 .entry(tool_call_id.clone())
-                .or_insert_with(|| {
-                    let idx = running_tool_call_idx;
-                    running_tool_call_idx += 1;
-                    idx
-                });
+                .or_insert_with(|| prompt_ids.push_tool_call(tool_call_id));
 
             if template_messages.is_empty()
                 || template_messages
@@ -474,6 +559,7 @@ pub(crate) fn messages_to_template(
                         special_token_map,
                     )?);
             }
+            prompt_ids.push_tool_message_contents(tool_call_template_id, &msg.content);
 
             continue;
         }
@@ -578,9 +664,9 @@ pub(crate) fn messages_to_template(
                     tc.id
                 )));
             }
-            tool_call_id_to_prompt_id.insert(tc.id.clone(), running_tool_call_idx);
-            let rendered_tool_call = tool_call_to_template(tc, running_tool_call_idx)?;
-            running_tool_call_idx += 1;
+            let tool_call_template_id = prompt_ids.push_tool_call(&tc.id);
+            tool_call_id_to_prompt_id.insert(tc.id.clone(), tool_call_template_id);
+            let rendered_tool_call = tool_call_to_template(tc, tool_call_template_id)?;
             rendered_tool_calls.push(rendered_tool_call);
         }
 
@@ -591,7 +677,12 @@ pub(crate) fn messages_to_template(
             tool_results: vec![],
         });
     }
-    Ok(message_to_map(&template_messages))
+    debug_assert_eq!(
+        prompt_ids.len(),
+        tool_call_id_to_prompt_id.len() + usize::from(!documents.is_empty()),
+        "PromptIds and tool_call_id_to_prompt_id should stay in sync",
+    );
+    Ok((message_to_map(&template_messages), prompt_ids))
 }
 
 // Based off of the minijinja version: https://github.com/mitsuhiko/minijinja/blob/64d933eaf325ba20e7af0012505571d7ae32364a/minijinja/src/filters.rs#L991

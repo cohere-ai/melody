@@ -183,11 +183,11 @@ pub struct FilterCitation {
 ///
 /// # Document ID resolution
 ///
-/// When a parser is configured with a document ID map (see
-/// `FilterOptions::with_document_id_map`), the parser resolves each entry of
+/// When a parser is configured with a document ID lookup table (see
+/// `FilterOptions::with_document_ids`), the parser resolves each entry of
 /// `tool_result_indices` back to the original document identifier that produced
-/// it in the prompt, populating `document_ids`. When no map is configured,
-/// `document_ids` is left empty.
+/// it in the prompt, populating `document_ids`. When no lookup table is
+/// configured, `document_ids` is left empty.
 ///
 /// # Examples
 ///

@@ -289,20 +289,21 @@ impl FilterImpl {
     }
 
     /// Populate `Source::document_ids` for each source using the configured
-    /// `document_id_map`. Out-of-bounds lookups resolve to empty strings so
-    /// the length of `document_ids` always matches `tool_result_indices`.
+    /// `document_ids` lookup table. Out-of-bounds lookups resolve to empty
+    /// strings so the length of `Source::document_ids` always matches
+    /// `tool_result_indices`.
     fn resolve_document_ids(&self, sources: &mut [Source]) {
-        if self.document_id_map.is_empty() {
+        if self.document_ids.is_empty() {
             return;
         }
         for source in sources {
-            let tool_map = self.document_id_map.get(source.tool_call_index);
+            let tool_row = self.document_ids.get(source.tool_call_index);
             source.document_ids = source
                 .tool_result_indices
                 .iter()
                 .map(|&i| {
-                    tool_map
-                        .and_then(|m| m.get(i))
+                    tool_row
+                        .and_then(|row| row.get(i))
                         .cloned()
                         .unwrap_or_default()
                 })
@@ -672,10 +673,10 @@ mod tests {
     }
 
     #[test]
-    fn test_document_id_map_resolves_cmd3_citation() {
+    fn test_document_ids_resolve_cmd3_citation() {
         let opts = crate::parsing::FilterOptions::default()
             .cmd3()
-            .with_document_id_map(vec![
+            .with_document_ids(vec![
                 vec!["doc-a".to_string(), "doc-b".to_string()],
                 vec!["res-x".to_string(), "res-y".to_string(), "res-z".to_string()],
             ]);
@@ -703,12 +704,12 @@ mod tests {
     }
 
     #[test]
-    fn test_document_id_map_missing_entries_resolve_to_empty_string() {
-        // Only define the first tool call's mapping; the second tool call and any
+    fn test_document_ids_missing_entries_resolve_to_empty_string() {
+        // Only define the first tool call's row; the second tool call and any
         // out-of-bounds indices should resolve to empty strings.
         let opts = crate::parsing::FilterOptions::default()
             .cmd3()
-            .with_document_id_map(vec![vec!["doc-a".to_string()]]);
+            .with_document_ids(vec![vec!["doc-a".to_string()]]);
         let mut filter = crate::parsing::new_filter(opts);
 
         let text =
@@ -730,7 +731,7 @@ mod tests {
     }
 
     #[test]
-    fn test_document_id_map_unset_leaves_field_empty() {
+    fn test_document_ids_unset_leaves_field_empty() {
         let mut filter = FilterImpl::new();
         filter.cmd3_citations = true;
 
@@ -746,10 +747,10 @@ mod tests {
     }
 
     #[test]
-    fn test_document_id_map_legacy_citation_format() {
+    fn test_document_ids_legacy_citation_format() {
         // Legacy `<co: 1,2>` format always resolves under tool_call_index 0.
         let opts = crate::parsing::FilterOptions::default()
-            .with_document_id_map(vec![vec![
+            .with_document_ids(vec![vec![
                 "doc-0".to_string(),
                 "doc-1".to_string(),
                 "doc-2".to_string(),

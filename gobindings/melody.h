@@ -166,6 +166,24 @@ extern CRenderResult* melody_render_cmd3(const CRenderCmd3Options* opts);
 extern CRenderResult* melody_render_cmd4(const CRenderCmd4Options* opts);
 extern void melody_render_result_free(CRenderResult* res);
 
+typedef struct {
+    char* prompt;                    // Rendered prompt
+    char** tool_call_ids;            // Per tool_call_index
+    size_t tool_call_ids_len;
+    char** document_ids_flat;        // Flattened document_ids table, row-major
+    size_t document_ids_flat_len;
+    size_t* document_id_row_lens;    // Length of each row (tool_call_ids_len entries)
+} CRenderOutput;
+
+typedef struct {
+    CRenderOutput* result; // null if error
+    char* error;           // null if success
+} CRenderOutputResponse;
+
+extern CRenderOutputResponse* melody_render_cmd3_detailed(const CRenderCmd3Options* opts);
+extern CRenderOutputResponse* melody_render_cmd4_detailed(const CRenderCmd4Options* opts);
+extern void melody_render_output_free(CRenderOutputResponse* res);
+
 typedef struct CFilter CFilter;
 typedef struct CFilterOptions CFilterOptions;
 
@@ -221,7 +239,7 @@ extern void melody_filter_options_with_chunk_size(CFilterOptions* options, size_
 extern void melody_filter_options_with_inclusive_stops(CFilterOptions* options, const char** stops, size_t stops_len);
 extern void melody_filter_options_with_exclusive_stops(CFilterOptions* options, const char** stops, size_t stops_len);
 extern void melody_filter_options_remove_token(CFilterOptions* options, const char* token);
-extern void melody_filter_options_with_document_id_map(CFilterOptions* options, const char** ids, const size_t* row_lens, size_t rows_len);
+extern void melody_filter_options_with_document_ids(CFilterOptions* options, const char** ids, const size_t* row_lens, size_t rows_len);
 
 // Filter functions
 extern CFilter* melody_filter_new(const CFilterOptions* options);

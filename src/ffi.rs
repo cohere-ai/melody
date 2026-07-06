@@ -28,7 +28,10 @@ use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };
-use crate::templating::{RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4};
+use crate::templating::{
+    RenderCmd3Options, RenderCmd4Options, RenderOutput, render_cmd3, render_cmd3_detailed,
+    render_cmd4, render_cmd4_detailed,
+};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -96,6 +99,34 @@ where
                 })
                 .into_raw();
             Box::into_raw(Box::new(CRenderResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }))
+        }
+    }
+}
+
+/// Catches panics and returns a `CRenderOutputResponse` with an error if one occurs.
+fn catch_panic_render_output_response<F>(f: F) -> *mut CRenderOutputResponse
+where
+    F: FnOnce() -> *mut CRenderOutputResponse + panic::UnwindSafe,
+{
+    match panic::catch_unwind(f) {
+        Ok(result) => result,
+        Err(e) => {
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                format!("Rust panic: {s}")
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                format!("Rust panic: {s}")
+            } else {
+                "Rust panic: unknown error".to_string()
+            };
+            let err = CString::new(msg)
+                .unwrap_or_else(|_| {
+                    CString::new("Rust panic: error message contained null bytes").unwrap()
+                })
+                .into_raw();
+            Box::into_raw(Box::new(CRenderOutputResponse {
                 result: std::ptr::null_mut(),
                 error: err,
             }))
@@ -213,6 +244,39 @@ pub struct CRenderResult {
     /// Null-terminated C string containing the result (null if error)
     pub result: *mut c_char,
     /// Null-terminated C string containing the error (null if success)
+    pub error: *mut c_char,
+}
+
+/// C-compatible representation of a `RenderOutput`.
+///
+/// `document_ids_flat` holds the concatenated `document_ids` rows in
+/// `tool_call_index` order. `document_id_row_lens` has `tool_call_ids_len`
+/// entries; each entry is the length of the corresponding row inside
+/// `document_ids_flat`. The sum of `document_id_row_lens` equals
+/// `document_ids_flat_len`.
+#[repr(C)]
+pub struct CRenderOutput {
+    /// Rendered prompt (null-terminated C string).
+    pub prompt: *mut c_char,
+    /// Array of `tool_call_id` C strings, one per `tool_call_index`.
+    pub tool_call_ids: *mut *mut c_char,
+    /// Length of `tool_call_ids` and `document_id_row_lens`.
+    pub tool_call_ids_len: usize,
+    /// Flattened `document_ids` values, row-major over `tool_call_index`
+    /// then `tool_result_index`.
+    pub document_ids_flat: *mut *mut c_char,
+    /// Number of entries in `document_ids_flat`.
+    pub document_ids_flat_len: usize,
+    /// Length of each row of the document ID lookup table.
+    pub document_id_row_lens: *mut usize,
+}
+
+/// Struct for returning either a `CRenderOutput` or an error (mutually exclusive, one is always null).
+#[repr(C)]
+pub struct CRenderOutputResponse {
+    /// Pointer to the render output (null if error).
+    pub result: *mut CRenderOutput,
+    /// Null-terminated C string containing the error (null if success).
     pub error: *mut c_char,
 }
 
@@ -480,10 +544,10 @@ pub unsafe extern "C" fn melody_filter_options_remove_token(
     }
 }
 
-/// Configures the document ID mapping used to resolve citation indices back
-/// to their original document identifiers.
+/// Configures the document ID lookup table used to resolve citation indices
+/// back to their original document identifiers.
 ///
-/// The mapping is provided as a flattened 2D table: `ids` is an array of
+/// The lookup table is provided as a flattened 2D array: `ids` is an array of
 /// pointers to null-terminated strings, and `row_lens` is an array of length
 /// `rows_len` giving the number of entries per row. The row at position `i`
 /// corresponds to `tool_call_index == i`. Concretely, the document ID for
@@ -496,7 +560,7 @@ pub unsafe extern "C" fn melody_filter_options_remove_token(
 /// - `ids` must point to `total` valid null-terminated C strings
 /// - `row_lens` must point to `rows_len` valid `size_t` values whose sum equals `total`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_options_with_document_id_map(
+pub unsafe extern "C" fn melody_filter_options_with_document_ids(
     options: *mut CFilterOptions,
     ids: *const *const c_char,
     row_lens: *const usize,
@@ -509,7 +573,7 @@ pub unsafe extern "C" fn melody_filter_options_with_document_id_map(
         let opts = &mut *(options.cast::<FilterOptions>());
 
         if rows_len == 0 || row_lens.is_null() {
-            *opts = std::mem::take(opts).with_document_id_map(Vec::new());
+            *opts = std::mem::take(opts).with_document_ids(Vec::new());
             return;
         }
 
@@ -522,7 +586,7 @@ pub unsafe extern "C" fn melody_filter_options_with_document_id_map(
             slice::from_raw_parts(ids, total)
         };
 
-        let mut map: Vec<Vec<String>> = Vec::with_capacity(rows_len);
+        let mut document_ids: Vec<Vec<String>> = Vec::with_capacity(rows_len);
         let mut cursor = 0usize;
         for &row_len in rows {
             let mut row = Vec::with_capacity(row_len);
@@ -536,9 +600,9 @@ pub unsafe extern "C" fn melody_filter_options_with_document_id_map(
                 row.push(s);
             }
             cursor += row_len;
-            map.push(row);
+            document_ids.push(row);
         }
-        *opts = std::mem::take(opts).with_document_id_map(map);
+        *opts = std::mem::take(opts).with_document_ids(document_ids);
     }
 }
 
@@ -1707,6 +1771,232 @@ pub unsafe extern "C" fn melody_render_result_free(res: *mut CRenderResult) {
         }
         if !res_box.error.is_null() {
             let _ = CString::from_raw(res_box.error);
+        }
+    }
+}
+
+/// Free every raw C string pointer in `ptrs` and clear the vector. Used to roll
+/// back partial allocations when a subsequent `CString::new` fails.
+///
+/// # Safety
+/// Every pointer must have been produced by `CString::into_raw` and must not
+/// have been freed already.
+unsafe fn free_raw_cstring_vec(ptrs: &mut Vec<*mut c_char>) {
+    for p in ptrs.drain(..) {
+        if !p.is_null() {
+            unsafe {
+                let _ = CString::from_raw(p);
+            }
+        }
+    }
+}
+
+/// Convert each string in `strings` into a raw C string pointer. On success
+/// returns the vector of raw pointers. On the first `CString::new` failure the
+/// helper frees anything it has already allocated and returns `None` so the
+/// caller can report an error and clean up other buffers.
+fn strings_to_raw_cstrings(strings: &[String]) -> Option<Vec<*mut c_char>> {
+    let mut out: Vec<*mut c_char> = Vec::with_capacity(strings.len());
+    for s in strings {
+        if let Ok(cs) = CString::new(s.as_str()) {
+            out.push(cs.into_raw());
+        } else {
+            unsafe {
+                free_raw_cstring_vec(&mut out);
+            }
+            return None;
+        }
+    }
+    Some(out)
+}
+
+/// Convert a Rust [`RenderOutput`] into a heap-allocated `CRenderOutput`.
+///
+/// Returns null when a `CString` allocation fails; in that case the caller
+/// wrapping this in a response should return an error instead.
+fn convert_render_output_to_c(output: RenderOutput) -> *mut CRenderOutput {
+    let Ok(prompt_c) = CString::new(output.prompt) else {
+        return std::ptr::null_mut();
+    };
+    let prompt = prompt_c.into_raw();
+
+    let Some(mut tool_call_id_ptrs) = strings_to_raw_cstrings(&output.tool_call_ids) else {
+        unsafe {
+            let _ = CString::from_raw(prompt);
+        }
+        return std::ptr::null_mut();
+    };
+
+    let row_lens: Vec<usize> = output.document_ids.iter().map(Vec::len).collect();
+    let flat_ids: Vec<&String> = output.document_ids.iter().flatten().collect();
+    let flat_strings: Vec<String> = flat_ids.into_iter().cloned().collect();
+    let Some(doc_id_ptrs) = strings_to_raw_cstrings(&flat_strings) else {
+        unsafe {
+            let _ = CString::from_raw(prompt);
+            free_raw_cstring_vec(&mut tool_call_id_ptrs);
+        }
+        return std::ptr::null_mut();
+    };
+
+    let tool_call_ids_len = tool_call_id_ptrs.len();
+    let tool_call_ids_box = tool_call_id_ptrs.into_boxed_slice();
+    let tool_call_ids_ptr = Box::into_raw(tool_call_ids_box).cast::<*mut c_char>();
+
+    let document_ids_flat_len = doc_id_ptrs.len();
+    let doc_ids_box = doc_id_ptrs.into_boxed_slice();
+    let doc_ids_ptr = Box::into_raw(doc_ids_box).cast::<*mut c_char>();
+
+    let row_lens_box = row_lens.into_boxed_slice();
+    let row_lens_ptr = Box::into_raw(row_lens_box).cast::<usize>();
+
+    Box::into_raw(Box::new(CRenderOutput {
+        prompt,
+        tool_call_ids: tool_call_ids_ptr,
+        tool_call_ids_len,
+        document_ids_flat: doc_ids_ptr,
+        document_ids_flat_len,
+        document_id_row_lens: row_lens_ptr,
+    }))
+}
+
+/// Wrap a rendering result (or error) into a `CRenderOutputResponse`.
+fn make_render_output_response<E: std::fmt::Display>(
+    result: Result<RenderOutput, E>,
+) -> *mut CRenderOutputResponse {
+    match result {
+        Ok(out) => {
+            let converted = convert_render_output_to_c(out);
+            if converted.is_null() {
+                let err = CString::new("failed to convert render output (embedded null byte?)")
+                    .unwrap()
+                    .into_raw();
+                return Box::into_raw(Box::new(CRenderOutputResponse {
+                    result: std::ptr::null_mut(),
+                    error: err,
+                }));
+            }
+            Box::into_raw(Box::new(CRenderOutputResponse {
+                result: converted,
+                error: std::ptr::null_mut(),
+            }))
+        }
+        Err(e) => {
+            let error = CString::new(e.to_string())
+                .unwrap_or_else(|_| CString::new("error message contained null bytes").unwrap())
+                .into_raw();
+            Box::into_raw(Box::new(CRenderOutputResponse {
+                result: std::ptr::null_mut(),
+                error,
+            }))
+        }
+    }
+}
+
+/// Renders a CMD3 template and additionally returns the identifier lookup
+/// tables used to number documents and tool calls.
+///
+/// # Safety
+/// Caller must free the returned pointer with `melody_render_output_free`.
+///
+/// # Returns
+/// A pointer to a `CRenderOutputResponse` whose `result` is populated on
+/// success or whose `error` is populated on failure.
+#[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
+pub unsafe extern "C" fn melody_render_cmd3_detailed(
+    opts: *const CRenderCmd3Options,
+) -> *mut CRenderOutputResponse {
+    catch_panic_render_output_response(AssertUnwindSafe(|| {
+        if opts.is_null() {
+            let err = CString::new("null options pointer")
+                .unwrap_or_else(|_| CString::new("null options").unwrap())
+                .into_raw();
+            return Box::into_raw(Box::new(CRenderOutputResponse {
+                result: std::ptr::null_mut(),
+                error: err,
+            }));
+        }
+        let rust_opts = unsafe { convert_cmd3_options(&*opts) };
+        make_render_output_response(render_cmd3_detailed(&rust_opts))
+    }))
+}
+
+/// Renders a CMD4 template and additionally returns the identifier lookup
+/// tables used to number documents and tool calls.
+///
+/// # Safety
+/// Caller must free the returned pointer with `melody_render_output_free`.
+#[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
+pub unsafe extern "C" fn melody_render_cmd4_detailed(
+    opts: *const CRenderCmd4Options,
+) -> *mut CRenderOutputResponse {
+    catch_panic_render_output_response(AssertUnwindSafe(|| {
+        if opts.is_null() {
+            let err = CString::new("null options pointer")
+                .unwrap_or_else(|_| CString::new("null options").unwrap())
+                .into_raw();
+            return Box::into_raw(Box::new(CRenderOutputResponse {
+                result: std::ptr::null_mut(),
+                error: err,
+            }));
+        }
+        let rust_opts = unsafe { convert_cmd4_options(&*opts) };
+        make_render_output_response(render_cmd4_detailed(&rust_opts))
+    }))
+}
+
+/// Frees a `CRenderOutputResponse` struct and all nested allocations.
+///
+/// # Safety
+/// `res` must be a valid pointer returned from
+/// `melody_render_cmd3_detailed` or `melody_render_cmd4_detailed`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_render_output_free(res: *mut CRenderOutputResponse) {
+    if res.is_null() {
+        return;
+    }
+    unsafe {
+        let res_box = Box::from_raw(res);
+        if !res_box.error.is_null() {
+            let _ = CString::from_raw(res_box.error);
+        }
+        if !res_box.result.is_null() {
+            let out = Box::from_raw(res_box.result);
+            if !out.prompt.is_null() {
+                let _ = CString::from_raw(out.prompt);
+            }
+            if !out.tool_call_ids.is_null() && out.tool_call_ids_len > 0 {
+                let ptrs = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                    out.tool_call_ids,
+                    out.tool_call_ids_len,
+                ))
+                .into_vec();
+                for p in ptrs {
+                    if !p.is_null() {
+                        let _ = CString::from_raw(p);
+                    }
+                }
+            }
+            if !out.document_ids_flat.is_null() && out.document_ids_flat_len > 0 {
+                let ptrs = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                    out.document_ids_flat,
+                    out.document_ids_flat_len,
+                ))
+                .into_vec();
+                for p in ptrs {
+                    if !p.is_null() {
+                        let _ = CString::from_raw(p);
+                    }
+                }
+            }
+            if !out.document_id_row_lens.is_null() && out.tool_call_ids_len > 0 {
+                let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                    out.document_id_row_lens,
+                    out.tool_call_ids_len,
+                ))
+                .into_vec();
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::errors::MelodyError;
 use crate::templating::types::{
-    CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
+    CitationQuality, Document, Grounding, Message, ReasoningType, RenderOutput, SafetyMode, Tool,
 };
 use crate::templating::util::{
     add_jinja_substitutions_cmd3, add_jinja_substitutions_cmd4, add_jinja_substitutions_common,
@@ -224,6 +224,10 @@ fn validate_no_multipart(messages: &[Message]) -> Option<MelodyError> {
 
 /// Renders a CMD3 format prompt from the given options.
 ///
+/// This is a convenience wrapper around [`render_cmd3_detailed`] that
+/// discards the identifier lookup tables. Prefer [`render_cmd3_detailed`]
+/// when the caller needs to hand the parser a document ID lookup table.
+///
 /// # Errors
 ///
 /// Returns a `MelodyError` if:
@@ -231,13 +235,51 @@ fn validate_no_multipart(messages: &[Message]) -> Option<MelodyError> {
 /// - Template parsing fails
 /// - Template rendering fails
 pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
+    Ok(render_cmd3_detailed(opts)?.prompt)
+}
+
+/// Renders a CMD4 format prompt from the given options.
+///
+/// This is a convenience wrapper around [`render_cmd4_detailed`] that
+/// discards the identifier lookup tables. Prefer [`render_cmd4_detailed`]
+/// when the caller needs to hand the parser a document ID lookup table.
+///
+/// # Errors
+///
+/// Returns a `MelodyError` if:
+/// - JSON serialization of documents fails
+/// - Template parsing fails
+/// - Template rendering fails
+pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
+    Ok(render_cmd4_detailed(opts)?.prompt)
+}
+
+/// Render a CMD3 prompt and additionally return the identifier lookup tables
+/// that describe how the templating engine numbered documents and tool calls.
+///
+/// The returned `document_ids` can be fed directly into
+/// [`crate::parsing::FilterOptions::with_document_ids`] so that
+/// `Source::document_ids` is populated with the original string IDs that the
+/// caller passed on the `documents` / tool-result inputs. `tool_call_ids`
+/// tells the caller which `tool_call_id` string is assigned to each numeric
+/// `tool_call_index` axis in citations (with an empty string at index `0`
+/// when a top-level `documents` array is present).
+///
+/// The lookup tables are built during the same walk that assigns tool-call
+/// indices to the prompt itself, so they are guaranteed to stay consistent
+/// with the rendered output.
+///
+/// # Errors
+///
+/// Returns the same errors as [`render_cmd3`].
+pub fn render_cmd3_detailed(opts: &RenderCmd3Options) -> Result<RenderOutput, MelodyError> {
     let mut template_tools = tools_to_template(&opts.available_tools)?;
     if let Some(err) = validate_no_multipart(&opts.messages) {
         return Err(err);
     }
-    let mut messages = messages_to_template(
+    let (mut messages, prompt_ids) = messages_to_template(
         &opts.messages,
-        !opts.documents.is_empty(),
+        &opts.documents,
         &opts.escaped_special_tokens,
     )?;
     let mut docs = docs_to_template(&opts.documents, &opts.escaped_special_tokens)?;
@@ -306,7 +348,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    if opts.use_jinja {
+    let prompt = if opts.use_jinja {
         add_jinja_substitutions_common(
             &mut substitutions,
             opts.json_mode,
@@ -325,30 +367,34 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         let template_name = "chat_template.jinja";
         let env = get_minijinja_env(template_name, active_template)?;
         let template = env.get_template(template_name)?;
-        let template_str = template.render(&substitutions)?;
-
-        Ok(template_str)
+        template.render(&substitutions)?
     } else {
         let parser = liquid::ParserBuilder::with_stdlib().build()?;
         let template = parser.parse(opts.template)?;
+        template.render(&liquid::object!(&substitutions))?
+    };
 
-        Ok(template.render(&liquid::object!(&substitutions))?)
-    }
+    Ok(RenderOutput {
+        prompt,
+        document_ids: prompt_ids.document_ids,
+        tool_call_ids: prompt_ids.tool_call_ids,
+    })
 }
 
-/// Renders a CMD4 format prompt from the given options.
+/// Render a CMD4 prompt and additionally return the identifier lookup tables
+/// that describe how the templating engine numbered documents and tool calls.
+///
+/// See [`render_cmd3_detailed`] for a description of the returned lookup
+/// tables and how they line up with citation coordinates.
 ///
 /// # Errors
 ///
-/// Returns a `MelodyError` if:
-/// - JSON serialization of documents fails
-/// - Template parsing fails
-/// - Template rendering fails
-pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
+/// Returns the same errors as [`render_cmd4`].
+pub fn render_cmd4_detailed(opts: &RenderCmd4Options) -> Result<RenderOutput, MelodyError> {
     let mut template_tools = tools_to_template(&opts.available_tools)?;
-    let mut messages = messages_to_template(
+    let (mut messages, prompt_ids) = messages_to_template(
         &opts.messages,
-        !opts.documents.is_empty(),
+        &opts.documents,
         &opts.escaped_special_tokens,
     )?;
     let mut docs = docs_to_template(&opts.documents, &opts.escaped_special_tokens)?;
@@ -399,7 +445,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     );
     substitutions.insert("json_mode".to_string(), Value::Bool(opts.json_mode));
 
-    if opts.use_jinja {
+    let prompt = if opts.use_jinja {
         add_jinja_substitutions_common(
             &mut substitutions,
             opts.json_mode,
@@ -418,15 +464,18 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
         let template_name = "chat_template.jinja";
         let env = get_minijinja_env(template_name, active_template)?;
         let template = env.get_template(template_name)?;
-        let template_str = template.render(&substitutions)?;
-
-        Ok(template_str)
+        template.render(&substitutions)?
     } else {
         let parser = liquid::ParserBuilder::with_stdlib().build()?;
         let template = parser.parse(opts.template)?;
+        template.render(&liquid::object!(&substitutions))?
+    };
 
-        Ok(template.render(&liquid::object!(&substitutions))?)
-    }
+    Ok(RenderOutput {
+        prompt,
+        document_ids: prompt_ids.document_ids,
+        tool_call_ids: prompt_ids.tool_call_ids,
+    })
 }
 
 #[cfg(test)]
@@ -604,5 +653,208 @@ mod tests {
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
+    }
+
+    #[test]
+    fn test_render_cmd3_detailed_top_level_documents() {
+        let json = r#"{
+            "messages": [
+                {"role": "user", "content": [{"type": "text", "text": "Hi"}]}
+            ],
+            "documents": [
+                {"id": "doc-a", "title": "A"},
+                {"id": "doc-b", "title": "B"},
+                {"title": "C-no-id"}
+            ]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts = deserialize::<_, RenderCmd3Options>(&value).unwrap();
+        let out = render_cmd3_detailed(&opts).unwrap();
+
+        assert!(out.prompt.contains("Hi"), "prompt should render");
+        assert_eq!(out.tool_call_ids, vec![String::new()]);
+        assert_eq!(
+            out.document_ids,
+            vec![vec![
+                "doc-a".to_string(),
+                "doc-b".to_string(),
+                String::new(),
+            ]]
+        );
+    }
+
+    #[test]
+    fn test_render_cmd3_detailed_tool_call_docs() {
+        let json = r#"{
+            "messages": [
+                {"role": "user", "content": [{"type": "text", "text": "Search"}]},
+                {
+                    "role": "chatbot",
+                    "content": [],
+                    "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"},
+                        {"id": "call_2", "name": "search", "parameters": "{}"}
+                    ]
+                },
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_1",
+                    "content": [
+                        {"type": "document", "document": {"id": "res-x", "text": "hit1"}},
+                        {"type": "document", "document": {"id": "res-y", "text": "hit2"}}
+                    ]
+                },
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_2",
+                    "content": [
+                        {"type": "document", "document": {"id": "res-z", "text": "hit3"}}
+                    ]
+                }
+            ]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts = deserialize::<_, RenderCmd3Options>(&value).unwrap();
+        let out = render_cmd3_detailed(&opts).unwrap();
+
+        assert_eq!(
+            out.tool_call_ids,
+            vec!["call_1".to_string(), "call_2".to_string()]
+        );
+        assert_eq!(
+            out.document_ids,
+            vec![
+                vec!["res-x".to_string(), "res-y".to_string()],
+                vec!["res-z".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn test_render_cmd3_detailed_top_level_and_tool_docs() {
+        let json = r#"{
+            "messages": [
+                {"role": "user", "content": [{"type": "text", "text": "Hi"}]},
+                {
+                    "role": "chatbot",
+                    "content": [],
+                    "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]
+                },
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_1",
+                    "content": [
+                        {"type": "document", "document": {"id": "res-1"}}
+                    ]
+                }
+            ],
+            "documents": [
+                {"id": "doc-a"},
+                {"id": "doc-b"}
+            ]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts = deserialize::<_, RenderCmd3Options>(&value).unwrap();
+        let out = render_cmd3_detailed(&opts).unwrap();
+
+        // Index 0 is the top-level docs bucket (empty tool_call_id), index 1 is call_1.
+        assert_eq!(out.tool_call_ids, vec![String::new(), "call_1".to_string()]);
+        assert_eq!(
+            out.document_ids,
+            vec![
+                vec!["doc-a".to_string(), "doc-b".to_string()],
+                vec!["res-1".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn test_render_cmd3_detailed_missing_ids_default_to_empty() {
+        let json = r#"{
+            "messages": [
+                {
+                    "role": "chatbot",
+                    "content": [],
+                    "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]
+                },
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_1",
+                    "content": [
+                        {"type": "document", "document": {"text": "no id here"}}
+                    ]
+                }
+            ]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts = deserialize::<_, RenderCmd3Options>(&value).unwrap();
+        let out = render_cmd3_detailed(&opts).unwrap();
+
+        assert_eq!(out.tool_call_ids, vec!["call_1".to_string()]);
+        assert_eq!(out.document_ids, vec![vec![String::new()]]);
+    }
+
+    #[test]
+    fn test_render_cmd3_detailed_pipes_into_parser() {
+        use crate::parsing::{FilterOptions, new_filter, Filter};
+
+        let json = r#"{
+            "messages": [],
+            "documents": [
+                {"id": "doc-a"},
+                {"id": "doc-b"},
+                {"id": "doc-c"}
+            ]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts = deserialize::<_, RenderCmd3Options>(&value).unwrap();
+        let out = render_cmd3_detailed(&opts).unwrap();
+
+        // Configure the parser using the document ID table returned from
+        // rendering, then feed it a synthetic citation that references the
+        // top-level docs.
+        let mut filter = new_filter(
+            FilterOptions::default()
+                .cmd3()
+                .with_document_ids(out.document_ids.clone()),
+        );
+        let result =
+            filter.write_decoded("<|START_RESPONSE|>foo <co>bar</co: 0:[0,2]><|END_RESPONSE|>");
+        let citations = result.citations;
+        assert_eq!(citations.len(), 1, "expected one citation");
+        let src = &citations[0].sources[0];
+        assert_eq!(src.tool_call_index, 0);
+        assert_eq!(src.tool_result_indices, vec![0, 2]);
+        assert_eq!(
+            src.document_ids,
+            vec!["doc-a".to_string(), "doc-c".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_render_cmd4_detailed_roundtrip() {
+        let json = r#"{
+            "messages": [
+                {"role": "user", "content": [{"type": "text", "text": "Hi"}]}
+            ],
+            "documents": [
+                {"id": "doc-a"},
+                {"id": "doc-b"}
+            ]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts = deserialize::<_, RenderCmd4Options>(&value).unwrap();
+        let out = render_cmd4_detailed(&opts).unwrap();
+
+        assert!(out.prompt.contains("Hi"));
+        assert_eq!(out.tool_call_ids, vec![String::new()]);
+        assert_eq!(
+            out.document_ids,
+            vec![vec!["doc-a".to_string(), "doc-b".to_string()]]
+        );
     }
 }

@@ -5,8 +5,9 @@
 use crate::parsing::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use crate::templating::{
-    RenderCmd3Options, RenderCmd4Options, render_cmd3 as rust_render_cmd3,
-    render_cmd4 as rust_render_cmd4,
+    RenderCmd3Options, RenderCmd4Options, RenderOutput, render_cmd3 as rust_render_cmd3,
+    render_cmd3_detailed as rust_render_cmd3_detailed, render_cmd4 as rust_render_cmd4,
+    render_cmd4_detailed as rust_render_cmd4_detailed,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -159,14 +160,15 @@ impl PyFilterOptions {
         }
     }
 
-    /// Configure the document ID map used to resolve citation indices back
-    /// to their original document identifiers.
+    /// Configure the document ID lookup table used to resolve citation
+    /// indices back to their original document identifiers.
     ///
-    /// `map` is indexed as `map[tool_call_index][tool_result_index]`.
+    /// `document_ids` is indexed as
+    /// `document_ids[tool_call_index][tool_result_index]`.
     #[allow(clippy::needless_pass_by_value)]
-    fn with_document_id_map(&self, map: Vec<Vec<String>>) -> Self {
+    fn with_document_ids(&self, document_ids: Vec<Vec<String>>) -> Self {
         PyFilterOptions {
-            inner: self.inner.clone().with_document_id_map(map),
+            inner: self.inner.clone().with_document_ids(document_ids),
         }
     }
 
@@ -355,6 +357,42 @@ fn render_cmd4(config: PyDictValue) -> PyResult<String> {
     rust_render_cmd4(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
 }
 
+/// Render a Command 3 prompt and return the rendered string alongside the
+/// identifier lookup tables used to number documents and tool calls.
+///
+/// # Returns
+///
+/// A `RenderOutput` object with attributes:
+///   - `prompt: str` — the rendered prompt.
+///   - `document_ids: list[list[str]]` — original `id` field of each document
+///     at `[tool_call_index][tool_result_index]`. Feed this into
+///     `PyFilterOptions.with_document_ids` to have the parser resolve
+///     citation indices back to original doc IDs.
+///   - `tool_call_ids: list[str]` — original `tool_call_id` string for each
+///     `tool_call_index`. Empty string at index 0 when a top-level
+///     `documents` array was passed.
+#[pyfunction]
+#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts owned values
+fn render_cmd3_detailed(config: PyDictValue) -> PyResult<RenderOutput> {
+    let opts: RenderCmd3Options = serde_path_to_error::deserialize(&config.0)
+        .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
+    rust_render_cmd3_detailed(&opts)
+        .map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
+}
+
+/// Render a Command 4 prompt and return the rendered string alongside the
+/// identifier lookup tables used to number documents and tool calls.
+///
+/// See `render_cmd3_detailed` for the shape of the returned `RenderOutput`.
+#[pyfunction]
+#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts owned values
+fn render_cmd4_detailed(config: PyDictValue) -> PyResult<RenderOutput> {
+    let opts: RenderCmd4Options = serde_path_to_error::deserialize(&config.0)
+        .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
+    rust_render_cmd4_detailed(&opts)
+        .map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
+}
+
 #[pymodule]
 fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOptions>()?;
@@ -362,8 +400,11 @@ fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<AccumulatedToolCall>()?;
     m.add_class::<FilterAggregatedResult>()?;
     m.add_class::<SearchQueryDelta>()?;
+    m.add_class::<RenderOutput>()?;
     m.add_function(wrap_pyfunction!(render_cmd3, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
+    m.add_function(wrap_pyfunction!(render_cmd3_detailed, m)?)?;
+    m.add_function(wrap_pyfunction!(render_cmd4_detailed, m)?)?;
     Ok(())
 }
 

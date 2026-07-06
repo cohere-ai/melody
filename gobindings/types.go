@@ -45,11 +45,31 @@ type FilterCitation struct {
 
 // Source indicates which tool call and which tool results from that tool are being cited
 type Source struct {
-	ToolCallIndex     uint     `json:"tool_call_index"`
-	ToolResultIndices []uint   `json:"tool_result_indices"`
+	ToolCallIndex     uint   `json:"tool_call_index"`
+	ToolResultIndices []uint `json:"tool_result_indices"`
 	// DocumentIDs are the original document identifiers that ToolResultIndices
 	// resolve back to, populated when the filter is configured with a document
-	// ID map (see FilterOptions.WithDocumentIDMap). Same length as
+	// ID lookup table (see FilterOptions.WithDocumentIDs). Same length as
 	// ToolResultIndices when populated; nil otherwise.
 	DocumentIDs []string `json:"document_ids,omitempty"`
+}
+
+// RenderOutput is the result of RenderCMD3Detailed / RenderCMD4Detailed.
+//
+// The two identifier lookup tables describe how the templating engine
+// numbered documents and tool calls, so callers can convert back and forth
+// between their own string identifiers and the numeric indices the model
+// emits inside citations:
+//
+//   - DocumentIDs[toolCallIndex][toolResultIndex] yields the original `id`
+//     field of the document at that prompt position. Feed it straight into
+//     FilterOptions.WithDocumentIDs to have the parser populate
+//     Source.DocumentIDs.
+//   - ToolCallIDs[toolCallIndex] yields the original tool_call_id string.
+//     Empty string at index 0 when a top-level Documents array was passed
+//     (its "virtual" tool-call bucket).
+type RenderOutput struct {
+	Prompt      string     `json:"prompt"`
+	DocumentIDs [][]string `json:"document_ids"`
+	ToolCallIDs []string   `json:"tool_call_ids"`
 }
