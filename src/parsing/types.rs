@@ -154,6 +154,7 @@ pub struct FilterToolParameter {
 ///     sources: vec![Source {
 ///         tool_call_index: 0,
 ///         tool_result_indices: vec![0, 1],
+///         document_ids: vec![],
 ///     }],
 ///     is_thinking: false,
 /// };
@@ -210,8 +211,9 @@ pub struct Source {
     pub tool_result_indices: Vec<usize>,
     /// Original document identifiers that `tool_result_indices` resolve back
     /// to. Same length as `tool_result_indices` when the parser was configured
-    /// with a document ID map; empty otherwise. Entries that cannot be resolved
-    /// are filled with an empty string so the index alignment is preserved.
+    /// with a document ID lookup table; empty otherwise. Entries that cannot
+    /// be resolved are filled with an empty string so the index alignment is
+    /// preserved.
     #[serde(default)]
     pub document_ids: Vec<String>,
 }

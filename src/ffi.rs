@@ -222,7 +222,8 @@ pub struct CSource {
     /// Number of tool result indices
     pub tool_result_indices_len: usize,
     /// Array of resolved document identifiers, one per `tool_result_indices`
-    /// entry. Null when no document ID map was configured on the filter.
+    /// entry. Null when no document ID lookup table was configured on the
+    /// filter.
     pub document_ids: *mut *mut c_char,
     /// Number of resolved document identifiers (either 0 or equal to
     /// `tool_result_indices_len`).
