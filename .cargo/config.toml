@@ -1,0 +1,5 @@
+# Align object-file LC_BUILD_VERSION with typical CGO/Go (and older Xcode) so linking
+# libcohere_melody.a does not warn that objects were "built for newer
+# macOS" than the consumer's deployment target.
+[env]
+MACOSX_DEPLOYMENT_TARGET = { value = "11.0", force = true }

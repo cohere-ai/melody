@@ -231,6 +231,17 @@ enum SpecialTokenScanResult {
     Found(SpecialTokenMatch),
 }
 
+/// Outcome of trying to apply a matched special token.
+enum SpecialTokenOutcome {
+    /// The token was consumed: buffer drained, mode updated. Keep scanning.
+    Consumed,
+    /// The match was rejected.
+    Rejected,
+    /// An inclusive/exclusive stop token fired; the filter is done.
+    Stop,
+}
+
+#[derive(Debug)]
 pub(crate) enum PartialMatchResult {
     NoMatch,
     Partial { idx: usize },
@@ -317,14 +328,28 @@ impl FilterImpl {
         self.buf.extend_from_slice(text);
         let mut out = Vec::new();
 
-        match self.detect_special_token() {
-            SpecialTokenScanResult::Partial => return Vec::new(),
-            SpecialTokenScanResult::Found(token_match) => {
-                if self.apply_special_token_match(&token_match, &mut out) {
-                    return out;
+        // a single text chunk may contain more than one special token!
+        // this is because when using speculative decoding several
+        // accepted tokens are concatenated into one delta.
+
+        // loop until no special token is detected to avoid leaking
+        // unconsumed tokens.
+        loop {
+            match self.detect_special_token() {
+                SpecialTokenScanResult::Partial => return out,
+                SpecialTokenScanResult::NoMatch => break,
+                SpecialTokenScanResult::Found(token_match) => {
+                    match self.apply_special_token_match(&token_match, &mut out) {
+                        SpecialTokenOutcome::Consumed => {}
+                        SpecialTokenOutcome::Stop => return out,
+                        // Rejected matches (e.g. `Answer:` while already in
+                        // GroundedAnswer) leave buf and mode untouched, so
+                        // rescanning would loop forever on the same hit.
+                        // Fall through to plain buffer processing.
+                        SpecialTokenOutcome::Rejected => break,
+                    }
                 }
             }
-            SpecialTokenScanResult::NoMatch => {}
         }
 
         // Process buffer by mode
@@ -375,7 +400,7 @@ impl FilterImpl {
         &mut self,
         token_match: &SpecialTokenMatch,
         out: &mut Vec<FilterOutput>,
-    ) -> bool {
+    ) -> SpecialTokenOutcome {
         let (o, new_mode, stop, valid_special) = self.handle_special_token(
             &token_match.decoded,
             token_match.idx,
@@ -385,13 +410,13 @@ impl FilterImpl {
         out.extend(o);
 
         if !valid_special {
-            return false;
+            return SpecialTokenOutcome::Rejected;
         }
 
         if stop {
             self.buf.clear();
             self.done = true;
-            return true;
+            return SpecialTokenOutcome::Stop;
         }
 
         // `idx` is a byte offset produced by string search on `decoded`.
@@ -423,7 +448,7 @@ impl FilterImpl {
         let remove_len = pre_special_token.len() + token_match.sequence.len();
         self.buf.drain(..remove_len);
         self.mode = new_mode;
-        false
+        SpecialTokenOutcome::Consumed
     }
 
     fn handle_token(
@@ -662,25 +687,16 @@ impl FilterImpl {
 
         while pos < text.len() && !self.done {
             let remaining = &text[pos..];
-
-            let mut best_idx = usize::MAX;
-            let mut best_len = 0;
-            for token in &tokens {
-                if let Some(idx) = remaining.find(token.as_str())
-                    && (idx < best_idx || (idx == best_idx && token.len() > best_len))
-                {
-                    best_idx = idx;
-                    best_len = token.len();
+            match find_partial(remaining, tokens.iter()) {
+                PartialMatchResult::Full { idx, sequence } => {
+                    let end = idx + sequence.len();
+                    all_outputs.extend(self.write_text(&remaining.as_bytes()[..end]));
+                    pos += end;
                 }
-            }
-
-            if best_idx == usize::MAX {
-                all_outputs.extend(self.write_text(remaining.as_bytes()));
-                pos = text.len();
-            } else {
-                let end = best_idx + best_len;
-                all_outputs.extend(self.write_text(&remaining.as_bytes()[..end]));
-                pos += end;
+                PartialMatchResult::Partial { .. } | PartialMatchResult::NoMatch => {
+                    all_outputs.extend(self.write_text(remaining.as_bytes()));
+                    pos = text.len();
+                }
             }
         }
 
@@ -718,21 +734,29 @@ impl Filter for FilterImpl {
 }
 
 /// Find partial returns first index in str that might match one of stop sequences.
+///
+/// Returns a ``Full`` match at the smallest byte index when any stop is
+/// present, otherwise a ``Partial`` if the tail of ``s`` is a non-empty
+/// prefix of some stop (so the caller can buffer until the next chunk
+/// completes it), otherwise ``NoMatch``.
+///
+/// Iteration order of ``stops`` does not affect the output as long as no
+/// stop is a prefix of another (true for all current callers).
 pub(crate) fn find_partial<'a>(
     s: &str,
     stops: impl Iterator<Item = &'a String>,
 ) -> PartialMatchResult {
-    let mut min_idx: Option<usize> = None;
+    let mut best_full: Option<(usize, String)> = None;
+    let mut min_partial_idx: Option<usize> = None;
 
     for stop in stops {
-        // If we find the stop sequence, return the index and the stop sequence
         if let Some(idx) = s.find(stop) {
-            return PartialMatchResult::Full {
-                idx,
-                sequence: stop.clone(),
-            };
+            if best_full.as_ref().is_none_or(|(cur_idx, _)| idx < *cur_idx) {
+                best_full = Some((idx, stop.clone()));
+            }
+            continue;
         }
-        // Go through the substrings of the stop sequence
+        // Otherwise look for a tail-prefix partial match.
         'inner: for i in 0..stop.len() {
             if !stop.is_char_boundary(stop.len() - i) {
                 continue 'inner;
@@ -741,15 +765,17 @@ pub(crate) fn find_partial<'a>(
 
             if s.ends_with(suffix) {
                 let idx = s.len() - suffix.len();
-                if min_idx.is_none_or(|current_min_idx| current_min_idx > idx) {
-                    min_idx = Some(idx);
+                if min_partial_idx.is_none_or(|current_min_idx| current_min_idx > idx) {
+                    min_partial_idx = Some(idx);
                 }
                 break;
             }
         }
     }
 
-    if let Some(idx) = min_idx {
+    if let Some((idx, sequence)) = best_full {
+        PartialMatchResult::Full { idx, sequence }
+    } else if let Some(idx) = min_partial_idx {
         PartialMatchResult::Partial { idx }
     } else {
         PartialMatchResult::NoMatch
@@ -790,6 +816,23 @@ mod tests {
             find_partial("hello world", stops.iter()),
             PartialMatchResult::NoMatch
         ));
+    }
+
+    /// Test: when several stop sequences match, ``find_partial`` must
+    /// return the earliest match.
+    #[test]
+    fn test_find_partial_picks_earliest_full_match() {
+        let stops = vec![
+            "<|END_THINKING|>".to_string(),
+            "<|START_ACTION|>".to_string(),
+        ];
+        match find_partial(" query1<|END_THINKING|><|START_ACTION|>", stops.iter()) {
+            PartialMatchResult::Full { idx, sequence } => {
+                assert_eq!(idx, 7);
+                assert_eq!(sequence, "<|END_THINKING|>");
+            }
+            other => panic!("expected Full(end-thinking@7), got {other:?}"),
+        }
     }
 
     #[test]
@@ -1569,6 +1612,97 @@ mod tests {
         assert_eq!(content_mask, vec![false, false, true, false]);
     }
 
+    /// Regression test for the speculative-decoding leak: when several
+    /// accepted tokens are decoded as a single chunk, the buffer may
+    /// contain two complete special-token boundaries (e.g.
+    /// ``<|END_THINKING|><|START_ACTION|>``). The streaming path must
+    /// consume both, not just the first otherwise the second marker
+    /// leaks out as raw text in the new mode and the downstream parser
+    /// fails to recognize the tool-call boundary.
+    #[test]
+    fn test_write_decoded_handles_multiple_special_tokens_in_one_chunk() {
+        let opts = FilterOptions::default().cmd4().stream_tool_actions();
+        let mut f = new_filter(opts);
+
+        f.write_decoded("<|START_THINKING|>");
+        f.write_decoded(" think ");
+        // end-of-thinking + start-of-action arrive together.
+        // The second marker must be consumed, not emitted as text.
+        let r = f.write_decoded("<|END_THINKING|><|START_ACTION|>");
+        assert!(
+            r.content.is_none(),
+            "second special token leaked as content: {:?}",
+            r.content,
+        );
+        assert!(r.tool_calls.is_empty());
+
+        // The remaining tool-call JSON should now be parsed as a tool call,
+        // not emitted as content.
+        let r = f.write_decoded(
+            r#"[{"tool_call_id": "0", "tool_name": "foo", "parameters": {"q": "x"}}]"#,
+        );
+        assert!(
+            r.content.is_none(),
+            "tool-call args leaked as content: {:?}",
+            r.content
+        );
+        assert_eq!(r.tool_calls.len(), 1);
+        assert_eq!(r.tool_calls[0].name, "foo");
+        assert_eq!(r.tool_calls[0].id, "0");
+    }
+
+    /// Single-chunk reasoning-end + tool-action-start + partial tool args
+    #[test]
+    fn test_write_decoded_multi_special_token_with_partial_action_body() {
+        let opts = FilterOptions::default().cmd4().stream_tool_actions();
+        let mut f = new_filter(opts);
+
+        f.write_decoded("<|START_THINKING|>");
+        f.write_decoded(" think");
+        // All three boundaries plus a partial JSON body in one chunk.
+        let r = f.write_decoded(
+            r#"<|END_THINKING|><|START_ACTION|>[{"tool_call_id": "0", "tool_name": "foo", "parameters": {"q": "x"}}]"#,
+        );
+
+        assert!(
+            r.content.is_none(),
+            "special token / tool args leaked as content: {:?}",
+            r.content,
+        );
+        assert_eq!(r.tool_calls.len(), 1);
+        assert_eq!(r.tool_calls[0].name, "foo");
+        assert_eq!(r.tool_calls[0].id, "0");
+    }
+
+    /// When a chunk ends mid-special-token (e.g. ``<|START_AC``), the
+    /// outputs accumulated from earlier full special tokens in the same
+    /// chunk must still be returned. They must not be silently dropped
+    /// while waiting for the partial token to complete.
+    #[test]
+    fn test_write_decoded_partial_after_full_keeps_earlier_outputs() {
+        let opts = FilterOptions::default().cmd4().stream_tool_actions();
+        let mut f = new_filter(opts);
+
+        f.write_decoded("<|START_THINKING|>");
+        f.write_decoded(" think");
+        // End-of-thinking followed by an incomplete next special token.
+        // The first must transition the mode; the partial bytes stay
+        // buffered for the next call to complete.
+        let r = f.write_decoded("<|END_THINKING|><|START_AC");
+        assert!(r.content.is_none());
+        assert!(r.tool_calls.is_empty());
+
+        // Next chunk completes the previously partial special token, then
+        // delivers the tool-call body. No content should be emitted.
+        let r = f.write_decoded(
+            r#"TION|>[{"tool_call_id": "1", "tool_name": "bar", "parameters": {}}]"#,
+        );
+        assert!(r.content.is_none(), "leaked content: {:?}", r.content);
+        assert_eq!(r.tool_calls.len(), 1);
+        assert_eq!(r.tool_calls[0].name, "bar");
+        assert_eq!(r.tool_calls[0].id, "1");
+    }
+
     #[test]
     fn test_classify_content_chunks_excludes_tool_action_chunks() {
         let opts = FilterOptions::default().cmd4().stream_tool_actions();
@@ -1591,6 +1725,28 @@ mod tests {
         assert_eq!(
             content_mask,
             vec![false, false, false, false, false, false, false, true, false]
+        );
+    }
+
+    /// Test when ``handle_special_token`` rejects a match via the
+    /// ``not_special`` rule (e.g. ``Answer:`` seen while already in
+    /// ``GroundedAnswer`` mode), ``apply_special_token_match`` returns false
+    /// without mutating the buffer or the mode. The streaming loop must
+    /// detect this and fall through to plain buffer processing otherwise
+    /// ``detect_special_token`` keeps returning the same ``Found`` result on
+    /// every iteration loops forever.
+    #[test]
+    fn test_write_decoded_rejected_special_token_does_not_loop() {
+        let mut f = new_filter(FilterOptions::default().handle_rag());
+
+        f.write_decoded("Grounded answer:");
+        // ``Answer:`` here is *not* a valid transition (already in
+        // GroundedAnswer); it must be emitted as part of the grounded text.
+        let r = f.write_decoded(" the Answer: is 42.");
+        let content = r.content.unwrap_or_default();
+        assert!(
+            content.contains("Answer:"),
+            "expected the rejected ``Answer:`` to be emitted as content, got {content:?}",
         );
     }
 }
