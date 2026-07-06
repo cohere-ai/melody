@@ -39,6 +39,7 @@ pub struct FilterOptions {
     pub(crate) stream_processed_params: bool,
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
+    pub(crate) document_id_map: Vec<Vec<String>>,
 }
 
 impl Default for FilterOptions {
@@ -56,6 +57,7 @@ impl Default for FilterOptions {
             stream_processed_params: false,
             has_tool_call_id: false,
             cmd3_citations: false,
+            document_id_map: Vec::new(),
         }
     }
 }
@@ -489,6 +491,41 @@ impl FilterOptions {
     #[must_use]
     pub fn remove_token(mut self, token: &str) -> Self {
         self.special_token_map.remove(token);
+        self
+    }
+
+    /// Configure a mapping from prompt indices back to the original document
+    /// identifiers.
+    ///
+    /// When rendering a prompt, the templating layer assigns each tool call /
+    /// document a numeric index so the model can emit compact citations such as
+    /// `</co: 1:[0,2]>`. This method provides the inverse mapping so the
+    /// parser can populate `Source::document_ids` with the original identifier
+    /// strings that those indices refer to.
+    ///
+    /// # Arguments
+    ///
+    /// * `map` - A two-dimensional vector indexed as `map[tool_call_index][tool_result_index]`.
+    ///   The outer vector is the tool call index emitted in the prompt. The inner vector
+    ///   contains the document identifiers for that tool call in the same order the
+    ///   prompt rendered them. Entries that are out of bounds resolve to an empty
+    ///   string in `Source::document_ids`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::parsing::FilterOptions;
+    ///
+    /// // Two top-level documents at tool_call_index 0, plus one tool result
+    /// // at tool_call_index 1 with three documents.
+    /// let options = FilterOptions::new().cmd3().with_document_id_map(vec![
+    ///     vec!["doc-a".to_string(), "doc-b".to_string()],
+    ///     vec!["res-x".to_string(), "res-y".to_string(), "res-z".to_string()],
+    /// ]);
+    /// ```
+    #[must_use]
+    pub fn with_document_id_map(mut self, map: Vec<Vec<String>>) -> Self {
+        self.document_id_map = map;
         self
     }
 }

@@ -170,6 +170,66 @@ func (opts *FilterOptions) RemoveToken(token string) *FilterOptions {
 	return opts
 }
 
+// WithDocumentIDMap configures the document ID mapping used by the parser to
+// resolve citation indices back to their original document identifiers.
+//
+// The outer slice is indexed by tool_call_index and the inner slice by
+// tool_result_index, so docIDs[i][j] is the original document identifier for
+// the prompt position (tool_call_index=i, tool_result_index=j). Out-of-bounds
+// lookups resolve to an empty string in Source.DocumentIDs.
+func (opts *FilterOptions) WithDocumentIDMap(docIDs [][]string) *FilterOptions {
+	if opts.ptr == nil {
+		return opts
+	}
+
+	rowsLen := len(docIDs)
+	if rowsLen == 0 {
+		C.melody_filter_options_with_document_id_map(opts.ptr, nil, nil, 0)
+		return opts
+	}
+
+	total := 0
+	for _, row := range docIDs {
+		total += len(row)
+	}
+
+	rowLens := make([]C.size_t, rowsLen)
+	for i, row := range docIDs {
+		rowLens[i] = C.size_t(len(row))
+	}
+
+	var flat []*C.char
+	if total > 0 {
+		flat = make([]*C.char, total)
+		idx := 0
+		for _, row := range docIDs {
+			for _, id := range row {
+				flat[idx] = C.CString(id)
+				idx++
+			}
+		}
+		defer func() {
+			for _, p := range flat {
+				if p != nil {
+					C.free(unsafe.Pointer(p))
+				}
+			}
+		}()
+	}
+
+	var idsPtr **C.char
+	if total > 0 {
+		idsPtr = (**C.char)(unsafe.Pointer(&flat[0]))
+	}
+	C.melody_filter_options_with_document_id_map(
+		opts.ptr,
+		idsPtr,
+		(*C.size_t)(unsafe.Pointer(&rowLens[0])),
+		C.size_t(rowsLen),
+	)
+	return opts
+}
+
 // cFilter is the internal CGO wrapper around the Rust filter
 type cFilter struct {
 	ptr *C.CFilter
@@ -339,6 +399,16 @@ func convertCSource(cSource *C.CSource) Source {
 		source.ToolResultIndices = make([]uint, len(indices))
 		for i, idx := range indices {
 			source.ToolResultIndices[i] = uint(idx)
+		}
+	}
+
+	if cSource.document_ids != nil && cSource.document_ids_len > 0 {
+		ids := unsafe.Slice(cSource.document_ids, int(cSource.document_ids_len))
+		source.DocumentIDs = make([]string, len(ids))
+		for i, idPtr := range ids {
+			if idPtr != nil {
+				source.DocumentIDs[i] = C.GoString(idPtr)
+			}
 		}
 	}
 
@@ -802,6 +872,21 @@ func buildCSources(a *cAllocator, sources []Source) (*C.CSource, C.size_t) {
 		} else {
 			arr[i].tool_result_indices = nil
 			arr[i].tool_result_indices_len = 0
+		}
+
+		lenDocIDs := len(source.DocumentIDs)
+		if lenDocIDs > 0 {
+			ssize := uintptr(lenDocIDs) * unsafe.Sizeof((*C.char)(nil))
+			baseDocIDs := (**C.char)(a.Malloc(ssize))
+			var cDocIDs []*C.char = unsafe.Slice(baseDocIDs, lenDocIDs)
+			for i, id := range source.DocumentIDs {
+				cDocIDs[i] = a.CString(id)
+			}
+			arr[i].document_ids = baseDocIDs
+			arr[i].document_ids_len = C.size_t(lenDocIDs)
+		} else {
+			arr[i].document_ids = nil
+			arr[i].document_ids_len = 0
 		}
 	}
 	return base, C.size_t(n)

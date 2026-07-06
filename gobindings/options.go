@@ -20,6 +20,8 @@ type filterConfig struct {
 	inclusiveStops          []string
 	exclusiveStops          []string
 	removeTokens            []string
+	documentIDMap           [][]string
+	documentIDMapSet        bool
 }
 
 // apply applies the configuration to the FilterOptions builder
@@ -76,6 +78,11 @@ func (cfg *filterConfig) apply(opts *FilterOptions) {
 	// Handle token removal
 	for _, token := range cfg.removeTokens {
 		opts.RemoveToken(token)
+	}
+
+	// Handle document ID mapping
+	if cfg.documentIDMapSet {
+		opts.WithDocumentIDMap(cfg.documentIDMap)
 	}
 }
 
@@ -174,5 +181,19 @@ func WithExclusiveStops(stops []string) FilterOption {
 func RemoveToken(token string) FilterOption {
 	return func(cfg *filterConfig) {
 		cfg.removeTokens = append(cfg.removeTokens, token)
+	}
+}
+
+// WithDocumentIDMap configures the document ID mapping used by the parser to
+// resolve citation indices back to their original document identifiers.
+//
+// The outer slice is indexed by tool_call_index and the inner slice by
+// tool_result_index, so docIDs[i][j] is the original document identifier for
+// the prompt position (tool_call_index=i, tool_result_index=j). The parser
+// populates Source.DocumentIDs whenever this mapping is set.
+func WithDocumentIDMap(docIDs [][]string) FilterOption {
+	return func(cfg *filterConfig) {
+		cfg.documentIDMap = docIDs
+		cfg.documentIDMapSet = true
 	}
 }

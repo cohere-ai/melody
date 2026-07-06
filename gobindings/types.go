@@ -45,6 +45,11 @@ type FilterCitation struct {
 
 // Source indicates which tool call and which tool results from that tool are being cited
 type Source struct {
-	ToolCallIndex     uint   `json:"tool_call_index"`
-	ToolResultIndices []uint `json:"tool_result_indices"`
+	ToolCallIndex     uint     `json:"tool_call_index"`
+	ToolResultIndices []uint   `json:"tool_result_indices"`
+	// DocumentIDs are the original document identifiers that ToolResultIndices
+	// resolve back to, populated when the filter is configured with a document
+	// ID map (see FilterOptions.WithDocumentIDMap). Same length as
+	// ToolResultIndices when populated; nil otherwise.
+	DocumentIDs []string `json:"document_ids,omitempty"`
 }

@@ -61,6 +61,45 @@ func TestFilter_Command3(t *testing.T) {
 				},
 			},
 		}, {
+			name: "command 3 with document ID resolution",
+			options: []melody.FilterOption{
+				melody.HandleMultiHopCmd3(),
+				melody.WithDocumentIDMap([][]string{
+					{"doc-a", "doc-b", "doc-c"},
+					{"res-x", "res-y", "res-z", "res-w", "res-v"},
+				}),
+			},
+			input:         "<|START_THINKING|>This is a rainbow <co>emoji: 🌈</co: 0:[1]><|END_THINKING|>\n<|START_RESPONSE|>foo <co>bar</co: 0:[1,2],1:[3,4]><|END_RESPONSE|>",
+			wantContent:   strPtr("foo bar"),
+			wantReasoning: strPtr("This is a rainbow emoji: 🌈"),
+			wantCitations: []melody.FilterCitation{
+				{
+					StartIndex: 18, EndIndex: 26, Text: "emoji: 🌈",
+					Sources: []melody.Source{{
+						ToolCallIndex:     0,
+						ToolResultIndices: []uint{1},
+						DocumentIDs:       []string{"doc-b"},
+					}},
+					IsThinking: true,
+				},
+				{
+					StartIndex: 4, EndIndex: 7, Text: "bar",
+					Sources: []melody.Source{
+						{
+							ToolCallIndex:     0,
+							ToolResultIndices: []uint{1, 2},
+							DocumentIDs:       []string{"doc-b", "doc-c"},
+						},
+						{
+							ToolCallIndex:     1,
+							ToolResultIndices: []uint{3, 4},
+							DocumentIDs:       []string{"res-w", "res-v"},
+						},
+					},
+					IsThinking: false,
+				},
+			},
+		}, {
 			name: "processed params tool call",
 			options: []melody.FilterOption{
 				melody.HandleMultiHopCmd3(),

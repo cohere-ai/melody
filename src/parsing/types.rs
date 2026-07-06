@@ -181,6 +181,14 @@ pub struct FilterCitation {
 /// This structure identifies which tool call and which specific results from that
 /// tool call are being cited. A single citation may reference multiple sources.
 ///
+/// # Document ID resolution
+///
+/// When a parser is configured with a document ID map (see
+/// `FilterOptions::with_document_id_map`), the parser resolves each entry of
+/// `tool_result_indices` back to the original document identifier that produced
+/// it in the prompt, populating `document_ids`. When no map is configured,
+/// `document_ids` is left empty.
+///
 /// # Examples
 ///
 /// ```rust
@@ -189,6 +197,7 @@ pub struct FilterCitation {
 /// let source = Source {
 ///     tool_call_index: 0,
 ///     tool_result_indices: vec![0, 1, 2],
+///     document_ids: vec![],
 /// };
 /// // This means the citation references results 0, 1, and 2 from tool call 0
 /// ```
@@ -199,6 +208,12 @@ pub struct Source {
     pub tool_call_index: usize,
     /// Indices of specific results from this tool call
     pub tool_result_indices: Vec<usize>,
+    /// Original document identifiers that `tool_result_indices` resolve back
+    /// to. Same length as `tool_result_indices` when the parser was configured
+    /// with a document ID map; empty otherwise. Entries that cannot be resolved
+    /// are filled with an empty string so the index alignment is preserved.
+    #[serde(default)]
+    pub document_ids: Vec<String>,
 }
 
 /// Aggregated result from filter processing, separating content, reasoning,

@@ -190,6 +190,12 @@ pub struct CSource {
     pub tool_result_indices: *mut usize,
     /// Number of tool result indices
     pub tool_result_indices_len: usize,
+    /// Array of resolved document identifiers, one per `tool_result_indices`
+    /// entry. Null when no document ID map was configured on the filter.
+    pub document_ids: *mut *mut c_char,
+    /// Number of resolved document identifiers (either 0 or equal to
+    /// `tool_result_indices_len`).
+    pub document_ids_len: usize,
 }
 
 /// Struct for returning either a `CAggregatedResult` or an error (mutually exclusive, one is always null)
@@ -474,6 +480,68 @@ pub unsafe extern "C" fn melody_filter_options_remove_token(
     }
 }
 
+/// Configures the document ID mapping used to resolve citation indices back
+/// to their original document identifiers.
+///
+/// The mapping is provided as a flattened 2D table: `ids` is an array of
+/// pointers to null-terminated strings, and `row_lens` is an array of length
+/// `rows_len` giving the number of entries per row. The row at position `i`
+/// corresponds to `tool_call_index == i`. Concretely, the document ID for
+/// `(tool_call_index, tool_result_index) = (i, j)` is at
+/// `ids[sum(row_lens[..i]) + j]`. Out-of-bounds lookups (sparse rows) resolve
+/// to an empty string.
+///
+/// # Safety
+/// - `options` must be a valid pointer returned from `melody_filter_options_new`
+/// - `ids` must point to `total` valid null-terminated C strings
+/// - `row_lens` must point to `rows_len` valid `size_t` values whose sum equals `total`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_with_document_id_map(
+    options: *mut CFilterOptions,
+    ids: *const *const c_char,
+    row_lens: *const usize,
+    rows_len: usize,
+) {
+    if options.is_null() {
+        return;
+    }
+    unsafe {
+        let opts = &mut *(options.cast::<FilterOptions>());
+
+        if rows_len == 0 || row_lens.is_null() {
+            *opts = std::mem::take(opts).with_document_id_map(Vec::new());
+            return;
+        }
+
+        let rows = slice::from_raw_parts(row_lens, rows_len);
+        let total: usize = rows.iter().sum();
+
+        let flat: &[*const c_char] = if total == 0 || ids.is_null() {
+            &[]
+        } else {
+            slice::from_raw_parts(ids, total)
+        };
+
+        let mut map: Vec<Vec<String>> = Vec::with_capacity(rows_len);
+        let mut cursor = 0usize;
+        for &row_len in rows {
+            let mut row = Vec::with_capacity(row_len);
+            for k in 0..row_len {
+                let ptr = flat.get(cursor + k).copied().unwrap_or(std::ptr::null());
+                let s = if ptr.is_null() {
+                    String::new()
+                } else {
+                    CStr::from_ptr(ptr).to_string_lossy().into_owned()
+                };
+                row.push(s);
+            }
+            cursor += row_len;
+            map.push(row);
+        }
+        *opts = std::mem::take(opts).with_document_id_map(map);
+    }
+}
+
 // ============================================================================
 // Filter FFI functions
 // ============================================================================
@@ -677,10 +745,24 @@ unsafe fn convert_citation_to_c(citation: FilterCitation) -> CFilterCitation {
                     std::ptr::null_mut()
                 };
 
+                let document_ids_len = s.document_ids.len();
+                let document_ids = if document_ids_len > 0 {
+                    let raw_ptrs: Vec<*mut c_char> = s
+                        .document_ids
+                        .into_iter()
+                        .map(|id| CString::new(id).unwrap_or_default().into_raw())
+                        .collect();
+                    Box::into_raw(raw_ptrs.into_boxed_slice()).cast::<*mut c_char>()
+                } else {
+                    std::ptr::null_mut()
+                };
+
                 CSource {
                     tool_call_index: s.tool_call_index,
                     tool_result_indices: indices,
                     tool_result_indices_len: indices_len,
+                    document_ids,
+                    document_ids_len,
                 }
             })
             .collect();
@@ -697,6 +779,34 @@ unsafe fn convert_citation_to_c(citation: FilterCitation) -> CFilterCitation {
         sources,
         sources_len,
         is_thinking: citation.is_thinking,
+    }
+}
+
+/// Free the `tool_result_indices` and `document_ids` arrays inside a `CSource`.
+///
+/// # Safety
+/// `source` must have been allocated by `convert_citation_to_c`.
+unsafe fn free_csource_inner(source: &CSource) {
+    unsafe {
+        if !source.tool_result_indices.is_null() && source.tool_result_indices_len > 0 {
+            let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                source.tool_result_indices,
+                source.tool_result_indices_len,
+            ))
+            .into_vec();
+        }
+        if !source.document_ids.is_null() && source.document_ids_len > 0 {
+            let ids = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                source.document_ids,
+                source.document_ids_len,
+            ))
+            .into_vec();
+            for id_ptr in ids {
+                if !id_ptr.is_null() {
+                    let _ = CString::from_raw(id_ptr);
+                }
+            }
+        }
     }
 }
 
@@ -772,16 +882,8 @@ pub unsafe extern "C" fn melody_aggregated_result_free(res: *mut CAggregatedResu
                             citation.sources_len,
                         ))
                         .into_vec();
-                        for source in sources {
-                            if !source.tool_result_indices.is_null()
-                                && source.tool_result_indices_len > 0
-                            {
-                                let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
-                                    source.tool_result_indices,
-                                    source.tool_result_indices_len,
-                                ))
-                                .into_vec();
-                            }
+                        for source in &sources {
+                            free_csource_inner(source);
                         }
                     }
                 }
@@ -1243,9 +1345,27 @@ unsafe fn convert_csource(source: &CSource) -> Source {
         Vec::new()
     };
 
+    let document_ids: Vec<String> = if !source.document_ids.is_null()
+        && source.document_ids_len > 0
+    {
+        unsafe { slice::from_raw_parts(source.document_ids, source.document_ids_len) }
+            .iter()
+            .map(|&ptr| {
+                if ptr.is_null() {
+                    String::new()
+                } else {
+                    unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     Source {
         tool_call_index: source.tool_call_index,
         tool_result_indices,
+        document_ids,
     }
 }
 

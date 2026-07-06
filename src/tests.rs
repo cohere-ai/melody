@@ -365,10 +365,12 @@ mod tests {
                     Source {
                         tool_call_index: 0,
                         tool_result_indices: vec![1, 2],
+                        document_ids: vec![],
                     },
                     Source {
                         tool_call_index: 1,
                         tool_result_indices: vec![3, 4],
+                        document_ids: vec![],
                     },
                 ],
                 is_thinking: false,
@@ -393,6 +395,7 @@ mod tests {
                     sources: vec![Source {
                         tool_call_index: 0,
                         tool_result_indices: vec![1],
+                        document_ids: vec![],
                     }],
                     is_thinking: true,
                 },
@@ -404,10 +407,12 @@ mod tests {
                         Source {
                             tool_call_index: 0,
                             tool_result_indices: vec![1, 2],
+                            document_ids: vec![],
                         },
                         Source {
                             tool_call_index: 1,
                             tool_result_indices: vec![3, 4],
+                            document_ids: vec![],
                         },
                     ],
                     is_thinking: false,
@@ -431,6 +436,7 @@ mod tests {
                 sources: vec![Source {
                     tool_call_index: 1,
                     tool_result_indices: vec![1],
+                    document_ids: vec![],
                 }],
                 is_thinking: false,
             }],

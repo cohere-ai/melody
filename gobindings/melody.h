@@ -79,6 +79,8 @@ typedef struct {
     size_t tool_call_index;
     size_t* tool_result_indices;
     size_t tool_result_indices_len;
+    char** document_ids;
+    size_t document_ids_len;
 } CSource;
 
 typedef struct {
@@ -219,6 +221,7 @@ extern void melody_filter_options_with_chunk_size(CFilterOptions* options, size_
 extern void melody_filter_options_with_inclusive_stops(CFilterOptions* options, const char** stops, size_t stops_len);
 extern void melody_filter_options_with_exclusive_stops(CFilterOptions* options, const char** stops, size_t stops_len);
 extern void melody_filter_options_remove_token(CFilterOptions* options, const char* token);
+extern void melody_filter_options_with_document_id_map(CFilterOptions* options, const char** ids, const size_t* row_lens, size_t rows_len);
 
 // Filter functions
 extern CFilter* melody_filter_new(const CFilterOptions* options);

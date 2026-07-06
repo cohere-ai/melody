@@ -159,6 +159,17 @@ impl PyFilterOptions {
         }
     }
 
+    /// Configure the document ID map used to resolve citation indices back
+    /// to their original document identifiers.
+    ///
+    /// `map` is indexed as `map[tool_call_index][tool_result_index]`.
+    #[allow(clippy::needless_pass_by_value)]
+    fn with_document_id_map(&self, map: Vec<Vec<String>>) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().with_document_id_map(map),
+        }
+    }
+
     #[allow(clippy::unused_self)]
     fn __repr__(&self) -> &'static str {
         "PyFilterOptions(...)"

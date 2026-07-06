@@ -114,8 +114,9 @@ impl FilterImpl {
         }
 
         // Then try to find the 'last' citation element.
-        let (start_last_id, end_last_id, docs_last) =
+        let (start_last_id, end_last_id, mut docs_last) =
             Self::find_an_element(s, START_LAST_CIT, END_OF_CIT, self.cmd3_citations);
+        self.resolve_document_ids(&mut docs_last);
 
         // Only partial citation found so we need to wait for the complete citation.
         if start_last_id == usize::MAX || end_last_id == usize::MAX {
@@ -279,11 +280,34 @@ impl FilterImpl {
                 vec![Source {
                     tool_call_index: 0,
                     tool_result_indices: int_indices,
+                    document_ids: Vec::new(),
                 }]
             }
         };
 
         (start_id, start_id + 1 + end_id, doc_indices)
+    }
+
+    /// Populate `Source::document_ids` for each source using the configured
+    /// `document_id_map`. Out-of-bounds lookups resolve to empty strings so
+    /// the length of `document_ids` always matches `tool_result_indices`.
+    fn resolve_document_ids(&self, sources: &mut [Source]) {
+        if self.document_id_map.is_empty() {
+            return;
+        }
+        for source in sources {
+            let tool_map = self.document_id_map.get(source.tool_call_index);
+            source.document_ids = source
+                .tool_result_indices
+                .iter()
+                .map(|&i| {
+                    tool_map
+                        .and_then(|m| m.get(i))
+                        .cloned()
+                        .unwrap_or_default()
+                })
+                .collect();
+        }
     }
 
     fn convert_string_to_doc_indices(s: &str) -> Vec<Source> {
@@ -326,6 +350,7 @@ impl FilterImpl {
             doc_indices.push(Source {
                 tool_call_index: tool_index,
                 tool_result_indices: result_indices,
+                document_ids: Vec::new(),
             });
         }
 
@@ -644,6 +669,110 @@ mod tests {
         assert_eq!(docs[0].tool_result_indices, vec![1, 2]);
         assert_eq!(docs[1].tool_call_index, 1);
         assert_eq!(docs[1].tool_result_indices, vec![0]);
+    }
+
+    #[test]
+    fn test_document_id_map_resolves_cmd3_citation() {
+        let opts = crate::parsing::FilterOptions::default()
+            .cmd3()
+            .with_document_id_map(vec![
+                vec!["doc-a".to_string(), "doc-b".to_string()],
+                vec!["res-x".to_string(), "res-y".to_string(), "res-z".to_string()],
+            ]);
+        let mut filter = crate::parsing::new_filter(opts);
+
+        let text =
+            "<|START_RESPONSE|>The answer is <co>here</co: 0:[1],1:[0,2]>.<|END_RESPONSE|>";
+        let result = filter.process_full_text(text);
+
+        assert_eq!(result.citations.len(), 1);
+        let citation = &result.citations[0];
+        assert_eq!(citation.text, "here");
+        assert_eq!(citation.sources.len(), 2);
+
+        assert_eq!(citation.sources[0].tool_call_index, 0);
+        assert_eq!(citation.sources[0].tool_result_indices, vec![1]);
+        assert_eq!(citation.sources[0].document_ids, vec!["doc-b".to_string()]);
+
+        assert_eq!(citation.sources[1].tool_call_index, 1);
+        assert_eq!(citation.sources[1].tool_result_indices, vec![0, 2]);
+        assert_eq!(
+            citation.sources[1].document_ids,
+            vec!["res-x".to_string(), "res-z".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_document_id_map_missing_entries_resolve_to_empty_string() {
+        // Only define the first tool call's mapping; the second tool call and any
+        // out-of-bounds indices should resolve to empty strings.
+        let opts = crate::parsing::FilterOptions::default()
+            .cmd3()
+            .with_document_id_map(vec![vec!["doc-a".to_string()]]);
+        let mut filter = crate::parsing::new_filter(opts);
+
+        let text =
+            "<|START_RESPONSE|>x<co>y</co: 0:[0,5],1:[0]>.<|END_RESPONSE|>";
+        let result = filter.process_full_text(text);
+
+        assert_eq!(result.citations.len(), 1);
+        let citation = &result.citations[0];
+        assert_eq!(citation.sources.len(), 2);
+
+        assert_eq!(
+            citation.sources[0].document_ids,
+            vec!["doc-a".to_string(), String::new()]
+        );
+        assert_eq!(
+            citation.sources[1].document_ids,
+            vec![String::new()]
+        );
+    }
+
+    #[test]
+    fn test_document_id_map_unset_leaves_field_empty() {
+        let mut filter = FilterImpl::new();
+        filter.cmd3_citations = true;
+
+        let (output, _) = filter.parse_citations(
+            "x<co>y</co: 0:[0,1]>",
+            FilterMode::GroundedAnswer,
+        );
+
+        let output = output.unwrap();
+        assert_eq!(output.citations.len(), 1);
+        assert_eq!(output.citations[0].sources.len(), 1);
+        assert!(output.citations[0].sources[0].document_ids.is_empty());
+    }
+
+    #[test]
+    fn test_document_id_map_legacy_citation_format() {
+        // Legacy `<co: 1,2>` format always resolves under tool_call_index 0.
+        let opts = crate::parsing::FilterOptions::default()
+            .with_document_id_map(vec![vec![
+                "doc-0".to_string(),
+                "doc-1".to_string(),
+                "doc-2".to_string(),
+            ]])
+            .stream_non_grounded_answer();
+        let mut filter = crate::parsing::new_filter(opts);
+
+        let (output, _) = filter.parse_citations(
+            "hello <co: 2,1>foo</co: 2,1>",
+            FilterMode::GroundedAnswer,
+        );
+        let output = output.unwrap();
+        assert_eq!(output.citations.len(), 1);
+        assert_eq!(output.citations[0].sources.len(), 1);
+        assert_eq!(output.citations[0].sources[0].tool_call_index, 0);
+        assert_eq!(
+            output.citations[0].sources[0].tool_result_indices,
+            vec![2, 1]
+        );
+        assert_eq!(
+            output.citations[0].sources[0].document_ids,
+            vec!["doc-2".to_string(), "doc-1".to_string()]
+        );
     }
 
     #[test]
