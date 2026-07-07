@@ -68,6 +68,13 @@ impl PyFilterOptions {
         }
     }
 
+    /// Configure for Command 5 format (cofl-tagged tool calls).
+    fn cmd5(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().cmd5(),
+        }
+    }
+
     /// Configure for RAG format.
     fn rag(&self) -> Self {
         PyFilterOptions {
@@ -239,6 +246,24 @@ impl PyFilter {
         }
     }
 
+    /// Create a filter for Command 5 format (cofl-tagged tool calls).
+    ///
+    /// # Arguments
+    ///
+    /// * `chunk_size` - Characters to buffer before emitting (default: 1)
+    #[staticmethod]
+    #[pyo3(signature = (chunk_size = None))]
+    fn cmd5(chunk_size: Option<usize>) -> Self {
+        let mut opts = FilterOptions::default().cmd5();
+        if let Some(size) = chunk_size {
+            opts = opts.with_chunk_size(size);
+        }
+        PyFilter {
+            inner: new_filter(opts),
+            config: "cmd5",
+        }
+    }
+
     /// Process a decoded token and return an aggregated result.
     fn write_decoded(&mut self, decoded_token: &str) -> FilterAggregatedResult {
         self.inner.write_decoded(decoded_token)
@@ -393,6 +418,22 @@ mod tests {
         let result = filter.write_decoded("Hello");
         assert_eq!(result.content, Some("Hello".to_string()));
         assert!(result.reasoning.is_none());
+    }
+
+    #[test]
+    fn test_filter_cmd5_cofl_tool_call() {
+        let mut filter = PyFilter::cmd5(None);
+        let text = concat!(
+            "<|START_THINKING|>thinking<|END_THINKING|>",
+            "<cofl:tool_calls><cofl:tool_call id=\"0\" name=\"search\">",
+            "<cofl:tool_param name=\"q\" string=\"true\">hello</cofl:tool_param>",
+            "</cofl:tool_call></cofl:tool_calls>"
+        );
+        let result = filter.process_full_text(text);
+        assert_eq!(result.reasoning, Some("thinking".to_string()));
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "search");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"q": "hello"}"#);
     }
 
     #[test]

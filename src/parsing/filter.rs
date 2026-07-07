@@ -4,6 +4,7 @@
 //! and extracts structured information, as well as aggregation functions for efficient interop.
 
 use crate::parsing::action_filter::FilterAction;
+use crate::parsing::cofl_filter::FilterCoflAction;
 use crate::parsing::options::FilterOptions;
 use crate::parsing::types::{
     AccumulatedToolCall, FilterAggregatedResult, FilterMode, FilterOutput, FilterSearchQueryDelta,
@@ -196,6 +197,7 @@ pub struct FilterImpl {
     pub(crate) cur_text_byte_index: usize,
     pub(crate) cur_citation_byte_index: Option<usize>,
     pub(crate) action_metadata: FilterAction,
+    pub(crate) cofl_action_metadata: FilterCoflAction,
 
     // Search query tracking
     pub(crate) curr_search_query_idx: usize,
@@ -204,6 +206,9 @@ pub struct FilterImpl {
     // Format flags
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
+    /// Use the cofl-tagged parser (cmd5) for [`FilterMode::ToolAction`]
+    /// instead of the JSON action parser.
+    pub(crate) cofl_tool_action: bool,
 
     // Chunking configuration
     pub(crate) chunk_size: usize,
@@ -261,10 +266,12 @@ impl FilterImpl {
             cur_text_byte_index: 0,
             cur_citation_byte_index: None,
             action_metadata: FilterAction::new(),
+            cofl_action_metadata: FilterCoflAction::new(),
             curr_search_query_idx: 0,
             sent_curr_index: false,
             has_tool_call_id: false,
             cmd3_citations: false,
+            cofl_tool_action: false,
             chunk_size: 1,
             num_tokens_in_chunk: 0,
             buf: Vec::new(),
@@ -282,6 +289,7 @@ impl FilterImpl {
         self.stream_processed_params = options.stream_processed_params;
         self.has_tool_call_id = options.has_tool_call_id;
         self.cmd3_citations = options.cmd3_citations;
+        self.cofl_tool_action = options.cofl_tool_action;
         self.default_mode = options.default_mode;
         self.mode = options.default_mode;
 
@@ -459,7 +467,11 @@ impl FilterImpl {
             FilterMode::Ignore | FilterMode::NextSearchQuery => (Vec::new(), 0),
             FilterMode::ToolAction => {
                 let s = String::from_utf8_lossy(bstr);
-                self.parse_actions(&s)
+                if self.cofl_tool_action {
+                    self.parse_cofl_actions(&s)
+                } else {
+                    self.parse_actions(&s)
+                }
             }
             FilterMode::GroundedAnswer | FilterMode::ToolReason => {
                 self.process_grounded_text(bstr, after_last_token, mode)
@@ -1166,6 +1178,14 @@ mod tests {
         new_filter(FilterOptions::default().cmd4().no_tools())
     }
 
+    fn make_cmd5_filter() -> FilterImpl {
+        new_filter(FilterOptions::default().cmd5())
+    }
+
+    fn make_cmd5_no_tools_filter() -> FilterImpl {
+        new_filter(FilterOptions::default().cmd5().no_tools())
+    }
+
     #[test]
     fn test_process_full_text_cmd3_thinking_and_response() {
         let mut f = make_cmd3_filter();
@@ -1720,6 +1740,296 @@ mod tests {
             content_mask,
             vec![false, false, false, false, false, false, false, true, false]
         );
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_thinking_and_text() {
+        let mut f = make_cmd5_no_tools_filter();
+        let text = "<|START_THINKING|>Let me think.\
+                     <|END_THINKING|>\
+                     <|START_TEXT|>Here is the answer.\
+                     <|END_TEXT|>";
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Let me think.".into()));
+        assert_eq!(result.content, Some("Here is the answer.".into()));
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_tool_call_with_string_param() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>I should search.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="call_0" name="web_search"><cofl:tool_param name="query" string="true">test</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("I should search.".into()));
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_0");
+        assert_eq!(result.tool_calls[0].name, "web_search");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"query": "test"}"#);
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_tool_call_mixed_param_types() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>thinking<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="DeleteReminder"><cofl:tool_param name="reminder_id" string="true">12-abc</cofl:tool_param><cofl:tool_param name="force" string="false">true</cofl:tool_param><cofl:tool_param name="limit" string="false">3</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "DeleteReminder");
+        assert_eq!(
+            result.tool_calls[0].arguments,
+            r#"{"reminder_id": "12-abc", "force": true, "limit": 3}"#
+        );
+    }
+
+    /// Nested `string="false"` JSON (array of objects with shell commands,
+    /// embedded quotes, backslashes, and newlines) must round-trip through
+    /// the cofl parser as valid tool-call arguments.
+    #[test]
+    fn test_process_full_text_cmd5_execute_command_nested_commands() {
+        let commands = serde_json::json!([
+            {
+                "cmd": "grep -n \"with open(csv_path\" -n /app/validate.py\n",
+                "time": 0.1
+            },
+            {
+                "cmd": "sed -i \"s/writer = csv\\.writer(f)/writer = csv.writer(f, lineterminator='\\n')/\" /app/validate.py\n",
+                "time": 0.1
+            },
+            {
+                "cmd": "grep -n \"writer = csv\" -n /app/validate.py\n",
+                "time": 0.1
+            }
+        ]);
+        let expected_args = serde_json::json!({ "commands": commands });
+        let commands_wire = serde_json::to_string(&commands).expect("wire JSON");
+
+        let text = format!(
+            r#"<|START_THINKING|>run commands<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="17" name="execute_command"><cofl:tool_param name="commands" string="false">{commands_wire}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#
+        );
+
+        let mut f = make_cmd5_filter();
+        let result = f.process_full_text(&text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "17");
+        assert_eq!(result.tool_calls[0].name, "execute_command");
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed, expected_args);
+
+        // Streaming one character at a time must produce the same arguments.
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+        let mut f2 = make_cmd5_filter();
+        let streamed = f2.process_full(&chunks);
+        assert_eq!(streamed.tool_calls.len(), 1);
+        assert_eq!(
+            streamed.tool_calls[0].arguments,
+            result.tool_calls[0].arguments
+        );
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_multiple_tool_calls() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>parallel<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="GetReminders"></cofl:tool_call><cofl:tool_call id="1" name="GetTodos"><cofl:tool_param name="filter" string="true">open</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 2);
+        assert_eq!(result.tool_calls[0].id, "0");
+        assert_eq!(result.tool_calls[0].name, "GetReminders");
+        assert_eq!(result.tool_calls[0].arguments, "{}");
+        assert_eq!(result.tool_calls[1].id, "1");
+        assert_eq!(result.tool_calls[1].name, "GetTodos");
+        assert_eq!(result.tool_calls[1].arguments, r#"{"filter": "open"}"#);
+    }
+
+    /// Rainbow emoji (U+1F308) is a 4-byte UTF-8 sequence. It must round-trip
+    /// through both `string="true"` parameters (where the body is JSON-escaped
+    /// per character) and `string="false"` parameters (where the body is
+    /// emitted verbatim as a JSON literal). Streaming the same input one char
+    /// at a time must produce the same aggregated arguments.
+    #[test]
+    fn test_process_full_text_cmd5_tool_call_with_emoji_params() {
+        let text = r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="send"><cofl:tool_param name="message" string="true">Hello 🌈 world! ☕</cofl:tool_param><cofl:tool_param name="tags" string="false">["🌈", "🦄"]</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+
+        let mut f = make_cmd5_filter();
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "0");
+        assert_eq!(result.tool_calls[0].name, "send");
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["message"], "Hello 🌈 world! ☕");
+        assert_eq!(parsed["tags"], serde_json::json!(["🌈", "🦄"]));
+
+        // Streaming character-by-character (which splits the buffer at every
+        // codepoint, including ones in the middle of the cofl tag bodies)
+        // must produce the same aggregated arguments. This guards against
+        // the per-chunk JSON escaping in `emit_cofl_param_value_chunk`
+        // accidentally splitting a multi-byte UTF-8 emoji.
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+        let mut f2 = make_cmd5_filter();
+        let streamed = f2.process_full(&chunks);
+        assert_eq!(
+            streamed.tool_calls[0].arguments,
+            result.tool_calls[0].arguments
+        );
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_processed_params_mode() {
+        // When stream_processed_params is enabled the raw_param_delta
+        // stream is suppressed and the structured `processed_params` are
+        // populated instead, mirroring action_filter behaviour.
+        let opts = FilterOptions::default().cmd5().stream_processed_params();
+        let mut f = new_filter(opts);
+        let text = r#"<|START_THINKING|>thinking<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="DeleteReminder"><cofl:tool_param name="reminder_id" string="true">12-abc</cofl:tool_param><cofl:tool_param name="force" string="false">true</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "DeleteReminder");
+        // raw arguments stream is empty in processed mode.
+        assert_eq!(result.tool_calls[0].arguments, "");
+        // processed params should reflect the JSON-shaped values.
+        let params = &result.tool_calls[0].processed_params;
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0].name, "reminder_id");
+        assert_eq!(params[0].value_delta, "\"12-abc\"");
+        assert_eq!(params[1].name, "force");
+        assert_eq!(params[1].value_delta, "true");
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_matches_streaming_process_full() {
+        let text = r#"<|START_THINKING|>think.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">hello</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+
+        let mut f1 = make_cmd5_filter();
+        let r_full_text = f1.process_full_text(text);
+        let mut f2 = make_cmd5_filter();
+        let r_full = f2.process_full(&chunks);
+
+        assert_eq!(r_full_text.reasoning, r_full.reasoning);
+        assert_eq!(r_full_text.tool_calls.len(), r_full.tool_calls.len());
+        assert_eq!(
+            r_full_text.tool_calls[0].arguments,
+            r_full.tool_calls[0].arguments
+        );
+        assert_eq!(r_full_text.tool_calls[0].name, r_full.tool_calls[0].name);
+        assert_eq!(r_full_text.tool_calls[0].id, r_full.tool_calls[0].id);
+    }
+
+    /// An empty `string="true"` parameter body must still produce a valid
+    /// JSON string (`""`), with both the opening and closing `"` emitted.
+    #[test]
+    fn test_process_full_text_cmd5_empty_string_param_value() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="set_note"><cofl:tool_param name="note" string="true"></cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].arguments, r#"{"note": ""}"#);
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["note"], "");
+    }
+
+    /// A `string="true"` parameter body with XML-entity escaped `<` and `>`
+    /// (as produced by the cmd5 template's `xml_text` macro) must decode to
+    /// the original characters in the tool-call arguments.
+    #[test]
+    fn test_process_full_text_cmd5_string_param_value_with_angle_brackets() {
+        let mut f = make_cmd5_filter();
+        let snippet = "if (a < b) { return <T>(); }";
+        let wire = "if (a &lt; b) { return &lt;T&gt;(); }";
+        let text = format!(
+            r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run_code"><cofl:tool_param name="snippet" string="true">{wire}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#
+        );
+        let result = f.process_full_text(&text);
+        assert_eq!(result.tool_calls.len(), 1);
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["snippet"], snippet);
+    }
+
+    /// Round-trip the XML-entity escaping used by the cmd5 template, mirroring
+    /// `tests/templating/jinja/cmd5/xml_escaping`.
+    #[test]
+    fn test_process_full_text_cmd5_xml_entity_escaping() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with &lt;tag&gt; &amp; "quotes"</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="bool_param" string="false">true</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a&lt;b", "c&amp;d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key&lt;1&gt;": "val&gt;2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "0");
+        assert_eq!(result.tool_calls[0].name, "run<cmd>&tool");
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["str_param"], "value with <tag> & \"quotes\"");
+        assert_eq!(parsed["num_param"], 42);
+        assert_eq!(parsed["bool_param"], true);
+        assert_eq!(parsed["list_param"], serde_json::json!(["a<b", "c&d"]));
+        assert_eq!(parsed["param<>&name"], "attr test");
+        assert_eq!(parsed["nested"], serde_json::json!({"key<1>": "val>2"}));
+    }
+
+    /// cmd5 generation prompts include `<|START_THINKING|>`, so the
+    /// reasoning block can be implicit (no explicit start token) and the
+    /// stream may begin directly with reasoning text terminated by
+    /// `<|END_THINKING|>`. Mirrors the cmd4 implicit-reasoning test.
+    #[test]
+    fn test_process_full_text_cmd5_implicit_reasoning_then_tool_call() {
+        let mut f = make_cmd5_filter();
+        let text = r#"Plan first.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="call_0" name="web_search"><cofl:tool_param name="query" string="true">test</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("Plan first.".into()));
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_0");
+        assert_eq!(result.tool_calls[0].name, "web_search");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"query": "test"}"#);
+    }
+
+    /// With `no_tools()` the `<cofl:tool_calls>` / `</cofl:tool_calls>`
+    /// wrappers are removed from the special-token map, so cofl markup
+    /// must pass through as plain content rather than transitioning into
+    /// `ToolAction` mode.
+    ///
+    /// `no_tools` is for vllm where parsing happens in two phases.
+    /// In the first phase (reasoning extraction) the tool calls
+    /// must be passed through as plain text so the second phase
+    // (tool call parsing) can parse them regularly.
+    #[test]
+    fn test_process_full_text_cmd5_no_tools_treats_cofl_as_plain_text() {
+        let mut f = make_cmd5_no_tools_filter();
+        let cofl = r#"<cofl:tool_calls><cofl:tool_call id="0" name="x"></cofl:tool_call></cofl:tool_calls>"#;
+        let text = format!("<|START_THINKING|>think<|END_THINKING|>{cofl}");
+        let result = f.process_full_text(&text);
+        assert_eq!(result.reasoning, Some("think".into()));
+        let content = result.content.expect("expected cofl markup as content");
+        assert!(
+            content.contains("<cofl:tool_calls>"),
+            "opening wrapper missing from content: {content:?}",
+        );
+        assert!(
+            content.contains(r#"<cofl:tool_call id="0" name="x">"#),
+            "inner tool_call markup missing from content: {content:?}",
+        );
+        assert!(
+            content.contains("</cofl:tool_calls>"),
+            "closing wrapper missing from content: {content:?}",
+        );
+        assert!(result.tool_calls.is_empty());
+    }
+
+    /// An empty `<cofl:tool_calls></cofl:tool_calls>` block (no inner tool
+    /// calls) must produce zero tool calls and no stray content. The body
+    /// dispatcher in `BeforeToolCall` mode never sees any input here
+    /// because the closing wrapper is consumed by the surrounding
+    /// special-token state machine.
+    #[test]
+    fn test_process_full_text_cmd5_empty_tool_calls_block() {
+        let mut f = make_cmd5_filter();
+        let text = r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.reasoning, Some("think".into()));
+        assert!(result.tool_calls.is_empty());
+        assert!(result.content.is_none());
     }
 
     /// Test when ``handle_special_token`` rejects a match via the
