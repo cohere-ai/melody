@@ -1,0 +1,45 @@
+{
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Delete reminder 12-abc please."
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll delete that reminder for you."
+        }
+      ],
+      "tool_calls": [
+        {
+          "id": "5",
+          "name": "DeleteReminder",
+          "parameters": "{\"reminder_id\": \"12-abc\", \"force\": true, \"limit\": 3}"
+        }
+      ]
+    }
+  ],
+  "available_tools": [
+    {
+      "name": "DeleteReminder",
+      "description": "Delete a reminder.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reminder_id": {"type": "string"},
+          "force": {"type": "boolean"},
+          "limit": {"type": "integer"}
+        },
+        "required": ["reminder_id"]
+      }
+    }
+  ],
+  "reasoning_type": "enabled"
+}

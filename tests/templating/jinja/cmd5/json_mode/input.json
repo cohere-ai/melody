@@ -1,0 +1,15 @@
+{
+  "json_mode": true,
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Give me a JSON object representing a single reminder."
+        }
+      ]
+    }
+  ],
+  "reasoning_type": "enabled"
+}

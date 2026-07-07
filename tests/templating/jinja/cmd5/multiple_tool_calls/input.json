@@ -1,0 +1,71 @@
+{
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Look up reminders and todos."
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll call both tools in parallel."
+        }
+      ],
+      "tool_calls": [
+        {
+          "id": "1",
+          "name": "GetReminders",
+          "parameters": "{}"
+        },
+        {
+          "id": "2",
+          "name": "GetTodos",
+          "parameters": "{\"filter\": \"open\"}"
+        }
+      ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "1",
+      "content": [
+        {
+          "type": "document",
+          "document": {"reminder": "A"}
+        }
+      ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "2",
+      "content": [
+        {
+          "type": "document",
+          "document": {"todo": "B"}
+        }
+      ]
+    }
+  ],
+  "available_tools": [
+    {
+      "name": "GetReminders",
+      "description": "Get a list of reminders.",
+      "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+      "name": "GetTodos",
+      "description": "Get todos.",
+      "parameters": {
+        "type": "object",
+        "properties": {"filter": {"type": "string"}},
+        "required": []
+      }
+    }
+  ],
+  "reasoning_type": "enabled"
+}

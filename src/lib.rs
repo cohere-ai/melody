@@ -109,8 +109,8 @@ pub mod parsing;
 
 /// Templating module for rendering prompts.
 ///
-/// Provides functionality to render cohere Command 3 & Command 4 format prompts with support
-/// for messages, tools, documents, and various configuration options.
+/// Provides functionality to render cohere Command 3, Command 4, and Command 5 format
+/// prompts with support for messages, tools, documents, and various configuration options.
 pub mod templating;
 
 // FFI bindings for calling from other languages (Go, Python, etc.)

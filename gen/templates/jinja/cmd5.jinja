@@ -10,25 +10,26 @@
 {%- set convert_first_system_msg = convert_first_system_msg | default(true) -%}
 {%- set skip_thinking = skip_thinking | default(false) -%}
 {{ bos_token }}
+{%- macro xml_text(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;') }}{%- endmacro -%}
+{%- macro xml_attr(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('"', '&quot;') }}{%- endmacro -%}
+{%- macro render_tool_call_params(arguments) -%}
+{%- for param_name, param_value in arguments|items -%}
+{%- if param_value is string -%}
+<cofl:tool_param name="{{ xml_attr(param_name) }}" string="true">{{ xml_text(param_value) }}</cofl:tool_param>
+{%- else -%}
+<cofl:tool_param name="{{ xml_attr(param_name) }}" string="false">{{ xml_text(param_value|tojson) }}</cofl:tool_param>
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro -%}
 {%- macro document_turn(documents) -%}
 {# format documents into chat turn -#}
-<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{%- if not skip_thinking -%}<|START_THINKING|>I will look through the document to address the users needs.<|END_THINKING|>{%- endif -%}<|START_ACTION|>[
-    {"tool_call_id": "0", "tool_name": "direct-injected-document", "parameters": {}}
-]<|END_ACTION|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
-    {
-        "tool_call_id": "0",
-        "results": {
-{%- for doc in documents %}
-{%- set doc_val = doc.data if doc.data else doc %}
-
-            "{{ loop.index0 }}": {{ doc_val|tojson }}{% if not loop.last %},
-            {%- endif %}
-{%- endfor %}
-
-        },
-        "is_error": null
-    }
-]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|>{%- endmacro %}
+<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{%- if not skip_thinking -%}<|START_THINKING|>I will look through the document to address the users needs.<|END_THINKING|>{%- endif -%}<cofl:tool_calls><cofl:tool_call id="0" name="direct-injected-document"></cofl:tool_call></cofl:tool_calls><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><cofl:tool_results><cofl:tool_result id="0" is_error="false">
+{%- for doc in documents -%}
+{%- set doc_val = doc.data if doc.data else doc -%}
+<cofl:tool_result_item index="{{ loop.index0 }}">{{ xml_text(doc_val|tojson) }}</cofl:tool_result_item>
+{%- endfor -%}
+</cofl:tool_result></cofl:tool_results><|END_OF_TURN_TOKEN|>
+{%- endmacro %}
 {%- macro tool_call_id_to_int(messages, tool_call_id) %}
 {%- if regen_tool_call_ids -%}
     {%- set counter = namespace(value=0) %}
@@ -48,28 +49,33 @@
     {{ tool_call_id }}
 {%- endif -%}
 {%- endmacro %}
+{%- macro print_cofl_tool_content(item) %}
+{%- if item.type|lower == "text" -%}
+{%- set text_wrapper = {"content": item.text} -%}
+{{ xml_text(text_wrapper|tojson) }}
+{%- elif item.type|lower == "document" and item.document and "data" in item.document -%}
+{{ xml_text(item.document.data|tojson) }}
+{%- else -%}
+{{ xml_text(item|tojson) }}
+{%- endif -%}
+{%- endmacro %}
 {%- macro format_tool_message(messages, tool_msg) -%}
-{#- format tool message #}{
-        "tool_call_id": "{{ tool_call_id_to_int(messages, tool_msg.tool_call_id) }}",
-        "results": {
-        {%- if tool_msg.content is mapping or tool_msg.content is string %}
-
-            {% if tool_msg.content is string -%}
-                {%- set text_wrapper = {"content": tool_msg.content} -%}
-            {%- else -%}
-                {%- set text_wrapper = tool_msg.content -%}
-            {%- endif %}
-            "0": {{ text_wrapper|tojson }}
-        {%- else %}
-            {%- for content in tool_msg.content %}
-
-            "{{ loop.index0 }}": {{ print_tool_content(content) }}{% if not loop.last %},{% endif %}
-            {%- endfor %}
-        {%- endif %}
-
-        },
-        "is_error": null
-    }
+{#- format tool message -#}
+{%- set is_err_val = "true" if tool_msg.is_error else "false" -%}
+<cofl:tool_result id="{{ tool_call_id_to_int(messages, tool_msg.tool_call_id) }}" is_error="{{ is_err_val }}">
+{%- if tool_msg.content is mapping or tool_msg.content is string -%}
+    {%- if tool_msg.content is string -%}
+        {%- set text_wrapper = {"content": tool_msg.content} -%}
+    {%- else -%}
+        {%- set text_wrapper = tool_msg.content -%}
+    {%- endif -%}
+<cofl:tool_result_item index="0">{{ xml_text(text_wrapper|tojson) }}</cofl:tool_result_item>
+{%- else -%}
+    {%- for content in tool_msg.content -%}
+<cofl:tool_result_item index="{{ loop.index0 }}">{{ print_cofl_tool_content(content) }}</cofl:tool_result_item>
+    {%- endfor -%}
+{%- endif -%}
+</cofl:tool_result>
 {%- endmacro -%}
 {%- macro print_tool_content(item) %}
 {%- if item.type|lower == "text" -%}
@@ -216,34 +222,35 @@ Your output should adhere to the following json schema:
                     <|START_THINKING|>{{ message.tool_plan }}<|END_THINKING|>
                 {%- elif message.thinking or (message.content and message.content[0].type == "thinking") -%}
                     <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
+                {%- else -%}
+                    <|START_THINKING|><|END_THINKING|>
                 {%- endif %}
-            {%- endif %}<|START_ACTION|>[
-            {%- for tc in message.tool_calls %}
-
-    {"tool_call_id": "{%- if regen_tool_call_ids -%}{{ tool_idx.value }}{%- else -%}{{ tc.id }}{%- endif -%}", "tool_name": "{{ tc['function']['name'] }}", "parameters": {{ tc['function']['arguments']|tojson }}}{% if not loop.last %},{% endif %}
+            {%- endif %}<cofl:tool_calls>
+            {%- for tc in message.tool_calls -%}
+<cofl:tool_call id="{%- if regen_tool_call_ids -%}{{ tool_idx.value }}{%- else -%}{{ tc.id }}{%- endif -%}" name="{{ xml_attr(tc['function']['name']) }}">{{ render_tool_call_params(tc['function']['arguments']) }}</cofl:tool_call>
                 {%- set tool_idx.value = tool_idx.value + 1 %}
-            {%- endfor %}
-
-]<|END_ACTION|><|END_OF_TURN_TOKEN|>
+            {%- endfor -%}
+</cofl:tool_calls><|END_OF_TURN_TOKEN|>
         {%- else -%}
-            {% if (message.thinking or (message.content and message.content[0].type == "thinking")) and not skip_thinking -%}
-                <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
+            {% if not skip_thinking -%}
+                {% if message.thinking or (message.content and message.content[0].type == "thinking") -%}
+                    <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
+                {%- else -%}
+                    <|START_THINKING|><|END_THINKING|>
+                {%- endif -%}
             {%- endif -%}
             {{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
         {%- endif %}
     {%- elif msg_role_downcased == 'tool' and message.tool_call_id not in tool_ids_seen.value -%}
-<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
-    {{ format_tool_message(messages, message) }}
-        {%- for msg in messages[loop.index0 + 1:] %}
-
-            {%- if msg.role | lower == 'tool' %},
-    {{ format_tool_message(messages, msg) }}
+<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><cofl:tool_results>{{ format_tool_message(messages, message) }}
+        {%- for msg in messages[loop.index0 + 1:] -%}
+            {%- if msg.role | lower == 'tool' -%}
+{{ format_tool_message(messages, msg) }}
                 {%- set tool_ids_seen.value = tool_ids_seen.value + [msg.tool_call_id] %}
             {%- else %}
                 {%- break %}
             {%- endif %}
-        {%- endfor %}
-
-]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|>
+        {%- endfor -%}
+</cofl:tool_results><|END_OF_TURN_TOKEN|>
     {%- endif %}
 {%- endfor %}{%- if add_generation_prompt -%}<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{% if reasoning %}<|START_THINKING|>{% else %}<|START_THINKING|><|END_THINKING|>{% endif %}{%- endif %}

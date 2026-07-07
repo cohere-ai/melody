@@ -1,0 +1,8 @@
+{%- if messages and messages[0]['role']|lower == 'system' and not has_developer_instruction and convert_first_system_msg %}{%- set developer_instruction = messages[0] %}{%- set render_developer_instruction = true %}{%- set initial_instruction_message = true %}{% endif %}
+{%- set json_object = true if response_format and response_format.type == "json_object" else false %}
+{%- set json_schema = (response_format.json_schema or response_format.schema) if response_format %}
+{%- set json_mode = json_object or json_schema %}
+{%- set tool_idx = namespace(value=0) %}
+{%- set tool_ids_seen = namespace(value=[]) %}
+{%- set regen_tool_call_ids = regen_tool_call_ids | default(true) -%}
+{%- set sent_documents = namespace(value=false) -%}

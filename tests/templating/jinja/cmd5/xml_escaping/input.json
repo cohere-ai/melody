@@ -1,0 +1,68 @@
+{
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Run the tool with tricky characters."
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll call the tool now."
+        }
+      ],
+      "tool_calls": [
+        {
+          "id": "0",
+          "name": "run<cmd>&tool",
+          "parameters": "{\"str_param\": \"value with <tag> & \\\"quotes\\\"\", \"num_param\": 42, \"bool_param\": true, \"list_param\": [\"a<b\", \"c&d\"], \"param<>&name\": \"attr test\", \"nested\": {\"key<1>\": \"val>2\"}}"
+        }
+      ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "0",
+      "content": [
+        {
+          "type": "text",
+          "text": "stdout: <cofl:tool_result_item> & ampersand \"quoted\""
+        },
+        {
+          "type": "document",
+          "document": {
+            "status": "ok",
+            "detail": "payload with <xml> & 'chars'"
+          }
+        }
+      ]
+    }
+  ],
+  "available_tools": [
+    {
+      "name": "run<cmd>&tool",
+      "description": "Run a command with special XML characters like <>&\".",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "str_param": {"type": "string"},
+          "num_param": {"type": "number"},
+          "bool_param": {"type": "boolean"},
+          "list_param": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "param<>&name": {"type": "string"},
+          "nested": {"type": "object"}
+        },
+        "required": ["str_param"]
+      }
+    }
+  ],
+  "reasoning_type": "enabled"
+}

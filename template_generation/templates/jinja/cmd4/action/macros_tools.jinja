@@ -1,0 +1,61 @@
+{%- macro document_turn(documents) -%}
+{# format documents into chat turn -#}
+<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{%- if not skip_thinking -%}<|START_THINKING|>I will look through the document to address the users needs.<|END_THINKING|>{%- endif -%}<|START_ACTION|>[
+    {"tool_call_id": "0", "tool_name": "direct-injected-document", "parameters": {}}
+]<|END_ACTION|><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
+    {
+        "tool_call_id": "0",
+        "results": {
+{%- for doc in documents %}
+{%- set doc_val = doc.data if doc.data else doc %}
+
+            "{{ loop.index0 }}": {{ doc_val|tojson }}{% if not loop.last %},
+            {%- endif %}
+{%- endfor %}
+
+        },
+        "is_error": null
+    }
+]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|>{%- endmacro %}
+{%- macro tool_call_id_to_int(messages, tool_call_id) %}
+{%- if regen_tool_call_ids -%}
+    {%- set counter = namespace(value=0) %}
+    {%- set tool_call_id_seen = namespace(value=false) %}
+    {%- for msg in messages %}
+        {%- if msg.tool_calls %}
+            {%- for tool_call in msg.tool_calls %}
+                {%- if tool_call.id == tool_call_id and not tool_call_id_seen.value -%}
+                    {{ counter.value }}
+                    {%- set tool_call_id_seen.value = true %}
+                {%- endif %}
+                {%- set counter.value = counter.value + 1 %}
+            {%- endfor %}
+        {%- endif %}
+    {%- endfor %}
+{%- else -%}
+    {{ tool_call_id }}
+{%- endif -%}
+{%- endmacro %}
+{%- macro format_tool_message(messages, tool_msg) -%}
+{#- format tool message #}{
+        "tool_call_id": "{{ tool_call_id_to_int(messages, tool_msg.tool_call_id) }}",
+        "results": {
+        {%- if tool_msg.content is mapping or tool_msg.content is string %}
+
+            {% if tool_msg.content is string -%}
+                {%- set text_wrapper = {"content": tool_msg.content} -%}
+            {%- else -%}
+                {%- set text_wrapper = tool_msg.content -%}
+            {%- endif %}
+            "0": {{ text_wrapper|tojson }}
+        {%- else %}
+            {%- for content in tool_msg.content %}
+
+            "{{ loop.index0 }}": {{ print_tool_content(content) }}{% if not loop.last %},{% endif %}
+            {%- endfor %}
+        {%- endif %}
+
+        },
+        "is_error": null
+    }
+{%- endmacro -%}
