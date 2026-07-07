@@ -13,35 +13,34 @@
                     <|START_THINKING|>{{ message.tool_plan }}<|END_THINKING|>
                 {%- elif message.reasoning or message.reasoning_content or message.thinking or (message.content and message.content[0].type == "thinking") -%}
                     <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
-                {%- else -%}
-                    <|START_THINKING|><|END_THINKING|>
                 {%- endif %}
-            {%- endif %}<cofl:tool_calls>
-            {%- for tc in message.tool_calls -%}
-<cofl:tool_call id="{%- if regen_tool_call_ids -%}{{ tool_idx.value }}{%- else -%}{{ tc.id }}{%- endif -%}" name="{{ xml_attr(tc['function']['name']) }}">{{ render_tool_call_params(tc['function']['arguments']) }}</cofl:tool_call>
+            {%- endif %}<|START_ACTION|>[
+            {%- for tc in message.tool_calls %}
+
+    {"tool_call_id": "{%- if regen_tool_call_ids -%}{{ tool_idx.value }}{%- else -%}{{ tc.id }}{%- endif -%}", "tool_name": "{{ tc['function']['name'] }}", "parameters": {{ tc['function']['arguments']|tojson }}}{% if not loop.last %},{% endif %}
                 {%- set tool_idx.value = tool_idx.value + 1 %}
-            {%- endfor -%}
-</cofl:tool_calls><|END_OF_TURN_TOKEN|>
+            {%- endfor %}
+
+]<|END_ACTION|><|END_OF_TURN_TOKEN|>
         {%- else -%}
-            {% if not skip_thinking -%}
-                {% if message.reasoning or message.reasoning_content or message.thinking or (message.content and message.content[0].type == "thinking") -%}
-                    <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
-                {%- else -%}
-                    <|START_THINKING|><|END_THINKING|>
-                {%- endif -%}
+            {% if (message.reasoning or message.reasoning_content or message.thinking or (message.content and message.content[0].type == "thinking")) and not skip_thinking -%}
+                <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
             {%- endif -%}
             {{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
         {%- endif %}
     {%- elif msg_role_downcased == 'tool' and message.tool_call_id not in tool_ids_seen.value -%}
-<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><cofl:tool_results>{{ format_tool_message(messages, message) }}
-        {%- for msg in messages[loop.index0 + 1:] -%}
-            {%- if msg.role | lower == 'tool' -%}
-{{ format_tool_message(messages, msg) }}
+<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
+    {{ format_tool_message(messages, message) }}
+        {%- for msg in messages[loop.index0 + 1:] %}
+
+            {%- if msg.role | lower == 'tool' %},
+    {{ format_tool_message(messages, msg) }}
                 {%- set tool_ids_seen.value = tool_ids_seen.value + [msg.tool_call_id] %}
             {%- else %}
                 {%- break %}
             {%- endif %}
-        {%- endfor -%}
-</cofl:tool_results><|END_OF_TURN_TOKEN|>
+        {%- endfor %}
+
+]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|>
     {%- endif %}
 {%- endfor %}
