@@ -276,6 +276,20 @@ pub unsafe extern "C" fn melody_filter_options_cmd4(options: *mut CFilterOptions
     }
 }
 
+/// Configures options for multi-hop CMD5 format
+///
+/// # Safety
+/// `options` must be a valid pointer returned from `melody_filter_options_new`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_cmd5(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options.cast::<FilterOptions>());
+            *opts = std::mem::take(opts).cmd5();
+        }
+    }
+}
+
 /// Configures options for RAG format
 ///
 /// # Safety

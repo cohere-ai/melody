@@ -7,6 +7,7 @@ type FilterOption func(*filterConfig)
 type filterConfig struct {
 	multiHopCmd3            bool
 	multiHopCmd4            bool
+	multiHopCmd5            bool
 	rag                     bool
 	searchQuery             bool
 	multiHop                bool
@@ -30,6 +31,9 @@ func (cfg *filterConfig) apply(opts *FilterOptions) {
 	}
 	if cfg.multiHopCmd4 {
 		opts.Cmd4()
+	}
+	if cfg.multiHopCmd5 {
+		opts.Cmd5()
 	}
 	if cfg.rag {
 		opts.HandleRAG()
@@ -90,6 +94,13 @@ func HandleMultiHopCmd3() FilterOption {
 func HandleMultiHopCmd4() FilterOption {
 	return func(cfg *filterConfig) {
 		cfg.multiHopCmd4 = true
+	}
+}
+
+// HandleMultiHopCmd5 configures the filter to handle multi-hop CMD5 format
+func HandleMultiHopCmd5() FilterOption {
+	return func(cfg *filterConfig) {
+		cfg.multiHopCmd5 = true
 	}
 }
 

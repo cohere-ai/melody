@@ -54,6 +54,14 @@ func (opts *FilterOptions) Cmd4() *FilterOptions {
 	return opts
 }
 
+// Cmd5 configures options for multi-hop CMD5 format
+func (opts *FilterOptions) Cmd5() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_cmd5(opts.ptr)
+	}
+	return opts
+}
+
 // HandleRAG configures options for RAG format
 func (opts *FilterOptions) HandleRAG() *FilterOptions {
 	if opts.ptr != nil {
