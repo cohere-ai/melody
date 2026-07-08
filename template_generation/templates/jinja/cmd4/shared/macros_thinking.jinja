@@ -1,0 +1,7 @@
+{%- macro print_thinking(msg) %}
+    {%- if msg.thinking -%}
+{{ msg.thinking }}
+    {%- elif msg.content and msg.content[0].thinking -%}
+{{ msg.content[0].thinking }}
+    {%- endif %}
+{%- endmacro %}
