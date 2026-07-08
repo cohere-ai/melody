@@ -28,7 +28,9 @@ jobs:
           set -e
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install cohere_melody --find-links dist --force-reinstall
+          # Install from the local sdist tarball so we don't pick up a stale
+          # prebuilt wheel from PyPI at the same version.
+          pip install dist/cohere_melody-*.tar.gz --force-reinstall
           pip install pytest
           pytest --ignore=tests/templating/jinja/python
 
@@ -59,5 +61,5 @@ jobs:
           pip install --no-cache-dir ty packaging
           # Type-check only: skip vllm's full CUDA dependency tree (~10+ GB on CI).
           pip install --no-cache-dir vllm==${{ matrix.vllm-version }} --no-deps
-          pip install --no-cache-dir cohere_melody --find-links dist --force-reinstall
+          pip install --no-cache-dir dist/cohere_melody-*.tar.gz --force-reinstall
           ty check cohere_melody_vllm/
