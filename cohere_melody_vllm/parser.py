@@ -15,10 +15,10 @@ from vllm.transformers_utils.tokenizer import AnyTokenizer
 # vllm > 0.14.1 reorganized OpenAI entrypoint imports (https://github.com/vllm-project/vllm/pull/32240)
 _VLLM_POST_0_14_1 = _Version(_get_version("vllm")) > _Version("0.14.1")
 if _VLLM_POST_0_14_1:
-    from vllm.entrypoints.openai.chat_completion.protocol import (  # ty: ignore[unresolved-import]
+    from vllm.entrypoints.openai.chat_completion.protocol import (
         ChatCompletionRequest,
     )
-    from vllm.entrypoints.openai.engine.protocol import (  # ty: ignore[unresolved-import]
+    from vllm.entrypoints.openai.engine.protocol import (
         DeltaFunctionCall,
         DeltaMessage,
         DeltaToolCall,
@@ -26,11 +26,11 @@ if _VLLM_POST_0_14_1:
         FunctionCall,
         ToolCall,
     )
-    from vllm.entrypoints.openai.responses.protocol import (  # ty: ignore[unresolved-import]
+    from vllm.entrypoints.openai.responses.protocol import (
         ResponsesRequest,
     )
 else:
-    from vllm.entrypoints.openai.protocol import (  # ty: ignore[unresolved-import]
+    from vllm.entrypoints.openai.protocol import (
         ChatCompletionRequest,
         DeltaFunctionCall,
         DeltaMessage,
@@ -43,7 +43,7 @@ else:
 
 
 try:
-    from cohere_melody import PyFilter, PyFilterOptions  # type: ignore
+    from cohere_melody import PyFilter, PyFilterOptions
 
 except ModuleNotFoundError:
     raise RuntimeError("The compiled melody bindings are not available.")

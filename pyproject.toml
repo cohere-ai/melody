@@ -35,3 +35,12 @@ managed = false
 [tool.pytest.ini_options]
 # Only collect tests from the top-level tests directory
 testpaths = ["tests"]
+
+[tool.ty.analysis]
+# vllm/cohere_melody may be absent locally; CI installs both before `ty check`.
+# Configuring this avoids per-import `# ty: ignore` comments that become unused
+# (and fail CI) once those packages are present.
+allowed-unresolved-imports = [
+    "vllm.entrypoints.openai.**",
+    "cohere_melody",
+]
