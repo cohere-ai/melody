@@ -33,8 +33,8 @@ cmd4-v1:
       path: cmd4/action/macros_tools.jinja
     macros_content.jinja:
       path: cmd4/shared/macros_content.jinja
-    macros_thinking.jinja:
-      path: cmd4/shared/macros_thinking.jinja
+    macros_reasoning.jinja:
+      path: cmd4/shared/macros_reasoning.jinja
     setup.jinja:
       path: cmd4/shared/setup.jinja
     platform_turn.jinja:
@@ -62,7 +62,7 @@ cmd4-v2:
     platform_turn.jinja:
       path: cmd4/shared/platform_turn.jinja
     messages_loop.jinja:
-      path: cmd4/action/messages_loop_v2.jinja
+      path: cmd4/action/messages_loop.jinja
     generation_prompt_reasoning.jinja:
       path: cmd4/shared/generation_prompt_reasoning.jinja
 
@@ -87,7 +87,7 @@ cmd4-hf:
         platform_turn.jinja:
           path: cmd4/shared/platform_turn.jinja
         messages_loop.jinja:
-          path: cmd4/action/messages_loop_v2.jinja
+          path: cmd4/action/messages_loop.jinja
         generation_prompt_reasoning.jinja:
           path: cmd4/shared/generation_prompt_reasoning.jinja
 
