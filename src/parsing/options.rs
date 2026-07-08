@@ -88,6 +88,21 @@ impl FilterOptions {
 
     // CONFIGURATION FOR BINDINGS
 
+    /// Clear cmd5 cofl tool-action configuration so a prior `cmd5()` call does
+    /// not leak into cmd3/cmd4 JSON action parsing.
+    fn clear_cofl_tool_action_config(&mut self) {
+        self.cofl_tool_action = false;
+        self.special_token_map.remove("<cofl:tool_calls>");
+        self.special_token_map.remove("</cofl:tool_calls>");
+    }
+
+    /// Clear cmd3/cmd4 JSON action tokens so a prior `cmd3()` / `cmd4()` call
+    /// does not leak into cmd5 cofl tool-action parsing.
+    fn clear_json_action_tokens(&mut self) {
+        self.special_token_map.remove("<|START_ACTION|>");
+        self.special_token_map.remove("<|END_ACTION|>");
+    }
+
     /// Configure for Cohere Command 3 model format.
     ///
     /// Command 3 is a structured output format that uses special tokens to delimit
@@ -120,6 +135,7 @@ impl FilterOptions {
         self.has_tool_call_id = true;
         self.cmd3_citations = true;
         self.stream_tool_actions = true;
+        self.clear_cofl_tool_action_config();
         self.special_token_map
             .insert("<|START_RESPONSE|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
@@ -160,6 +176,7 @@ impl FilterOptions {
         self.has_tool_call_id = true;
         self.cmd3_citations = true;
         self.stream_tool_actions = true;
+        self.clear_cofl_tool_action_config();
         self.special_token_map
             .insert("<|START_TEXT|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
@@ -218,6 +235,7 @@ impl FilterOptions {
         self.has_tool_call_id = true;
         self.cmd3_citations = true;
         self.stream_tool_actions = true;
+        self.clear_json_action_tokens();
         self.cofl_tool_action = true;
         self.special_token_map
             .insert("<|START_TEXT|>".to_string(), FilterMode::GroundedAnswer);
