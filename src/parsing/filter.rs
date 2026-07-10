@@ -1959,14 +1959,14 @@ mod tests {
     fn test_process_full_text_cmd5_no_xml_text_decode() {
         let opts = FilterOptions::default().cmd5().cofl_no_xml_text_decode();
         let mut f = new_filter(opts);
-        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with <tag> & "quotes"</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a<b", "c&d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key<1>": "val>2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with <tag> & "quotes" & &amp;</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a<b", "c&d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key<1>": "val>2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 1);
         assert_eq!(result.tool_calls[0].name, "run<cmd>&tool");
 
         let parsed: serde_json::Value =
             serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
-        assert_eq!(parsed["str_param"], "value with <tag> & \"quotes\"");
+        assert_eq!(parsed["str_param"], "value with <tag> & \"quotes\" & &amp;");
         assert_eq!(parsed["num_param"], 42);
         assert_eq!(parsed["list_param"], serde_json::json!(["a<b", "c&d"]));
         assert_eq!(parsed["param<>&name"], "attr test");
