@@ -1,0 +1,11 @@
+{%- macro print_thinking(msg) %}
+    {%- if msg.reasoning -%}
+{{ msg.reasoning }}
+    {%- elif msg.reasoning_content -%}
+{{ msg.reasoning_content }}
+    {%- elif msg.thinking -%}
+{{ msg.thinking }}
+    {%- elif msg.content and msg.content[0].thinking -%}
+{{ msg.content[0].thinking }}
+    {%- endif %}
+{%- endmacro %}

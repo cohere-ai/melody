@@ -1,0 +1,46 @@
+{%- for message in messages %}
+    {%- set msg_role_downcased = message.role | lower %}
+    {%- if msg_role_downcased == 'system' and (not (loop.first and initial_instruction_message)) -%}
+<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
+    {%- elif msg_role_downcased == 'user' -%}
+<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
+        {%- if documents and not sent_documents.value %}{%- set sent_documents.value = true %}{% set tool_idx.value = tool_idx.value + 1 %}{{ document_turn(documents) }}{% endif %}
+    {%- elif msg_role_downcased == 'assistant' or msg_role_downcased == 'chatbot' -%}
+<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>
+        {%- if message.tool_calls %}
+            {% if not skip_thinking %}
+                {% if message.tool_plan -%}
+                    <|START_THINKING|>{{ message.tool_plan }}<|END_THINKING|>
+                {%- elif message.reasoning or message.reasoning_content or message.thinking or (message.content and message.content[0].type == "thinking") -%}
+                    <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
+                {%- endif %}
+            {%- endif %}<|START_ACTION|>[
+            {%- for tc in message.tool_calls %}
+
+    {"tool_call_id": "{%- if regen_tool_call_ids -%}{{ tool_idx.value }}{%- else -%}{{ tc.id }}{%- endif -%}", "tool_name": "{{ tc['function']['name'] }}", "parameters": {{ tc['function']['arguments']|tojson }}}{% if not loop.last %},{% endif %}
+                {%- set tool_idx.value = tool_idx.value + 1 %}
+            {%- endfor %}
+
+]<|END_ACTION|><|END_OF_TURN_TOKEN|>
+        {%- else -%}
+            {% if (message.reasoning or message.reasoning_content or message.thinking or (message.content and message.content[0].type == "thinking")) and not skip_thinking -%}
+                <|START_THINKING|>{{ print_thinking(message) }}<|END_THINKING|>
+            {%- endif -%}
+            {{ print_msg(message) }}<|END_OF_TURN_TOKEN|>
+        {%- endif %}
+    {%- elif msg_role_downcased == 'tool' and message.tool_call_id not in tool_ids_seen.value -%}
+<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TOOL_RESULT|>[
+    {{ format_tool_message(messages, message) }}
+        {%- for msg in messages[loop.index0 + 1:] %}
+
+            {%- if msg.role | lower == 'tool' %},
+    {{ format_tool_message(messages, msg) }}
+                {%- set tool_ids_seen.value = tool_ids_seen.value + [msg.tool_call_id] %}
+            {%- else %}
+                {%- break %}
+            {%- endif %}
+        {%- endfor %}
+
+]<|END_TOOL_RESULT|><|END_OF_TURN_TOKEN|>
+    {%- endif %}
+{%- endfor %}

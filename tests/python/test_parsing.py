@@ -154,6 +154,46 @@ class TestPyFilterOptions:
         result = f.write_decoded("Hello")
         assert result.reasoning == "Hello"
 
+    def test_cmd5_option(self):
+        """Test cmd5() builder method parses cofl tool calls."""
+        opts = PyFilterOptions().cmd5()
+        f = PyFilter(opts)
+        text = (
+            "<|START_THINKING|>I should search.<|END_THINKING|>"
+            '<cofl:tool_calls><cofl:tool_call id="call_0" name="web_search">'
+            '<cofl:tool_param name="query" string="true">test</cofl:tool_param>'
+            "</cofl:tool_call></cofl:tool_calls>"
+        )
+        result = f.process_full_text(text)
+        assert result.reasoning == "I should search."
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].id == "call_0"
+        assert result.tool_calls[0].name == "web_search"
+        assert result.tool_calls[0].arguments == '{"query": "test"}'
+
+    def test_cmd5_static_factory(self):
+        """Test PyFilter.cmd5() factory parses cofl tool calls."""
+        f = PyFilter.cmd5()
+        text = (
+            '<cofl:tool_calls><cofl:tool_call id="0" name="search">'
+            '<cofl:tool_param name="q" string="true">hello</cofl:tool_param>'
+            "</cofl:tool_call></cofl:tool_calls>"
+        )
+        result = f.process_full_text(text)
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].arguments == '{"q": "hello"}'
+
+    def test_cmd4_does_not_parse_cofl_tool_calls(self):
+        """cmd4 filter must not treat cofl tags as structured tool calls."""
+        f = PyFilter.cmd4()
+        text = (
+            '<cofl:tool_calls><cofl:tool_call id="0" name="search">'
+            '<cofl:tool_param name="q" string="true">hello</cofl:tool_param>'
+            "</cofl:tool_call></cofl:tool_calls>"
+        )
+        result = f.process_full_text(text)
+        assert result.tool_calls == []
+
     def test_rag_option(self):
         """Test rag() builder method."""
         opts = PyFilterOptions().rag()

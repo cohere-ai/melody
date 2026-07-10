@@ -151,6 +151,10 @@ typedef struct {
     const char* escaped_special_tokens_json;
 } CRenderCmd4Options;
 
+// CMD5 uses the same option layout as CMD4; this typedef makes the binding
+// intent explicit at call sites without duplicating the struct definition.
+typedef CRenderCmd4Options CRenderCmd5Options;
+
 // ============================================================================
 // Templating FFI functions
 // ============================================================================
@@ -162,6 +166,7 @@ typedef struct {
 
 extern CRenderResult* melody_render_cmd3(const CRenderCmd3Options* opts);
 extern CRenderResult* melody_render_cmd4(const CRenderCmd4Options* opts);
+extern CRenderResult* melody_render_cmd5(const CRenderCmd5Options* opts);
 extern void melody_render_result_free(CRenderResult* res);
 
 typedef struct CFilter CFilter;
@@ -207,6 +212,7 @@ extern CFilterOptions* melody_filter_options_new();
 extern void melody_filter_options_free(CFilterOptions* options);
 extern void melody_filter_options_cmd3(CFilterOptions* options);
 extern void melody_filter_options_cmd4(CFilterOptions* options);
+extern void melody_filter_options_cmd5(CFilterOptions* options);
 extern void melody_filter_options_handle_rag(CFilterOptions* options);
 extern void melody_filter_options_handle_search_query(CFilterOptions* options);
 extern void melody_filter_options_handle_multi_hop(CFilterOptions* options);

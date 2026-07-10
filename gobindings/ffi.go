@@ -54,6 +54,14 @@ func (opts *FilterOptions) Cmd4() *FilterOptions {
 	return opts
 }
 
+// Cmd5 configures options for multi-hop CMD5 format
+func (opts *FilterOptions) Cmd5() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_cmd5(opts.ptr)
+	}
+	return opts
+}
+
 // HandleRAG configures options for RAG format
 func (opts *FilterOptions) HandleRAG() *FilterOptions {
 	if opts.ptr != nil {
@@ -625,6 +633,10 @@ type RenderCmd4Options struct {
 	EscapedSpecialTokens     map[string]string    `json:"escaped_special_tokens,omitempty"`     // optional
 }
 
+// RenderCmd5Options uses the same shape as RenderCmd4Options. The CMD5 render
+// path differs only in which jinja template is used by default.
+type RenderCmd5Options = RenderCmd4Options
+
 // Internal C allocator helper to track and free C allocations
 type cAllocator struct {
 	ptrs []unsafe.Pointer
@@ -955,14 +967,13 @@ func RenderCMD3(opts RenderCmd3Options) (string, error) {
 	return "", errors.New("melody_render_cmd3 returned neither result nor error")
 }
 
-// RenderCMD4 renders CMD4 using the Rust templating engine via FFI.
-func RenderCMD4(opts RenderCmd4Options) (string, error) {
-	var a cAllocator
-	defer a.FreeAll()
-
-	cMsgs, cMsgsLen := buildCMessages(&a, opts.Messages)
-	cDocs, cDocsLen := buildCDocuments(&a, opts.Documents)
-	cTools, cToolsLen := buildCTools(&a, opts.AvailableTools)
+// buildCCmd4Options marshals RenderCmd4Options-shaped options into the C-side
+// CRenderCmd4Options struct (also used for CMD5 since it shares the layout).
+// Allocations are tracked in the provided allocator and freed by the caller.
+func buildCCmd4Options(a *cAllocator, opts RenderCmd4Options) C.CRenderCmd4Options {
+	cMsgs, cMsgsLen := buildCMessages(a, opts.Messages)
+	cDocs, cDocsLen := buildCDocuments(a, opts.Documents)
+	cTools, cToolsLen := buildCTools(a, opts.AvailableTools)
 
 	var cGround C.CGrounding
 	var hasGround C.bool
@@ -978,8 +989,8 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		hasReason = C.bool(true)
 	}
 
-	additionalFields := jsonCString(&a, opts.AdditionalTemplateFields)
-	escapedTokens := jsonCString(&a, opts.EscapedSpecialTokens)
+	additionalFields := jsonCString(a, opts.AdditionalTemplateFields)
+	escapedTokens := jsonCString(a, opts.EscapedSpecialTokens)
 
 	cOpts := C.CRenderCmd4Options{
 		messages:                        cMsgs,
@@ -1016,6 +1027,16 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		cOpts.json_schema = a.CString(*opts.JSONSchema)
 	}
 
+	return cOpts
+}
+
+// RenderCMD4 renders CMD4 using the Rust templating engine via FFI.
+func RenderCMD4(opts RenderCmd4Options) (string, error) {
+	var a cAllocator
+	defer a.FreeAll()
+
+	cOpts := buildCCmd4Options(&a, opts)
+
 	res := C.melody_render_cmd4(&cOpts)
 	if res == nil {
 		return "", errors.New("melody_render_cmd4 returned null result struct")
@@ -1029,4 +1050,29 @@ func RenderCMD4(opts RenderCmd4Options) (string, error) {
 		return "", errors.New(C.GoString(res.error))
 	}
 	return "", errors.New("melody_render_cmd4 returned neither result nor error")
+}
+
+// RenderCMD5 renders CMD5 using the Rust templating engine via FFI.
+//
+// CMD5 reuses the CMD4 option schema; the only behavioral difference is the
+// underlying jinja template selected on the Rust side.
+func RenderCMD5(opts RenderCmd5Options) (string, error) {
+	var a cAllocator
+	defer a.FreeAll()
+
+	cOpts := buildCCmd4Options(&a, opts)
+
+	res := C.melody_render_cmd5(&cOpts)
+	if res == nil {
+		return "", errors.New("melody_render_cmd5 returned null result struct")
+	}
+	defer C.melody_render_result_free(res)
+
+	if res.result != nil {
+		return C.GoString(res.result), nil
+	}
+	if res.error != nil {
+		return "", errors.New(C.GoString(res.error))
+	}
+	return "", errors.New("melody_render_cmd5 returned neither result nor error")
 }

@@ -28,7 +28,9 @@ use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
 };
-use crate::templating::{RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4};
+use crate::templating::{
+    RenderCmd3Options, RenderCmd4Options, render_cmd3, render_cmd4, render_cmd5,
+};
 use serde_json::{Map, Value};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -270,6 +272,20 @@ pub unsafe extern "C" fn melody_filter_options_cmd4(options: *mut CFilterOptions
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
             *opts = std::mem::take(opts).cmd4();
+        }
+    }
+}
+
+/// Configures options for multi-hop CMD5 format
+///
+/// # Safety
+/// `options` must be a valid pointer returned from `melody_filter_options_new`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_cmd5(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options.cast::<FilterOptions>());
+            *opts = std::mem::take(opts).cmd5();
         }
     }
 }
@@ -1022,6 +1038,13 @@ pub struct CRenderCmd3Options {
     pub escaped_special_tokens_json: *const c_char,
 }
 
+/// C-compatible struct for CMD5 render options.
+///
+/// CMD5 shares its option schema with CMD4, so `CRenderCmd5Options` is a type
+/// alias for `CRenderCmd4Options`. The `melody_render_cmd5` function delegates
+/// to the CMD5 jinja template internally.
+pub type CRenderCmd5Options = CRenderCmd4Options;
+
 /// C-compatible struct for CMD4 render options.
 #[repr(C)]
 pub struct CRenderCmd4Options {
@@ -1468,17 +1491,11 @@ unsafe fn convert_cmd4_options<'a>(opts: &CRenderCmd4Options) -> RenderCmd4Optio
     }
     let template = unsafe { CStr::from_ptr(opts.template).to_str().unwrap() };
     let template_jinja = unsafe { CStr::from_ptr(opts.template_jinja).to_str().unwrap() };
-    if !template_jinja.is_empty() && opts.use_jinja {
-        return RenderCmd4Options {
-            template_jinja,
-            ..rs_opts
-        };
+    if !template_jinja.is_empty() {
+        rs_opts.template_jinja = template_jinja;
     }
     if !template.is_empty() && !opts.use_jinja {
-        return RenderCmd4Options {
-            template,
-            ..rs_opts
-        };
+        rs_opts.template = template;
     }
     rs_opts
 }
@@ -1575,6 +1592,54 @@ pub unsafe extern "C" fn melody_render_cmd4(opts: *const CRenderCmd4Options) -> 
     }))
 }
 
+/// Renders CMD5 template and returns a struct with result or error.
+///
+/// CMD5 shares its option layout with CMD4 (`CRenderCmd5Options` is a typedef
+/// alias for `CRenderCmd4Options`); only the underlying jinja template differs.
+///
+/// # Safety
+/// Caller must free return value with `melody_render_result_free`.
+///
+/// # Returns
+/// Returns a result struct with either the rendered output or an error message.
+/// If a panic occurs, returns a result struct with an error describing the panic.
+#[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
+pub unsafe extern "C" fn melody_render_cmd5(opts: *const CRenderCmd5Options) -> *mut CRenderResult {
+    catch_panic_render_result(AssertUnwindSafe(|| {
+        if opts.is_null() {
+            let err = CString::new("null options pointer")
+                .unwrap_or_else(|_| CString::new("null options").unwrap())
+                .into_raw();
+            return Box::into_raw(Box::new(CRenderResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }));
+        }
+        let rust_opts = unsafe { convert_cmd4_options(&*opts) };
+        match render_cmd5(&rust_opts) {
+            Ok(s) => {
+                let result = CString::new(s)
+                    .unwrap_or_else(|_| CString::new("result contained null bytes").unwrap())
+                    .into_raw();
+                Box::into_raw(Box::new(CRenderResult {
+                    result,
+                    error: std::ptr::null_mut(),
+                }))
+            }
+            Err(e) => {
+                let error = CString::new(e.to_string())
+                    .unwrap_or_else(|_| CString::new("error message contained null bytes").unwrap())
+                    .into_raw();
+                Box::into_raw(Box::new(CRenderResult {
+                    result: std::ptr::null_mut(),
+                    error,
+                }))
+            }
+        }
+    }))
+}
+
 /// Frees a `CRenderResult` struct and its strings.
 ///
 /// # Safety
@@ -1598,6 +1663,93 @@ pub unsafe extern "C" fn melody_render_result_free(res: *mut CRenderResult) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ptr;
+
+    fn empty_cmd4_c_options(
+        template: &str,
+        template_jinja: &str,
+        use_jinja: bool,
+    ) -> (CRenderCmd4Options, CString, CString) {
+        let (opts, c_template, c_template_jinja, _c_template_id) =
+            empty_cmd4_c_options_with_template_id(template, template_jinja, use_jinja, None);
+        (opts, c_template, c_template_jinja)
+    }
+
+    fn empty_cmd4_c_options_with_template_id(
+        template: &str,
+        template_jinja: &str,
+        use_jinja: bool,
+        template_id: Option<&str>,
+    ) -> (CRenderCmd4Options, CString, CString, Option<CString>) {
+        let c_template = CString::new(template).unwrap();
+        let c_template_jinja = CString::new(template_jinja).unwrap();
+        let c_template_id = template_id.map(|id| CString::new(id).unwrap());
+        let opts = CRenderCmd4Options {
+            messages: ptr::null(),
+            messages_len: 0,
+            template_id: c_template_id.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
+            template: c_template.as_ptr(),
+            template_jinja: c_template_jinja.as_ptr(),
+            use_jinja,
+            dev_instruction: ptr::null(),
+            platform_instruction: ptr::null(),
+            documents_json: ptr::null(),
+            documents_len: 0,
+            available_tools: ptr::null(),
+            available_tools_len: 0,
+            grounding: CGrounding::Disabled,
+            has_grounding: false,
+            reasoning_type: CReasoningType::Enabled,
+            has_reasoning_type: false,
+            response_prefix: ptr::null(),
+            json_schema: ptr::null(),
+            json_mode: false,
+            additional_template_fields_json: ptr::null(),
+            escaped_special_tokens_json: ptr::null(),
+        };
+        (opts, c_template, c_template_jinja, c_template_id)
+    }
+
+    #[test]
+    fn test_convert_cmd4_options_preserves_template_jinja_without_use_jinja() {
+        let custom = "CUSTOM_CMD5_TEMPLATE_OUTPUT";
+        let (opts, _t, _tj) = empty_cmd4_c_options("", custom, false);
+        let rust_opts = unsafe { convert_cmd4_options(&opts) };
+        assert_eq!(rust_opts.template_jinja, custom);
+    }
+
+    #[test]
+    fn test_render_cmd5_rejects_liquid_template_after_ffi_conversion() {
+        let (opts, _t, _tj) = empty_cmd4_c_options("{% liquid %}", "", false);
+        let rust_opts = unsafe { convert_cmd4_options(&opts) };
+        let err = render_cmd5(&rust_opts).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("does not support liquid templates"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_render_cmd5_uses_template_jinja_after_ffi_conversion_without_use_jinja() {
+        let custom = "CUSTOM_CMD5_TEMPLATE_OUTPUT";
+        let (opts, _t, _tj) = empty_cmd4_c_options("", custom, false);
+        let rust_opts = unsafe { convert_cmd4_options(&opts) };
+        let rendered = render_cmd5(&rust_opts).unwrap();
+        assert_eq!(rendered, custom);
+    }
+
+    #[test]
+    fn test_render_cmd5_template_id_ignores_leftover_liquid_template_after_ffi_conversion() {
+        let (opts, _t, _tj, _tid) =
+            empty_cmd4_c_options_with_template_id("{% liquid %}", "", false, Some("cmd5"));
+        let rust_opts = unsafe { convert_cmd4_options(&opts) };
+        let rendered = render_cmd5(&rust_opts).unwrap();
+        assert!(
+            rendered.contains("CHATBOT"),
+            "template_id=cmd5 should render via jinja, ignoring leftover liquid template"
+        );
+    }
 
     #[test]
     fn test_catch_panic_aggregated_result_catches_panic() {

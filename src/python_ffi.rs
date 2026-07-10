@@ -1,13 +1,13 @@
 //! Python bindings for the Melody parsing library.
 //!
-//! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4` for templating.
+//! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4`/`render_cmd5` for templating.
 
 use crate::parsing::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
 use crate::templating::types::{Document, Message};
 use crate::templating::{
-    RenderCmd3Options, RenderCmd4Options, render_cmd3 as rust_render_cmd3,
-    render_cmd4 as rust_render_cmd4,
+    RenderCmd3Options, RenderCmd4Options, RenderCmd5Options, render_cmd3 as rust_render_cmd3,
+    render_cmd4 as rust_render_cmd4, render_cmd5 as rust_render_cmd5,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -83,6 +83,13 @@ impl PyFilterOptions {
     fn cmd4(&self) -> Self {
         PyFilterOptions {
             inner: self.inner.clone().cmd4(),
+        }
+    }
+
+    /// Configure for Command 5 format (cofl-tagged tool calls).
+    fn cmd5(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().cmd5(),
         }
     }
 
@@ -303,6 +310,24 @@ impl PyFilter {
         }
     }
 
+    /// Create a filter for Command 5 format (cofl-tagged tool calls).
+    ///
+    /// # Arguments
+    ///
+    /// * `chunk_size` - Characters to buffer before emitting (default: 1)
+    #[staticmethod]
+    #[pyo3(signature = (chunk_size = None))]
+    fn cmd5(chunk_size: Option<usize>) -> Self {
+        let mut opts = FilterOptions::default().cmd5();
+        if let Some(size) = chunk_size {
+            opts = opts.with_chunk_size(size);
+        }
+        PyFilter {
+            inner: new_filter(opts),
+            config: "cmd5",
+        }
+    }
+
     /// Process a decoded token and return an aggregated result.
     fn write_decoded(&mut self, decoded_token: &str) -> FilterAggregatedResult {
         self.inner.write_decoded(decoded_token)
@@ -408,6 +433,32 @@ fn render_cmd4(config: PyDictValue) -> PyResult<String> {
     rust_render_cmd4(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
 }
 
+/// Render a Command 5 format prompt.
+///
+/// CMD5 accepts the same configuration as CMD4 (see `render_cmd4`); the
+/// difference is the underlying Jinja template that is used.
+///
+/// # Arguments
+///
+/// * `config` - Dict with rendering options (same shape as `render_cmd4`).
+///
+/// # Returns
+///
+/// The rendered prompt string.
+///
+/// # Example
+///
+/// ```python
+/// render_cmd5({"messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}]})
+/// ```
+#[pyfunction]
+#[allow(clippy::needless_pass_by_value)] // PyO3's FromPyObject extracts owned values
+fn render_cmd5(config: PyDictValue) -> PyResult<String> {
+    let opts: RenderCmd5Options = serde_path_to_error::deserialize(&config.0)
+        .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
+    rust_render_cmd5(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
+}
+
 #[pymodule]
 fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOptions>()?;
@@ -417,6 +468,7 @@ fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SearchQueryDelta>()?;
     m.add_function(wrap_pyfunction!(render_cmd3, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
+    m.add_function(wrap_pyfunction!(render_cmd5, m)?)?;
     Ok(())
 }
 
@@ -430,6 +482,22 @@ mod tests {
         let result = filter.write_decoded("Hello");
         assert_eq!(result.content, Some("Hello".to_string()));
         assert!(result.reasoning.is_none());
+    }
+
+    #[test]
+    fn test_filter_cmd5_cofl_tool_call() {
+        let mut filter = PyFilter::cmd5(None);
+        let text = concat!(
+            "<|START_THINKING|>thinking<|END_THINKING|>",
+            "<cofl:tool_calls><cofl:tool_call id=\"0\" name=\"search\">",
+            "<cofl:tool_param name=\"q\" string=\"true\">hello</cofl:tool_param>",
+            "</cofl:tool_call></cofl:tool_calls>"
+        );
+        let result = filter.process_full_text(text);
+        assert_eq!(result.reasoning, Some("thinking".to_string()));
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "search");
+        assert_eq!(result.tool_calls[0].arguments, r#"{"q": "hello"}"#);
     }
 
     #[test]
@@ -457,6 +525,27 @@ mod tests {
         let opts: RenderCmd4Options = serde_path_to_error::deserialize(&value).unwrap();
         let result = rust_render_cmd4(&opts);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_cmd5_empty() {
+        let json = r#"{"messages": []}"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts: RenderCmd5Options = serde_path_to_error::deserialize(&value).unwrap();
+        let result = rust_render_cmd5(&opts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_cmd5_with_message() {
+        let json = r#"{
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "Hello!"}]}]
+        }"#;
+        let value: Value = serde_json::from_str(json).unwrap();
+        let opts: RenderCmd5Options = serde_path_to_error::deserialize(&value).unwrap();
+        let result = rust_render_cmd5(&opts).unwrap();
+        assert!(result.contains("USER"));
+        assert!(result.contains("Hello!"));
     }
 
     #[test]
