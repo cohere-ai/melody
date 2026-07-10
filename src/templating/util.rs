@@ -1308,8 +1308,7 @@ mod tests {
         }
 
         fn expect_validation_error(msgs: &[Message], needle: &str) {
-            let err =
-                super::super::messages_to_template(msgs, &[], &BTreeMap::new()).unwrap_err();
+            let err = super::super::messages_to_template(msgs, &[], &BTreeMap::new()).unwrap_err();
             let MelodyError::TemplateValidation(msg) = err else {
                 panic!("expected TemplateValidation error, got {err:?}");
             };

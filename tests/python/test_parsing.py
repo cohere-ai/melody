@@ -388,11 +388,7 @@ class TestWithMessageHistory:
 
     def test_positional_arguments_work(self):
         """messages and documents can be passed positionally, matching Rust."""
-        opts = (
-            PyFilterOptions()
-            .cmd3()
-            .with_message_history([], [{"id": "doc-a"}])
-        )
+        opts = PyFilterOptions().cmd3().with_message_history([], [{"id": "doc-a"}])
         f = PyFilter(opts)
         result = f.process_full_text(self._cmd3_input("<co>bar</co: 0:[0]>"))
         assert result.citations[0].sources[0].document_ids == ["doc-a"]
@@ -405,16 +401,12 @@ class TestWithMessageHistory:
             {
                 "role": "chatbot",
                 "content": [],
-                "tool_calls": [
-                    {"id": "call_1", "name": "search", "parameters": "{}"}
-                ],
+                "tool_calls": [{"id": "call_1", "name": "search", "parameters": "{}"}],
             },
             {
                 "role": "chatbot",
                 "content": [],
-                "tool_calls": [
-                    {"id": "call_1", "name": "search", "parameters": "{}"}
-                ],
+                "tool_calls": [{"id": "call_1", "name": "search", "parameters": "{}"}],
             },
             {
                 "role": "tool",

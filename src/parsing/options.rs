@@ -625,11 +625,7 @@ impl FilterOptions {
     ///
     /// [`Source::document_ids`]: crate::parsing::types::Source::document_ids
     #[must_use]
-    pub fn with_message_history(
-        mut self,
-        messages: &[Message],
-        documents: &[Document],
-    ) -> Self {
+    pub fn with_message_history(mut self, messages: &[Message], documents: &[Document]) -> Self {
         let prompt_ids = PromptRenderIds::from_messages(messages, documents);
         self.document_ids = prompt_ids.document_ids;
         self

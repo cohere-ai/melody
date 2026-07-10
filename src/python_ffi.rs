@@ -40,8 +40,8 @@ fn depythonize_optional<T: DeserializeOwned + Default>(
     let Some(obj) = obj else {
         return Ok(T::default());
     };
-    let value: Value = depythonize(obj)
-        .map_err(|e| PyValueError::new_err(format!("Invalid {field}: {e}")))?;
+    let value: Value =
+        depythonize(obj).map_err(|e| PyValueError::new_err(format!("Invalid {field}: {e}")))?;
     serde_path_to_error::deserialize(&value)
         .map_err(|e| PyValueError::new_err(format!("Invalid {field}: {e}")))
 }
@@ -226,7 +226,10 @@ impl PyFilterOptions {
     ) -> PyResult<Self> {
         let messages: Vec<Message> = depythonize_optional(messages, "messages")?;
         let documents: Vec<Document> = depythonize_optional(documents, "documents")?;
-        let inner = self.inner.clone().with_message_history(&messages, &documents);
+        let inner = self
+            .inner
+            .clone()
+            .with_message_history(&messages, &documents);
         Ok(PyFilterOptions { inner })
     }
 
