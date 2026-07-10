@@ -209,6 +209,9 @@ pub struct FilterImpl {
     /// Use the cofl-tagged parser (cmd5) for [`FilterMode::ToolAction`]
     /// instead of the JSON action parser.
     pub(crate) cofl_tool_action: bool,
+    /// Decode XML entities in cofl parameter bodies before emitting tool-call
+    /// arguments. Attribute values are always decoded regardless of this flag.
+    pub(crate) cofl_decode_xml_text: bool,
 
     // Chunking configuration
     pub(crate) chunk_size: usize,
@@ -272,6 +275,7 @@ impl FilterImpl {
             has_tool_call_id: false,
             cmd3_citations: false,
             cofl_tool_action: false,
+            cofl_decode_xml_text: true,
             chunk_size: 1,
             num_tokens_in_chunk: 0,
             buf: Vec::new(),
@@ -290,6 +294,7 @@ impl FilterImpl {
         self.has_tool_call_id = options.has_tool_call_id;
         self.cmd3_citations = options.cmd3_citations;
         self.cofl_tool_action = options.cofl_tool_action;
+        self.cofl_decode_xml_text = options.cofl_decode_xml_text;
         self.default_mode = options.default_mode;
         self.mode = options.default_mode;
 
@@ -1946,6 +1951,26 @@ mod tests {
         let parsed: serde_json::Value =
             serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
         assert_eq!(parsed["snippet"], snippet);
+    }
+
+    /// Round-trip the no-escape wire format produced by the `cmd5-no-escape`
+    /// template (unescaped bodies, escaped attributes).
+    #[test]
+    fn test_process_full_text_cmd5_no_xml_text_decode() {
+        let opts = FilterOptions::default().cmd5().cofl_no_xml_text_decode();
+        let mut f = new_filter(opts);
+        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with <tag> & "quotes"</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a<b", "c&d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key<1>": "val>2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "run<cmd>&tool");
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["str_param"], "value with <tag> & \"quotes\"");
+        assert_eq!(parsed["num_param"], 42);
+        assert_eq!(parsed["list_param"], serde_json::json!(["a<b", "c&d"]));
+        assert_eq!(parsed["param<>&name"], "attr test");
+        assert_eq!(parsed["nested"], serde_json::json!({"key<1>": "val>2"}));
     }
 
     /// Round-trip the XML-entity escaping used by the cmd5 template, mirroring

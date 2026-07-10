@@ -14,6 +14,7 @@ type filterConfig struct {
 	streamToolActions       bool
 	streamNonGroundedAnswer bool
 	streamProcessedParams   bool
+	coflNoXMLTextDecode     bool
 	leftTrimmed             bool
 	rightTrimmed            bool
 	prefixTrim              string
@@ -54,6 +55,9 @@ func (cfg *filterConfig) apply(opts *FilterOptions) {
 	}
 	if cfg.streamProcessedParams {
 		opts.StreamProcessedParams()
+	}
+	if cfg.coflNoXMLTextDecode {
+		opts.CoflNoXMLTextDecode()
 	}
 
 	// Handle trimming options
@@ -143,6 +147,13 @@ func StreamNonGroundedAnswer() FilterOption {
 func StreamProcessedParams() FilterOption {
 	return func(cfg *filterConfig) {
 		cfg.streamProcessedParams = true
+	}
+}
+
+// CoflNoXMLTextDecode disables XML entity decoding for cofl parameter bodies.
+func CoflNoXMLTextDecode() FilterOption {
+	return func(cfg *filterConfig) {
+		cfg.coflNoXMLTextDecode = true
 	}
 }
 

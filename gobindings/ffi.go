@@ -110,6 +110,14 @@ func (opts *FilterOptions) StreamProcessedParams() *FilterOptions {
 	return opts
 }
 
+// CoflNoXMLTextDecode disables XML entity decoding for cofl parameter bodies.
+func (opts *FilterOptions) CoflNoXMLTextDecode() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_cofl_no_xml_text_decode(opts.ptr)
+	}
+	return opts
+}
+
 // WithLeftTrimmed enables left trimming
 func (opts *FilterOptions) WithLeftTrimmed() *FilterOptions {
 	if opts.ptr != nil {

@@ -159,6 +159,13 @@ impl PyFilterOptions {
         }
     }
 
+    /// Disable XML entity decoding for cofl parameter bodies.
+    fn cofl_no_xml_text_decode(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().cofl_no_xml_text_decode(),
+        }
+    }
+
     /// Remove a special token from the token map.
     fn remove_token(&self, token: &str) -> Self {
         PyFilterOptions {

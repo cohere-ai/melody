@@ -42,6 +42,10 @@ pub struct FilterOptions {
     /// When set, [`FilterMode::ToolAction`] is parsed with the cofl-tagged
     /// parser (cmd5 format) rather than the JSON action parser.
     pub(crate) cofl_tool_action: bool,
+    /// When `false`, cofl parameter bodies are not XML-entity decoded before
+    /// being emitted as tool-call arguments. Attribute values (`id`, `name`)
+    /// are always decoded. Pair with the `cmd5-no-escape` template.
+    pub(crate) cofl_decode_xml_text: bool,
 }
 
 impl Default for FilterOptions {
@@ -60,6 +64,7 @@ impl Default for FilterOptions {
             has_tool_call_id: false,
             cmd3_citations: false,
             cofl_tool_action: false,
+            cofl_decode_xml_text: true,
         }
     }
 }
@@ -92,6 +97,7 @@ impl FilterOptions {
     /// not leak into cmd3/cmd4 JSON action parsing.
     fn clear_cofl_tool_action_config(&mut self) {
         self.cofl_tool_action = false;
+        self.cofl_decode_xml_text = true;
         self.special_token_map.remove("<cofl:tool_calls>");
         self.special_token_map.remove("</cofl:tool_calls>");
     }
@@ -549,6 +555,28 @@ impl FilterOptions {
         self.special_token_map.remove("<|END_ACTION|>");
         self.special_token_map.remove("<cofl:tool_calls>");
         self.special_token_map.remove("</cofl:tool_calls>");
+        self
+    }
+
+    /// Disable XML entity decoding for cofl parameter bodies.
+    ///
+    /// When disabled, text between `<cofl:tool_param>` tags is passed through
+    /// as-is. Attribute values on cofl tags (`id`, `name`) are still decoded.
+    /// Use with the `cmd5-no-escape` template, which omits XML escaping in
+    /// parameter bodies.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::parsing::FilterOptions;
+    ///
+    /// let options = FilterOptions::new()
+    ///     .cmd5()
+    ///     .cofl_no_xml_text_decode();
+    /// ```
+    #[must_use]
+    pub fn cofl_no_xml_text_decode(mut self) -> Self {
+        self.cofl_decode_xml_text = false;
         self
     }
 

@@ -1,0 +1,67 @@
+{%- macro xml_text(value) -%}{{ value }}{%- endmacro -%}
+{%- macro xml_attr(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('"', '&quot;') }}{%- endmacro -%}
+{%- macro render_tool_call_params(arguments) -%}
+{%- for param_name, param_value in arguments|items -%}
+{%- if param_value is string -%}
+<cofl:tool_param name="{{ xml_attr(param_name) }}" string="true">{{ xml_text(param_value) }}</cofl:tool_param>
+{%- else -%}
+<cofl:tool_param name="{{ xml_attr(param_name) }}" string="false">{{ xml_text(param_value|tojson) }}</cofl:tool_param>
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+{%- macro document_turn(documents) -%}
+{# format documents into chat turn -#}
+<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{%- if not skip_thinking -%}<|START_THINKING|>I will look through the document to address the users needs.<|END_THINKING|>{%- endif -%}<cofl:tool_calls><cofl:tool_call id="0" name="direct-injected-document"></cofl:tool_call></cofl:tool_calls><|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><cofl:tool_results><cofl:tool_result id="0" is_error="false">
+{%- for doc in documents -%}
+{%- set doc_val = doc.data if doc.data else doc -%}
+<cofl:tool_result_item index="{{ loop.index0 }}">{{ xml_text(doc_val|tojson) }}</cofl:tool_result_item>
+{%- endfor -%}
+</cofl:tool_result></cofl:tool_results><|END_OF_TURN_TOKEN|>
+{%- endmacro %}
+{%- macro tool_call_id_to_int(messages, tool_call_id) %}
+{%- if regen_tool_call_ids -%}
+    {%- set counter = namespace(value=0) %}
+    {%- set tool_call_id_seen = namespace(value=false) %}
+    {%- for msg in messages %}
+        {%- if msg.tool_calls %}
+            {%- for tool_call in msg.tool_calls %}
+                {%- if tool_call.id == tool_call_id and not tool_call_id_seen.value -%}
+                    {{ counter.value }}
+                    {%- set tool_call_id_seen.value = true %}
+                {%- endif %}
+                {%- set counter.value = counter.value + 1 %}
+            {%- endfor %}
+        {%- endif %}
+    {%- endfor %}
+{%- else -%}
+    {{ tool_call_id }}
+{%- endif -%}
+{%- endmacro %}
+{%- macro print_cofl_tool_content(item) %}
+{%- if item.type|lower == "text" -%}
+{%- set text_wrapper = {"content": item.text} -%}
+{{ xml_text(text_wrapper|tojson) }}
+{%- elif item.type|lower == "document" and item.document and "data" in item.document -%}
+{{ xml_text(item.document.data|tojson) }}
+{%- else -%}
+{{ xml_text(item|tojson) }}
+{%- endif -%}
+{%- endmacro %}
+{%- macro format_tool_message(messages, tool_msg) -%}
+{#- format tool message -#}
+{%- set is_err_val = "true" if tool_msg.is_error else "false" -%}
+<cofl:tool_result id="{{ tool_call_id_to_int(messages, tool_msg.tool_call_id) }}" is_error="{{ is_err_val }}">
+{%- if tool_msg.content is mapping or tool_msg.content is string -%}
+    {%- if tool_msg.content is string -%}
+        {%- set text_wrapper = {"content": tool_msg.content} -%}
+    {%- else -%}
+        {%- set text_wrapper = tool_msg.content -%}
+    {%- endif -%}
+<cofl:tool_result_item index="0">{{ xml_text(text_wrapper|tojson) }}</cofl:tool_result_item>
+{%- else -%}
+    {%- for content in tool_msg.content -%}
+<cofl:tool_result_item index="{{ loop.index0 }}">{{ print_cofl_tool_content(content) }}</cofl:tool_result_item>
+    {%- endfor -%}
+{%- endif -%}
+</cofl:tool_result>
+{%- endmacro -%}

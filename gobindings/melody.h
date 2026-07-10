@@ -219,6 +219,7 @@ extern void melody_filter_options_handle_multi_hop(CFilterOptions* options);
 extern void melody_filter_options_stream_non_grounded_answer(CFilterOptions* options);
 extern void melody_filter_options_stream_tool_actions(CFilterOptions* options);
 extern void melody_filter_options_stream_processed_params(CFilterOptions* options);
+extern void melody_filter_options_cofl_no_xml_text_decode(CFilterOptions* options);
 extern void melody_filter_options_with_left_trimmed(CFilterOptions* options);
 extern void melody_filter_options_with_right_trimmed(CFilterOptions* options);
 extern void melody_filter_options_with_chunk_size(CFilterOptions* options, size_t size);
