@@ -5,6 +5,7 @@
 
 use crate::parsing::action_filter::FilterAction;
 use crate::parsing::cofl_filter::FilterCoflAction;
+use crate::parsing::cofl_nested_filter;
 use crate::parsing::options::FilterOptions;
 use crate::parsing::types::{
     AccumulatedToolCall, FilterAggregatedResult, FilterMode, FilterOutput, FilterSearchQueryDelta,
@@ -198,6 +199,7 @@ pub struct FilterImpl {
     pub(crate) cur_citation_byte_index: Option<usize>,
     pub(crate) action_metadata: FilterAction,
     pub(crate) cofl_action_metadata: FilterCoflAction,
+    pub(crate) cofl_nested_action_metadata: cofl_nested_filter::FilterCoflNestedAction,
 
     // Search query tracking
     pub(crate) curr_search_query_idx: usize,
@@ -212,6 +214,8 @@ pub struct FilterImpl {
     /// Decode XML entities in cofl parameter bodies before emitting tool-call
     /// arguments. Attribute values are always decoded regardless of this flag.
     pub(crate) cofl_decode_xml_text: bool,
+    /// Parse cofl tool parameters as nested `<cofl:value>` nodes (cmd5-nested-xml).
+    pub(crate) cofl_nested_xml: bool,
 
     // Chunking configuration
     pub(crate) chunk_size: usize,
@@ -270,12 +274,14 @@ impl FilterImpl {
             cur_citation_byte_index: None,
             action_metadata: FilterAction::new(),
             cofl_action_metadata: FilterCoflAction::new(),
+            cofl_nested_action_metadata: cofl_nested_filter::FilterCoflNestedAction::new(),
             curr_search_query_idx: 0,
             sent_curr_index: false,
             has_tool_call_id: false,
             cmd3_citations: false,
             cofl_tool_action: false,
             cofl_decode_xml_text: true,
+            cofl_nested_xml: false,
             chunk_size: 1,
             num_tokens_in_chunk: 0,
             buf: Vec::new(),
@@ -295,6 +301,7 @@ impl FilterImpl {
         self.cmd3_citations = options.cmd3_citations;
         self.cofl_tool_action = options.cofl_tool_action;
         self.cofl_decode_xml_text = options.cofl_decode_xml_text;
+        self.cofl_nested_xml = options.cofl_nested_xml;
         self.default_mode = options.default_mode;
         self.mode = options.default_mode;
 
@@ -2000,6 +2007,33 @@ mod tests {
             parsed["filters"],
             serde_json::json!({"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"})
         );
+    }
+
+    /// Round-trip nested-xml cofl tool calls from the cmd5-nested-xml template.
+    #[test]
+    fn test_process_full_text_cmd5_nested_xml() {
+        let opts = FilterOptions::default().cmd5().cofl_nested_xml();
+        let mut f = new_filter(opts);
+        let text = r#"<|START_THINKING|>searching<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search &quot;web&quot;"><cofl:value name="query" type="raw">echo "Hello" >> foo.txt && exit</cofl:value><cofl:value name="limit" type="json">3</cofl:value><cofl:value name="float example" type="json">3.14</cofl:value><cofl:value name="filters" type="dict"><cofl:value name="fresh" type="json">true</cofl:value><cofl:value name="tags" type="list"><cofl:value type="raw">music</cofl:value><cofl:value type="raw">Sudan</cofl:value></cofl:value></cofl:value><cofl:value name="missing" type="json">null</cofl:value><cofl:value name="empty_dict" type="dict"></cofl:value><cofl:value name="empty_list" type="list"></cofl:value></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, r#"search "web""#);
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(
+            parsed["query"],
+            r#"echo "Hello" >> foo.txt && exit"#
+        );
+        assert_eq!(parsed["limit"], 3);
+        assert_eq!(parsed["float example"], 3.14);
+        assert_eq!(
+            parsed["filters"],
+            serde_json::json!({"fresh": true, "tags": ["music", "Sudan"]})
+        );
+        assert_eq!(parsed["missing"], serde_json::Value::Null);
+        assert_eq!(parsed["empty_dict"], serde_json::json!({}));
+        assert_eq!(parsed["empty_list"], serde_json::json!([]));
     }
 
     /// cmd5 generation prompts include `<|START_THINKING|>`, so the

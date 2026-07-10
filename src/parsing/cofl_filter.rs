@@ -88,7 +88,7 @@ const XML_ENTITIES: &[&str] = &["&amp;", "&lt;", "&gt;", "&quot;", "&apos;"];
 /// Returns `None` if the attribute is missing or its value is unterminated.
 /// Attribute values use `&quot;` rather than literal `"`, so a naive scan is
 /// safe on the wire format.
-fn extract_attr<'a>(tag_inner: &'a str, key: &str) -> Option<&'a str> {
+pub(crate) fn extract_attr<'a>(tag_inner: &'a str, key: &str) -> Option<&'a str> {
     let needle = format!("{key}=\"");
     let start = tag_inner.find(&needle)?;
     let value_start = start + needle.len();
@@ -100,7 +100,7 @@ fn extract_attr<'a>(tag_inner: &'a str, key: &str) -> Option<&'a str> {
 /// Decode XML entities in a complete string (attribute values and flushed
 /// parameter bodies). `&amp;` is decoded last so sequences like `&amp;lt;`
 /// round-trip correctly.
-fn decode_xml_entities(s: &str) -> String {
+pub(crate) fn decode_xml_entities(s: &str) -> String {
     s.replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
@@ -115,7 +115,7 @@ fn decode_xml_entities(s: &str) -> String {
 /// holdback suffix is left in the caller's buffer (via a reduced `consumed`
 /// count) rather than decoded prematurely. When `flush` is true (final chunk
 /// of a param), everything is decoded with no holdback.
-fn split_xml_entity_holdback(s: &str, flush: bool) -> (&str, &str) {
+pub(crate) fn split_xml_entity_holdback(s: &str, flush: bool) -> (&str, &str) {
     if flush || s.is_empty() {
         return (s, "");
     }
@@ -138,7 +138,7 @@ fn split_xml_entity_holdback(s: &str, flush: bool) -> (&str, &str) {
 
 /// JSON-escape the body of a string parameter so it can be emitted between
 /// surrounding `"` quotes as a valid JSON string literal.
-fn json_escape_string_content(s: &str) -> String {
+pub(crate) fn json_escape_string_content(s: &str) -> String {
     use std::fmt::Write as _;
 
     let mut out = String::with_capacity(s.len());
@@ -175,6 +175,10 @@ impl FilterImpl {
     pub(crate) fn parse_cofl_actions(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
         if s.is_empty() {
             return (Vec::new(), 0);
+        }
+
+        if self.cofl_nested_xml {
+            return self.parse_cofl_nested_actions(s);
         }
 
         match self.cofl_action_metadata.mode {

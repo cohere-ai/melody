@@ -46,6 +46,9 @@ pub struct FilterOptions {
     /// being emitted as tool-call arguments. Attribute values (`id`, `name`)
     /// are always decoded. Pair with the `cmd5-no-escape` template.
     pub(crate) cofl_decode_xml_text: bool,
+    /// When set, cofl tool parameters are parsed as nested `<cofl:value>` nodes
+    /// (cmd5-nested-xml format) rather than flat `<cofl:tool_param>` tags.
+    pub(crate) cofl_nested_xml: bool,
 }
 
 impl Default for FilterOptions {
@@ -65,6 +68,7 @@ impl Default for FilterOptions {
             cmd3_citations: false,
             cofl_tool_action: false,
             cofl_decode_xml_text: true,
+            cofl_nested_xml: false,
         }
     }
 }
@@ -98,6 +102,7 @@ impl FilterOptions {
     fn clear_cofl_tool_action_config(&mut self) {
         self.cofl_tool_action = false;
         self.cofl_decode_xml_text = true;
+        self.cofl_nested_xml = false;
         self.special_token_map.remove("<cofl:tool_calls>");
         self.special_token_map.remove("</cofl:tool_calls>");
     }
@@ -244,6 +249,7 @@ impl FilterOptions {
         self.clear_json_action_tokens();
         self.cofl_tool_action = true;
         self.cofl_decode_xml_text = true;
+        self.cofl_nested_xml = false;
         self.special_token_map
             .insert("<|START_TEXT|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
@@ -577,6 +583,29 @@ impl FilterOptions {
     /// ```
     #[must_use]
     pub fn cofl_no_xml_text_decode(mut self) -> Self {
+        self.cofl_decode_xml_text = false;
+        self
+    }
+
+    /// Parse cofl tool parameters as nested `<cofl:value>` nodes.
+    ///
+    /// Use with the `cmd5-nested-xml` template, which encodes scalars,
+    /// objects, and arrays as recursive `<cofl:value type="raw|json|dict|list">`
+    /// elements. Parameter bodies are not XML-entity escaped (attributes
+    /// still are), so this also disables body entity decoding.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::parsing::FilterOptions;
+    ///
+    /// let options = FilterOptions::new()
+    ///     .cmd5()
+    ///     .cofl_nested_xml();
+    /// ```
+    #[must_use]
+    pub fn cofl_nested_xml(mut self) -> Self {
+        self.cofl_nested_xml = true;
         self.cofl_decode_xml_text = false;
         self
     }

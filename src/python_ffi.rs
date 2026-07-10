@@ -166,6 +166,13 @@ impl PyFilterOptions {
         }
     }
 
+    /// Parse cofl tool parameters as nested `<cofl:value>` nodes.
+    fn cofl_nested_xml(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().cofl_nested_xml(),
+        }
+    }
+
     /// Remove a special token from the token map.
     fn remove_token(&self, token: &str) -> Self {
         PyFilterOptions {
