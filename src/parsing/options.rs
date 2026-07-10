@@ -243,6 +243,7 @@ impl FilterOptions {
         self.stream_tool_actions = true;
         self.clear_json_action_tokens();
         self.cofl_tool_action = true;
+        self.cofl_decode_xml_text = true;
         self.special_token_map
             .insert("<|START_TEXT|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
