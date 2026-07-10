@@ -4,6 +4,7 @@
 
 use crate::parsing::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
 use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
+use crate::templating::types::{Document, Message};
 use crate::templating::{
     RenderCmd3Options, RenderCmd4Options, render_cmd3 as rust_render_cmd3,
     render_cmd4 as rust_render_cmd4,
@@ -12,6 +13,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pythonize::depythonize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 /// A Python dict extracted as a JSON value.
@@ -26,6 +28,22 @@ impl<'a, 'py> FromPyObject<'a, 'py> for PyDictValue {
             .map_err(|e| PyValueError::new_err(format!("Invalid config: {e}")))?;
         Ok(PyDictValue(value))
     }
+}
+
+/// Depythonize an optional Python object into a Rust value, deserialising
+/// with detailed error paths. Returns `T::default()` when the object is
+/// `None`.
+fn depythonize_optional<T: DeserializeOwned + Default>(
+    obj: Option<&Bound<'_, PyAny>>,
+    field: &str,
+) -> PyResult<T> {
+    let Some(obj) = obj else {
+        return Ok(T::default());
+    };
+    let value: Value = depythonize(obj)
+        .map_err(|e| PyValueError::new_err(format!("Invalid {field}: {e}")))?;
+    serde_path_to_error::deserialize(&value)
+        .map_err(|e| PyValueError::new_err(format!("Invalid {field}: {e}")))
 }
 
 /// Configuration builder for creating filters.
@@ -157,6 +175,52 @@ impl PyFilterOptions {
         PyFilterOptions {
             inner: self.inner.clone().remove_token(token),
         }
+    }
+
+    /// Configure the parser with the `messages` and `documents` that will
+    /// be rendered into the prompt, so it can resolve citation indices
+    /// back to their original document identifiers.
+    ///
+    /// The parser walks the message history exactly the way the renderer
+    /// does, builds a lookup table indexed by
+    /// `[tool_call_index][tool_result_index]`, and uses it to populate
+    /// `Source.document_ids` on every citation it emits.
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` (optional, defaults to `[]`) — the same message shape
+    ///   used for `render_cmd3` / `render_cmd4`.
+    /// * `documents` (optional, defaults to `[]`) — top-level documents,
+    ///   in the same shape used for rendering.
+    ///
+    /// This method is best-effort: template-shape mistakes in `messages`
+    /// (missing `tool_call_id`, empty or duplicate `id`,
+    /// `tool_calls` on a non-`chatbot` role) are the renderer's concern
+    /// and do not raise here. Only argument deserialisation failures
+    /// (e.g. `messages` isn't a list, an item is missing a required
+    /// field) raise `ValueError`.
+    ///
+    /// # Example
+    ///
+    /// ```python
+    /// opts = PyFilterOptions().cmd3().with_message_history(
+    ///     messages=[...],
+    ///     documents=[{"id": "doc-a"}, {"id": "doc-b"}],
+    /// )
+    /// filter = PyFilter(opts)
+    /// # ...citations produced by `filter` will have `source.document_ids`
+    /// # filled in with the original ID strings.
+    /// ```
+    #[pyo3(signature = (messages=None, documents=None))]
+    fn with_message_history(
+        &self,
+        messages: Option<&Bound<'_, PyAny>>,
+        documents: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let messages: Vec<Message> = depythonize_optional(messages, "messages")?;
+        let documents: Vec<Document> = depythonize_optional(documents, "documents")?;
+        let inner = self.inner.clone().with_message_history(&messages, &documents);
+        Ok(PyFilterOptions { inner })
     }
 
     #[allow(clippy::unused_self)]

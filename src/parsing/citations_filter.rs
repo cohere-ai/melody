@@ -163,11 +163,13 @@ impl FilterImpl {
         }
         self.cur_citation_byte_index = None;
 
+        let mut sources = docs_last;
+        self.resolve_document_ids(&mut sources);
         let mut cits = vec![FilterCitation {
             start_index,
             end_index: start_index + cit_txt.chars().count(),
             text: cit_txt.to_string(),
-            sources: docs_last,
+            sources,
             is_thinking: mode == FilterMode::ToolReason,
         }];
 
@@ -279,11 +281,37 @@ impl FilterImpl {
                 vec![Source {
                     tool_call_index: 0,
                     tool_result_indices: int_indices,
+                    document_ids: Vec::new(),
                 }]
             }
         };
 
         (start_id, start_id + 1 + end_id, doc_indices)
+    }
+
+    /// Fill in the original document identifiers on each `Source`, using
+    /// the lookup table the parser was configured with via
+    /// [`crate::parsing::FilterOptions::with_message_history`].
+    ///
+    /// No-op when the parser wasn't configured with a lookup table. When
+    /// a citation refers to an out-of-bounds `tool_call_index` the source
+    /// is left unresolved (`document_ids` stays empty); for out-of-bounds
+    /// `tool_result_indices` the corresponding entry becomes an empty
+    /// string, preserving positional alignment with `tool_result_indices`.
+    pub(crate) fn resolve_document_ids(&self, sources: &mut [Source]) {
+        if self.document_ids.is_empty() {
+            return;
+        }
+        for source in sources {
+            let Some(row) = self.document_ids.get(source.tool_call_index) else {
+                continue;
+            };
+            source.document_ids = source
+                .tool_result_indices
+                .iter()
+                .map(|&idx| row.get(idx).cloned().unwrap_or_default())
+                .collect();
+        }
     }
 
     fn convert_string_to_doc_indices(s: &str) -> Vec<Source> {
@@ -326,6 +354,7 @@ impl FilterImpl {
             doc_indices.push(Source {
                 tool_call_index: tool_index,
                 tool_result_indices: result_indices,
+                document_ids: Vec::new(),
             });
         }
 
@@ -657,5 +686,160 @@ mod tests {
         assert_eq!(convert_string_to_int_list("foo,0"), vec![0]);
         assert_eq!(convert_string_to_int_list("999"), vec![999]);
         assert_eq!(convert_string_to_int_list("-1"), Vec::<usize>::new());
+    }
+
+    mod test_resolve_document_ids {
+        use crate::parsing::options::{FilterOptions, new_filter};
+        use serde_json::Value;
+
+        fn cmd3_input(citation: &str) -> String {
+            format!("<|START_RESPONSE|>foo {citation}<|END_RESPONSE|>")
+        }
+
+        fn deserialize_messages(json: &str) -> Vec<crate::templating::types::Message> {
+            let value: Value = serde_json::from_str(json).unwrap();
+            serde_path_to_error::deserialize(&value).unwrap()
+        }
+
+        fn deserialize_documents(json: &str) -> Vec<crate::templating::types::Document> {
+            let value: Value = serde_json::from_str(json).unwrap();
+            serde_path_to_error::deserialize(&value).unwrap()
+        }
+
+        #[test]
+        fn without_message_history_leaves_document_ids_empty() {
+            let opts = FilterOptions::new().cmd3();
+            let mut filter = new_filter(opts);
+            let result = filter.process_full_text(&cmd3_input("<co>bar</co: 0:[0,1]>"));
+            assert_eq!(result.citations.len(), 1);
+            let src = &result.citations[0].sources[0];
+            assert_eq!(src.tool_call_index, 0);
+            assert_eq!(src.tool_result_indices, vec![0, 1]);
+            assert!(
+                src.document_ids.is_empty(),
+                "document_ids should stay empty when the parser has no lookup"
+            );
+        }
+
+        #[test]
+        fn top_level_documents_resolve_ids() {
+            let docs = deserialize_documents(r#"[{"id": "doc-a"}, {"id": "doc-b"}]"#);
+            let opts = FilterOptions::new().cmd3().with_message_history(&[], &docs);
+            let mut filter = new_filter(opts);
+            let result = filter.process_full_text(&cmd3_input("<co>bar</co: 0:[0,1]>"));
+            assert_eq!(result.citations.len(), 1);
+            let src = &result.citations[0].sources[0];
+            assert_eq!(src.document_ids, vec!["doc-a", "doc-b"]);
+        }
+
+        #[test]
+        fn tool_result_documents_resolve_ids() {
+            let msgs = deserialize_messages(
+                r#"[
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "tool", "tool_call_id": "call_1", "content": [
+                        {"type": "document", "document": {"id": "res-x"}},
+                        {"type": "document", "document": {"id": "res-y"}},
+                        {"type": "document", "document": {"id": "res-z"}}
+                    ]}
+                ]"#,
+            );
+            let opts = FilterOptions::new().cmd3().with_message_history(&msgs, &[]);
+            let mut filter = new_filter(opts);
+            // tool_call_index 0 because no top-level docs; citing results 0 and 2.
+            let result = filter.process_full_text(&cmd3_input("<co>bar</co: 0:[0,2]>"));
+            let src = &result.citations[0].sources[0];
+            assert_eq!(src.document_ids, vec!["res-x", "res-z"]);
+        }
+
+        #[test]
+        fn top_level_docs_and_tool_calls_interleave_correctly() {
+            let msgs = deserialize_messages(
+                r#"[
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "tool", "tool_call_id": "call_1", "content": [
+                        {"type": "document", "document": {"id": "res-1"}}
+                    ]}
+                ]"#,
+            );
+            let docs = deserialize_documents(r#"[{"id": "doc-a"}]"#);
+            let opts = FilterOptions::new()
+                .cmd3()
+                .with_message_history(&msgs, &docs);
+            let mut filter = new_filter(opts);
+            // tool_call_index 0 → the reserved top-level docs bucket;
+            // tool_call_index 1 → the tool call.
+            let result = filter.process_full_text(&cmd3_input("<co>bar</co: 0:[0],1:[0]>"));
+            let cit = &result.citations[0];
+            assert_eq!(cit.sources.len(), 2);
+            assert_eq!(cit.sources[0].document_ids, vec!["doc-a"]);
+            assert_eq!(cit.sources[1].document_ids, vec!["res-1"]);
+        }
+
+        #[test]
+        fn out_of_bounds_tool_call_index_leaves_source_unresolved() {
+            let docs = deserialize_documents(r#"[{"id": "doc-a"}]"#);
+            let opts = FilterOptions::new().cmd3().with_message_history(&[], &docs);
+            let mut filter = new_filter(opts);
+            // tool_call_index 5 doesn't exist.
+            let result = filter.process_full_text(&cmd3_input("<co>bar</co: 5:[0]>"));
+            let src = &result.citations[0].sources[0];
+            assert!(src.document_ids.is_empty());
+        }
+
+        #[test]
+        fn out_of_bounds_tool_result_index_becomes_empty_string() {
+            let docs = deserialize_documents(r#"[{"id": "doc-a"}]"#);
+            let opts = FilterOptions::new().cmd3().with_message_history(&[], &docs);
+            let mut filter = new_filter(opts);
+            // tool_result_index 3 doesn't exist for docs bucket 0 (only doc-a).
+            let result = filter.process_full_text(&cmd3_input("<co>bar</co: 0:[0,3]>"));
+            let src = &result.citations[0].sources[0];
+            // Positional alignment preserved.
+            assert_eq!(src.document_ids, vec!["doc-a".to_string(), String::new()]);
+        }
+
+        #[test]
+        fn legacy_format_resolves_via_bucket_zero() {
+            let docs = deserialize_documents(r#"[{"id": "doc-a"}, {"id": "doc-b"}]"#);
+            let opts = FilterOptions::new()
+                .handle_rag()
+                .with_message_history(&[], &docs);
+            let mut filter = new_filter(opts);
+            let result = filter.process_full_text("Grounded answer: <co: 0,1>hi</co: 0,1>");
+            let src = &result.citations[0].sources[0];
+            assert_eq!(src.tool_call_index, 0);
+            assert_eq!(src.document_ids, vec!["doc-a", "doc-b"]);
+        }
+
+        #[test]
+        fn invalid_message_history_is_accepted_and_resolves_best_effort() {
+            // Template-shape errors (duplicate tool_call ids here) are the
+            // renderer's concern; the parser must never surface a template
+            // validation back to a caller. Duplicates dedupe into a single
+            // bucket, and citations continue to resolve against it.
+            let msgs = deserialize_messages(
+                r#"[
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "tool", "tool_call_id": "call_1", "content": [
+                        {"type": "document", "document": {"id": "res-1"}}
+                    ]}
+                ]"#,
+            );
+            let opts = FilterOptions::new().cmd3().with_message_history(&msgs, &[]);
+            let mut filter = new_filter(opts);
+            let result = filter.process_full_text(&cmd3_input("<co>bar</co: 0:[0]>"));
+            let src = &result.citations[0].sources[0];
+            assert_eq!(src.document_ids, vec!["res-1"]);
+        }
     }
 }

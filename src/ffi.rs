@@ -1246,6 +1246,10 @@ unsafe fn convert_csource(source: &CSource) -> Source {
     Source {
         tool_call_index: source.tool_call_index,
         tool_result_indices,
+        // document_ids resolution isn't wired through the C FFI (the
+        // parser can't be configured with a lookup table via C right now).
+        // Rust callers should use `FilterOptions::with_message_history`.
+        document_ids: Vec::new(),
     }
 }
 

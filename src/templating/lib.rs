@@ -241,7 +241,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     }
     let mut messages = messages_to_template(
         &opts.messages,
-        !opts.documents.is_empty(),
+        &opts.documents,
         &opts.escaped_special_tokens,
     )?;
     let mut docs = docs_to_template(&opts.documents, &opts.escaped_special_tokens)?;
@@ -352,7 +352,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
     let mut template_tools = tools_to_template(&opts.available_tools)?;
     let mut messages = messages_to_template(
         &opts.messages,
-        !opts.documents.is_empty(),
+        &opts.documents,
         &opts.escaped_special_tokens,
     )?;
     let mut docs = docs_to_template(&opts.documents, &opts.escaped_special_tokens)?;

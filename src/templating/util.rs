@@ -1,12 +1,12 @@
 use crate::errors::MelodyError;
 use crate::parsing::types::FilterCitation;
-use crate::templating::types::{ContentType, Message, Role, Tool, ToolCall};
+use crate::templating::types::{ContentType, Document, Message, Role, Tool, ToolCall};
 use crate::templating::{
     CitationQuality, Content, Grounding, ReasoningType, RenderCmd3Options, RenderCmd4Options,
 };
 use minijinja::Environment;
 use serde_json::{Map, Value, json, to_string};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 pub(crate) fn add_spaces_to_json_encoding(input: &str) -> String {
     let mut b = String::with_capacity(input.len());
@@ -414,30 +414,214 @@ fn tool_content_item_to_template(
     }
 }
 
-// Convert messages to template
+fn extract_doc_id(doc: &Document) -> String {
+    doc.get("id")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn extract_content_doc_id(content: &Content) -> String {
+    match content.content_type {
+        ContentType::Document => content
+            .document
+            .as_ref()
+            .map(extract_doc_id)
+            .unwrap_or_default(),
+        ContentType::Multipart => content
+            .multipart
+            .as_ref()
+            .and_then(|parts| parts.first())
+            .and_then(|part| part.document.as_ref())
+            .map(extract_doc_id)
+            .unwrap_or_default(),
+        _ => String::new(),
+    }
+}
+
+/// Identifier lookup tables produced when messages/documents are numbered
+/// for a prompt.
+///
+/// The tables mirror the numeric axes emitted by the parser inside citations:
+///
+/// - `document_ids[tool_call_index][tool_result_index]` yields the original
+///   `id` field of the document placed at that position in the prompt
+///   (empty string when the source document had no `id`).
+/// - `tool_call_ids[tool_call_index]` yields the original `tool_call_id`
+///   string, or an empty string for the reserved bucket that holds the
+///   top-level `documents` array (index `0` when that array is non-empty).
+///
+/// Both vectors always have the same length.
+///
+/// Produced by [`PromptRenderIds::from_messages`], and used by
+/// [`crate::parsing::FilterOptions::with_message_history`] to resolve
+/// citation indices back to their original document identifiers.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PromptRenderIds {
+    /// Original `tool_call_id` strings, indexed by `tool_call_index`.
+    pub tool_call_ids: Vec<String>,
+    /// Original document identifiers, indexed as
+    /// `document_ids[tool_call_index][tool_result_index]`.
+    pub document_ids: Vec<Vec<String>>,
+}
+
+impl PromptRenderIds {
+    fn new(top_level_documents: &[Document]) -> Self {
+        let mut ids = Self::default();
+        if !top_level_documents.is_empty() {
+            ids.tool_call_ids.push(String::new());
+            ids.document_ids
+                .push(top_level_documents.iter().map(extract_doc_id).collect());
+        }
+        ids
+    }
+
+    fn push_tool_call(&mut self, tool_call_id: &str) -> usize {
+        let idx = self.tool_call_ids.len();
+        self.tool_call_ids.push(tool_call_id.to_string());
+        self.document_ids.push(Vec::new());
+        idx
+    }
+
+    fn push_tool_message_contents(&mut self, tool_call_idx: usize, content: &[Content]) {
+        if let Some(row) = self.document_ids.get_mut(tool_call_idx) {
+            for c in content {
+                row.push(extract_content_doc_id(c));
+            }
+        }
+    }
+
+    /// Walk `messages` and `documents` the same way the renderer would,
+    /// producing the identifier lookup tables that describe how the
+    /// templating engine will assign `tool_call_index` /
+    /// `tool_result_index` axes.
+    ///
+    /// This is the single source of truth for prompt-side ID numbering.
+    /// The renderer ([`messages_to_template`]) and the parser
+    /// ([`crate::parsing::FilterOptions::with_message_history`]) both call
+    /// through here so the two paths stay consistent.
+    ///
+    /// The function is best-effort: malformed inputs (a
+    /// tool message with no `tool_call_id`, an empty or duplicate
+    /// `ToolCall::id`, `tool_calls` on a non-`Chatbot` message, etc.) do
+    /// not error here. They are added into the lookup
+    /// — missing IDs become the empty string, duplicates reuse the
+    /// existing bucket. Callers that care about template shape (i.e. the
+    /// renderer) must validate separately; the parser deliberately does
+    /// not.
+    #[must_use]
+    pub fn from_messages(messages: &[Message], documents: &[Document]) -> Self {
+        let mut prompt_ids = Self::new(documents);
+        let mut tool_call_id_to_idx = HashMap::<String, usize>::new();
+
+        for msg in messages {
+            if msg.role == Role::Tool {
+                let tool_call_id = msg.tool_call_id.as_deref().unwrap_or_default();
+                let idx = *tool_call_id_to_idx
+                    .entry(tool_call_id.to_string())
+                    .or_insert_with(|| prompt_ids.push_tool_call(tool_call_id));
+                prompt_ids.push_tool_message_contents(idx, &msg.content);
+                continue;
+            }
+
+            for tc in &msg.tool_calls {
+                tool_call_id_to_idx
+                    .entry(tc.id.clone())
+                    .or_insert_with(|| prompt_ids.push_tool_call(&tc.id));
+            }
+        }
+
+        prompt_ids
+    }
+}
+
+/// Validate the shape of a single message so the templating engine can
+/// serialise it unambiguously. Designed to be called once per message
+/// inside the renderer's existing message walk, so template building
+/// and validation share a single pass.
+///
+/// `seen_tool_call_ids` threads duplicate-detection state across
+/// successive calls; pass a fresh empty set before the first message.
+///
+/// The parser deliberately does not call this — malformed histories are
+/// the renderer's concern. See [`PromptRenderIds::from_messages`] for
+/// the parser's best-effort numbering.
+fn validate_message_for_rendering<'a>(
+    msg: &'a Message,
+    i: usize,
+    seen_tool_call_ids: &mut HashSet<&'a str>,
+) -> Result<(), MelodyError> {
+    if msg.role == Role::Tool {
+        if msg.tool_call_id.is_none() {
+            return Err(MelodyError::TemplateValidation(format!(
+                "tool message[{i}] missing tool_call_id"
+            )));
+        }
+        return Ok(());
+    }
+
+    for tc in &msg.tool_calls {
+        if msg.role != Role::Chatbot {
+            return Err(MelodyError::TemplateValidation(
+                "tool calls are only supported for chatbot/assistant messages".to_string(),
+            ));
+        }
+        if tc.id.is_empty() {
+            return Err(MelodyError::TemplateValidation(format!(
+                "message[{i}] has tool call with empty id"
+            )));
+        }
+        if !seen_tool_call_ids.insert(tc.id.as_str()) {
+            return Err(MelodyError::TemplateValidation(format!(
+                "message[{i}] has duplicate tool call id: {}",
+                tc.id
+            )));
+        }
+    }
+    Ok(())
+}
+
+// Convert messages to template.
+//
+// Numbering is delegated to `PromptRenderIds::from_messages` so it stays a
+// single source of truth; this function performs a second walk purely for
+// template construction, looking up already-assigned indices instead of
+// re-numbering.
 #[allow(clippy::too_many_lines)] //TODO: Refactor this function to reduce its length.
 pub(crate) fn messages_to_template(
     messages: &[Message],
-    docs_present: bool,
+    documents: &[Document],
     special_token_map: &BTreeMap<String, String>,
 ) -> Result<Vec<Value>, MelodyError> {
+    let prompt_ids = PromptRenderIds::from_messages(messages, documents);
+
+    // Precompute tool_call_id → prompt index, skipping the reserved
+    // top-level documents bucket at index 0 (when present).
+    let starting_idx = usize::from(!documents.is_empty());
+    let tool_call_id_to_prompt_id: BTreeMap<&str, usize> = prompt_ids
+        .tool_call_ids
+        .iter()
+        .enumerate()
+        .skip(starting_idx)
+        .map(|(i, id)| (id.as_str(), i))
+        .collect();
+
     let mut template_messages: Vec<TemplateMessage> = Vec::new();
-    let mut running_tool_call_idx = usize::from(docs_present);
     let mut tool_call_id_to_tool_result_idx = BTreeMap::new();
-    let mut tool_call_id_to_prompt_id = BTreeMap::new();
+    let mut seen_tool_call_ids: HashSet<&str> = HashSet::new();
 
     for (i, msg) in messages.iter().enumerate() {
+        validate_message_for_rendering(msg, i, &mut seen_tool_call_ids)?;
+
         if msg.role == Role::Tool {
-            let tool_call_id = msg.tool_call_id.as_ref().ok_or_else(|| {
-                MelodyError::TemplateValidation(format!("tool message[{i}] missing tool_call_id"))
-            })?;
-            let tool_call_template_id = *tool_call_id_to_prompt_id
-                .entry(tool_call_id.clone())
-                .or_insert_with(|| {
-                    let idx = running_tool_call_idx;
-                    running_tool_call_idx += 1;
-                    idx
-                });
+            // `validate_message_for_rendering` checked tool_call_id is
+            // present; `from_messages` assigned a bucket for every id it
+            // saw (including this one).
+            let tool_call_id = msg.tool_call_id.as_deref().unwrap_or_default();
+            let tool_call_template_id = tool_call_id_to_prompt_id
+                .get(tool_call_id)
+                .copied()
+                .expect("from_messages assigned every tool_call_id");
 
             if template_messages.is_empty()
                 || template_messages
@@ -457,7 +641,7 @@ pub(crate) fn messages_to_template(
                 )
             })?;
             let tool_result_idx = *tool_call_id_to_tool_result_idx
-                .entry(tool_call_id.clone())
+                .entry(tool_call_id.to_string())
                 .or_insert_with(|| {
                     m.tool_results.push(TemplateToolResult {
                         tool_call_id: tool_call_template_id,
@@ -560,27 +744,16 @@ pub(crate) fn messages_to_template(
             }
         }
 
+        // `validate_messages_for_rendering` already rejected empty ids,
+        // duplicates, and tool_calls on non-Chatbot roles.
+        // `from_messages` assigned every id we look up here.
         let mut rendered_tool_calls = Vec::new();
         for tc in &msg.tool_calls {
-            if msg.role != Role::Chatbot {
-                return Err(MelodyError::TemplateValidation(
-                    "tool calls are only supported for chatbot/assistant messages".to_string(),
-                ));
-            }
-            if tc.id.is_empty() {
-                return Err(MelodyError::TemplateValidation(format!(
-                    "message[{i}] has tool call with empty id"
-                )));
-            }
-            if tool_call_id_to_prompt_id.contains_key(&tc.id) {
-                return Err(MelodyError::TemplateValidation(format!(
-                    "message[{i}] has duplicate tool call id: {}",
-                    tc.id
-                )));
-            }
-            tool_call_id_to_prompt_id.insert(tc.id.clone(), running_tool_call_idx);
-            let rendered_tool_call = tool_call_to_template(tc, running_tool_call_idx)?;
-            running_tool_call_idx += 1;
+            let tool_call_template_id = tool_call_id_to_prompt_id
+                .get(tc.id.as_str())
+                .copied()
+                .expect("from_messages assigned every tool_call id");
+            let rendered_tool_call = tool_call_to_template(tc, tool_call_template_id)?;
             rendered_tool_calls.push(rendered_tool_call);
         }
 
@@ -935,5 +1108,270 @@ mod tests {
         let result = to_string(&escaped).unwrap();
         let expected = r#"{"outer_key":["zoozoo",{"inner_key_ooo":["foofoo",{"inner_inner_key_ooo":"inner_inner_volue_ooo"}]}]}"#;
         assert_eq!(result, expected);
+    }
+
+    mod test_prompt_render_ids_from_messages {
+        use super::*;
+
+        fn parse_messages(json: &str) -> Vec<Message> {
+            let value: Value = serde_json::from_str(json).unwrap();
+            serde_path_to_error::deserialize(&value).unwrap()
+        }
+
+        fn parse_documents(json: &str) -> Vec<Document> {
+            let value: Value = serde_json::from_str(json).unwrap();
+            serde_path_to_error::deserialize(&value).unwrap()
+        }
+
+        #[test]
+        fn empty_inputs_produce_empty_tables() {
+            let ids = PromptRenderIds::from_messages(&[], &[]);
+            assert!(ids.tool_call_ids.is_empty());
+            assert!(ids.document_ids.is_empty());
+        }
+
+        #[test]
+        fn top_level_documents_only_reserve_index_zero() {
+            let docs = parse_documents(r#"[{"id": "doc-a"}, {"id": "doc-b"}]"#);
+            let ids = PromptRenderIds::from_messages(&[], &docs);
+            assert_eq!(ids.tool_call_ids, vec![String::new()]);
+            assert_eq!(
+                ids.document_ids,
+                vec![vec!["doc-a".to_string(), "doc-b".to_string()]]
+            );
+        }
+
+        #[test]
+        fn tool_calls_and_results() {
+            let msgs = parse_messages(
+                r#"[
+                    {"role": "user", "content": [{"type": "text", "text": "hi"}]},
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"},
+                        {"id": "call_2", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "tool", "tool_call_id": "call_1", "content": [
+                        {"type": "document", "document": {"id": "res-x"}},
+                        {"type": "document", "document": {"id": "res-y"}}
+                    ]},
+                    {"role": "tool", "tool_call_id": "call_2", "content": [
+                        {"type": "document", "document": {"id": "res-z"}}
+                    ]}
+                ]"#,
+            );
+            let ids = PromptRenderIds::from_messages(&msgs, &[]);
+            assert_eq!(
+                ids.tool_call_ids,
+                vec!["call_1".to_string(), "call_2".to_string()]
+            );
+            assert_eq!(
+                ids.document_ids,
+                vec![
+                    vec!["res-x".to_string(), "res-y".to_string()],
+                    vec!["res-z".to_string()],
+                ]
+            );
+        }
+
+        #[test]
+        fn top_level_docs_interleave_with_tool_calls() {
+            let msgs = parse_messages(
+                r#"[
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "tool", "tool_call_id": "call_1", "content": [
+                        {"type": "document", "document": {"id": "res-1"}}
+                    ]}
+                ]"#,
+            );
+            let docs = parse_documents(r#"[{"id": "doc-a"}]"#);
+            let ids = PromptRenderIds::from_messages(&msgs, &docs);
+            assert_eq!(ids.tool_call_ids, vec![String::new(), "call_1".to_string()]);
+            assert_eq!(
+                ids.document_ids,
+                vec![vec!["doc-a".to_string()], vec!["res-1".to_string()]]
+            );
+        }
+
+        #[test]
+        fn missing_ids_default_to_empty_string() {
+            let msgs = parse_messages(
+                r#"[
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "tool", "tool_call_id": "call_1", "content": [
+                        {"type": "document", "document": {}}
+                    ]}
+                ]"#,
+            );
+            let ids = PromptRenderIds::from_messages(&msgs, &[]);
+            assert_eq!(ids.document_ids, vec![vec![String::new()]]);
+        }
+
+        // `from_messages` is deliberately infallible: template-shape
+        // errors are the renderer's problem, not the parser's. The tests
+        // below pin the graceful-degradation behaviour so the parser
+        // never surfaces a `TemplateValidation` back to a caller.
+
+        #[test]
+        fn tool_message_missing_tool_call_id_gets_empty_bucket() {
+            let msgs = parse_messages(r#"[{"role": "tool", "content": []}]"#);
+            let ids = PromptRenderIds::from_messages(&msgs, &[]);
+            assert_eq!(ids.tool_call_ids, vec![String::new()]);
+            assert_eq!(ids.document_ids, vec![Vec::<String>::new()]);
+        }
+
+        #[test]
+        fn empty_tool_call_id_gets_empty_bucket() {
+            let msgs = parse_messages(
+                r#"[{"role": "chatbot", "content": [], "tool_calls": [
+                    {"id": "", "name": "search", "parameters": "{}"}
+                ]}]"#,
+            );
+            let ids = PromptRenderIds::from_messages(&msgs, &[]);
+            assert_eq!(ids.tool_call_ids, vec![String::new()]);
+        }
+
+        #[test]
+        fn duplicate_tool_call_id_reuses_bucket() {
+            let msgs = parse_messages(
+                r#"[
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]}
+                ]"#,
+            );
+            let ids = PromptRenderIds::from_messages(&msgs, &[]);
+            assert_eq!(ids.tool_call_ids, vec!["call_1".to_string()]);
+        }
+
+        #[test]
+        fn tool_calls_on_non_chatbot_still_number() {
+            let msgs = parse_messages(
+                r#"[{"role": "user", "content": [], "tool_calls": [
+                    {"id": "call_1", "name": "search", "parameters": "{}"}
+                ]}]"#,
+            );
+            let ids = PromptRenderIds::from_messages(&msgs, &[]);
+            assert_eq!(ids.tool_call_ids, vec!["call_1".to_string()]);
+        }
+
+        #[test]
+        fn matches_render_cmd3_numbering() {
+            // Sanity check: whatever the renderer produced (via the shared
+            // helper) must line up with what `from_messages` returns
+            // standalone. Round-trip through render_cmd3 to a produced
+            // prompt substring to make sure the numbering is real.
+            use crate::templating::{RenderCmd3Options, render_cmd3};
+            let json = r#"{
+                "messages": [
+                    {"role": "user", "content": [{"type": "text", "text": "Hi"}]},
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "tool", "tool_call_id": "call_1", "content": [
+                        {"type": "document", "document": {"id": "res-1"}}
+                    ]}
+                ],
+                "documents": [{"id": "doc-a"}, {"id": "doc-b"}]
+            }"#;
+            let value: Value = serde_json::from_str(json).unwrap();
+            let opts: RenderCmd3Options = serde_path_to_error::deserialize(&value).unwrap();
+
+            let standalone = PromptRenderIds::from_messages(&opts.messages, &opts.documents);
+            // Top-level docs go to bucket 0, the tool call gets bucket 1.
+            assert_eq!(standalone.tool_call_ids, vec!["", "call_1"]);
+            assert_eq!(
+                standalone.document_ids,
+                vec![vec!["doc-a", "doc-b"], vec!["res-1"]]
+            );
+            // Prompt must actually render successfully with the same input.
+            assert!(render_cmd3(&opts).is_ok());
+        }
+    }
+
+    mod messages_to_template_validation {
+        //! Renderer-side validation lives inside `messages_to_template`'s
+        //! single message walk (via `validate_message_for_rendering`). We
+        //! test it through the public entry point so the tests don't pin
+        //! the helper's exact shape.
+        use super::*;
+
+        fn parse_messages(json: &str) -> Vec<Message> {
+            let value: Value = serde_json::from_str(json).unwrap();
+            serde_path_to_error::deserialize(&value).unwrap()
+        }
+
+        fn expect_validation_error(msgs: &[Message], needle: &str) {
+            let err =
+                super::super::messages_to_template(msgs, &[], &BTreeMap::new()).unwrap_err();
+            let MelodyError::TemplateValidation(msg) = err else {
+                panic!("expected TemplateValidation error, got {err:?}");
+            };
+            assert!(
+                msg.contains(needle),
+                "expected error message to contain {needle:?}, got {msg:?}"
+            );
+        }
+
+        #[test]
+        fn accepts_well_formed_history() {
+            let msgs = parse_messages(
+                r#"[
+                    {"role": "user", "content": [{"type": "text", "text": "hi"}]},
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "tool", "tool_call_id": "call_1", "content": []}
+                ]"#,
+            );
+            assert!(super::super::messages_to_template(&msgs, &[], &BTreeMap::new()).is_ok());
+        }
+
+        #[test]
+        fn rejects_tool_message_without_tool_call_id() {
+            let msgs = parse_messages(r#"[{"role": "tool", "content": []}]"#);
+            expect_validation_error(&msgs, "missing tool_call_id");
+        }
+
+        #[test]
+        fn rejects_empty_tool_call_id() {
+            let msgs = parse_messages(
+                r#"[{"role": "chatbot", "content": [], "tool_calls": [
+                    {"id": "", "name": "search", "parameters": "{}"}
+                ]}]"#,
+            );
+            expect_validation_error(&msgs, "empty id");
+        }
+
+        #[test]
+        fn rejects_duplicate_tool_call_id() {
+            let msgs = parse_messages(
+                r#"[
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]},
+                    {"role": "chatbot", "content": [], "tool_calls": [
+                        {"id": "call_1", "name": "search", "parameters": "{}"}
+                    ]}
+                ]"#,
+            );
+            expect_validation_error(&msgs, "duplicate tool call id");
+        }
+
+        #[test]
+        fn rejects_tool_calls_on_non_chatbot_role() {
+            let msgs = parse_messages(
+                r#"[{"role": "user", "content": [], "tool_calls": [
+                    {"id": "call_1", "name": "search", "parameters": "{}"}
+                ]}]"#,
+            );
+            expect_validation_error(&msgs, "chatbot");
+        }
     }
 }

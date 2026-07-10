@@ -154,6 +154,7 @@ pub struct FilterToolParameter {
 ///     sources: vec![Source {
 ///         tool_call_index: 0,
 ///         tool_result_indices: vec![0, 1],
+///         document_ids: vec![],
 ///     }],
 ///     is_thinking: false,
 /// };
@@ -189,16 +190,25 @@ pub struct FilterCitation {
 /// let source = Source {
 ///     tool_call_index: 0,
 ///     tool_result_indices: vec![0, 1, 2],
+///     document_ids: vec![],
 /// };
 /// // This means the citation references results 0, 1, and 2 from tool call 0
 /// ```
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
 #[cfg_attr(feature = "python_ffi", pyclass(get_all))]
 pub struct Source {
     /// Index of the tool call that produced these results
     pub tool_call_index: usize,
     /// Indices of specific results from this tool call
     pub tool_result_indices: Vec<usize>,
+    /// Original document identifiers aligned 1-to-1 with
+    /// `tool_result_indices`, resolved via the lookup table the parser was
+    /// configured with (see
+    /// [`crate::parsing::FilterOptions::with_message_history`]). Empty when
+    /// no lookup was configured, or when a specific index falls outside
+    /// the table (in which case the corresponding entry is an empty string).
+    #[serde(default)]
+    pub document_ids: Vec<String>,
 }
 
 /// Aggregated result from filter processing, separating content, reasoning,

@@ -17,10 +17,30 @@ class PyFilterOptions:
     def stream_non_grounded_answer(self) -> PyFilterOptions: ...
     def no_tools(self) -> PyFilterOptions: ...
     def remove_token(self, token: str) -> PyFilterOptions: ...
+    def with_message_history(
+        self,
+        messages: list[dict] | None = None,
+        documents: list[dict] | None = None,
+    ) -> PyFilterOptions:
+        """Configure the parser with the `messages` and `documents` that
+        will be rendered into the prompt, so it can resolve citation
+        indices back to their original document identifiers.
+
+        `messages` and `documents` accept the same shapes used for
+        `render_cmd3` / `render_cmd4`. Either argument may be omitted or
+        passed as `None` to default to an empty list.
+
+        Best-effort by design: template-shape mistakes (missing
+        `tool_call_id`, empty/duplicate ids, `tool_calls` on a
+        non-`chatbot` role) do not raise here — that's the renderer's
+        job. Only argument deserialisation failures raise `ValueError`.
+        """
+        ...
 
 class Source:
     tool_call_index: int
     tool_result_indices: list[int]
+    document_ids: list[str]
 
 class FilterCitation:
     start_index: int

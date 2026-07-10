@@ -240,3 +240,154 @@ class TestPyFilterOptions:
         opts3 = opts2.with_chunk_size(10)
         assert opts1 is not opts2
         assert opts2 is not opts3
+
+
+class TestWithMessageHistory:
+    """End-to-end tests: parser resolves citation indices to document IDs."""
+
+    def _cmd3_input(self, citation: str) -> str:
+        return f"<|START_RESPONSE|>foo {citation}<|END_RESPONSE|>"
+
+    def test_without_message_history_document_ids_empty(self):
+        """When no lookup is configured, document_ids stays empty."""
+        f = PyFilter(PyFilterOptions().cmd3())
+        result = f.process_full_text(self._cmd3_input("<co>bar</co: 0:[0,1]>"))
+        assert len(result.citations) == 1
+        src = result.citations[0].sources[0]
+        assert src.tool_call_index == 0
+        assert src.tool_result_indices == [0, 1]
+        assert src.document_ids == []
+
+    def test_top_level_documents_resolve(self):
+        """Top-level documents live in tool_call_index 0."""
+        opts = (
+            PyFilterOptions()
+            .cmd3()
+            .with_message_history(documents=[{"id": "doc-a"}, {"id": "doc-b"}])
+        )
+        f = PyFilter(opts)
+        result = f.process_full_text(self._cmd3_input("<co>bar</co: 0:[0,1]>"))
+        src = result.citations[0].sources[0]
+        assert src.document_ids == ["doc-a", "doc-b"]
+
+    def test_tool_results_resolve(self):
+        """Tool result documents resolve via their assigned tool_call_index."""
+        messages = [
+            {
+                "role": "chatbot",
+                "content": [],
+                "tool_calls": [
+                    {"id": "call_1", "name": "search", "parameters": "{}"},
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call_1",
+                "content": [
+                    {"type": "document", "document": {"id": "res-x"}},
+                    {"type": "document", "document": {"id": "res-y"}},
+                    {"type": "document", "document": {"id": "res-z"}},
+                ],
+            },
+        ]
+        opts = PyFilterOptions().cmd3().with_message_history(messages=messages)
+        f = PyFilter(opts)
+        result = f.process_full_text(self._cmd3_input("<co>bar</co: 0:[0,2]>"))
+        src = result.citations[0].sources[0]
+        assert src.document_ids == ["res-x", "res-z"]
+
+    def test_docs_and_tool_calls_interleave_correctly(self):
+        """Top-level docs sit at index 0; tool calls start at index 1."""
+        documents = [{"id": "doc-a"}]
+        messages = [
+            {
+                "role": "chatbot",
+                "content": [],
+                "tool_calls": [
+                    {"id": "call_1", "name": "search", "parameters": "{}"},
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call_1",
+                "content": [
+                    {"type": "document", "document": {"id": "res-1"}},
+                ],
+            },
+        ]
+        opts = (
+            PyFilterOptions()
+            .cmd3()
+            .with_message_history(messages=messages, documents=documents)
+        )
+        f = PyFilter(opts)
+        result = f.process_full_text(self._cmd3_input("<co>bar</co: 0:[0],1:[0]>"))
+        cit = result.citations[0]
+        assert len(cit.sources) == 2
+        assert cit.sources[0].document_ids == ["doc-a"]
+        assert cit.sources[1].document_ids == ["res-1"]
+
+    def test_out_of_bounds_indices_handled_gracefully(self):
+        """Out-of-bounds tool_result_indices produce empty strings."""
+        opts = (
+            PyFilterOptions().cmd3().with_message_history(documents=[{"id": "doc-a"}])
+        )
+        f = PyFilter(opts)
+        result = f.process_full_text(self._cmd3_input("<co>bar</co: 0:[0,3]>"))
+        src = result.citations[0].sources[0]
+        assert src.document_ids == ["doc-a", ""]
+
+    def test_arguments_default_to_empty(self):
+        """Both messages and documents default to empty lists. With no history
+        to build a lookup from, the parser leaves document_ids empty (same as
+        never calling with_message_history at all)."""
+        opts = PyFilterOptions().cmd3().with_message_history()
+        f = PyFilter(opts)
+        result = f.process_full_text(self._cmd3_input("<co>bar</co: 0:[0]>"))
+        assert result.citations[0].sources[0].document_ids == []
+
+    def test_positional_arguments_work(self):
+        """messages and documents can be passed positionally, matching Rust."""
+        opts = (
+            PyFilterOptions()
+            .cmd3()
+            .with_message_history([], [{"id": "doc-a"}])
+        )
+        f = PyFilter(opts)
+        result = f.process_full_text(self._cmd3_input("<co>bar</co: 0:[0]>"))
+        assert result.citations[0].sources[0].document_ids == ["doc-a"]
+
+    def test_template_shape_errors_do_not_raise(self):
+        """Template-shape issues (duplicate tool_call_id here) are the
+        renderer's concern, not the parser's. `with_message_history` accepts
+        them silently and still produces a usable lookup."""
+        messages = [
+            {
+                "role": "chatbot",
+                "content": [],
+                "tool_calls": [
+                    {"id": "call_1", "name": "search", "parameters": "{}"}
+                ],
+            },
+            {
+                "role": "chatbot",
+                "content": [],
+                "tool_calls": [
+                    {"id": "call_1", "name": "search", "parameters": "{}"}
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call_1",
+                "content": [{"type": "document", "document": {"id": "res-1"}}],
+            },
+        ]
+        opts = PyFilterOptions().cmd3().with_message_history(messages=messages)
+        f = PyFilter(opts)
+        result = f.process_full_text(self._cmd3_input("<co>bar</co: 0:[0]>"))
+        assert result.citations[0].sources[0].document_ids == ["res-1"]
+
+    def test_non_list_messages_raises(self):
+        """Argument-deserialisation failures still raise ValueError."""
+        with pytest.raises(ValueError):
+            PyFilterOptions().cmd3().with_message_history(messages="not a list")

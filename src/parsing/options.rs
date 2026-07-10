@@ -4,6 +4,8 @@
 
 use crate::parsing::filter::FilterImpl;
 use crate::parsing::types::FilterMode;
+use crate::templating::PromptRenderIds;
+use crate::templating::types::{Document, Message};
 use std::collections::HashMap;
 
 /// Configuration builder for creating filters.
@@ -39,6 +41,11 @@ pub struct FilterOptions {
     pub(crate) stream_processed_params: bool,
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
+    /// Optional lookup table for resolving citation indices back to their
+    /// original document identifiers. Indexed as
+    /// `document_ids[tool_call_index][tool_result_index]`. Empty when
+    /// [`FilterOptions::with_message_history`] hasn't been called.
+    pub(crate) document_ids: Vec<Vec<String>>,
 }
 
 impl Default for FilterOptions {
@@ -56,6 +63,7 @@ impl Default for FilterOptions {
             stream_processed_params: false,
             has_tool_call_id: false,
             cmd3_citations: false,
+            document_ids: Vec::new(),
         }
     }
 }
@@ -489,6 +497,57 @@ impl FilterOptions {
     #[must_use]
     pub fn remove_token(mut self, token: &str) -> Self {
         self.special_token_map.remove(token);
+        self
+    }
+
+    /// Configure the parser with the same `messages` and `documents` that
+    /// will be rendered into the prompt, so it can resolve citation
+    /// indices back to their original document identifiers.
+    ///
+    /// The parser walks the message history exactly the way the renderer
+    /// does (via [`PromptRenderIds::from_messages`]), builds a lookup
+    /// table indexed by `[tool_call_index][tool_result_index]`, and uses
+    /// it to populate [`Source::document_ids`] on every citation it
+    /// emits.
+    ///
+    /// This is the recommended entry point when the parser must be
+    /// created before the prompt is rendered — for example, when vLLM's
+    /// streaming filter is set up alongside the request but the prompt
+    /// itself is materialised later inside the engine. Rendering will
+    /// produce identical numbering, since both paths route through
+    /// [`PromptRenderIds::from_messages`].
+    ///
+    /// This method is infallible: template-shape errors (missing
+    /// `tool_call_id`, empty/duplicate ids, `tool_calls` on a non-Chatbot
+    /// role) are the renderer's concern, not the parser's. On malformed
+    /// input the lookup falls back to best-effort behaviour (empty
+    /// strings, deduplicated buckets) — see
+    /// [`PromptRenderIds::from_messages`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use cohere_melody::parsing::{FilterOptions, new_filter};
+    /// use cohere_melody::templating::types::{Document, Message};
+    ///
+    /// let messages: Vec<Message> = vec![];
+    /// let documents: Vec<Document> = vec![];
+    /// let options = FilterOptions::new()
+    ///     .cmd3()
+    ///     .with_message_history(&messages, &documents);
+    /// let mut filter = new_filter(options);
+    /// # let _ = filter;
+    /// ```
+    ///
+    /// [`Source::document_ids`]: crate::parsing::types::Source::document_ids
+    #[must_use]
+    pub fn with_message_history(
+        mut self,
+        messages: &[Message],
+        documents: &[Document],
+    ) -> Self {
+        let prompt_ids = PromptRenderIds::from_messages(messages, documents);
+        self.document_ids = prompt_ids.document_ids;
         self
     }
 }
