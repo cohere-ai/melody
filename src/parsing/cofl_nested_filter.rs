@@ -132,8 +132,7 @@ impl FilterImpl {
 
         match (close_call_pos, open_value_pos) {
             (Some(c), Some(v)) if v < c => self.handle_nested_open_value(s, v),
-            (Some(c), Some(_)) => self.handle_nested_close_tool_call(s, c),
-            (Some(c), None) => self.handle_nested_close_tool_call(s, c),
+            (Some(c), _) => self.handle_nested_close_tool_call(s, c),
             (None, Some(v)) => self.handle_nested_open_value(s, v),
             (None, None) => (Vec::new(), 0),
         }
@@ -145,8 +144,7 @@ impl FilterImpl {
 
         match (close_value_pos, open_value_pos) {
             (Some(c), Some(v)) if v < c => self.handle_nested_open_value(s, v),
-            (Some(c), Some(_)) => self.handle_nested_close_container(s, c),
-            (Some(c), None) => self.handle_nested_close_container(s, c),
+            (Some(c), _) => self.handle_nested_close_container(s, c),
             (None, Some(v)) => self.handle_nested_open_value(s, v),
             (None, None) => (Vec::new(), 0),
         }
@@ -281,9 +279,6 @@ impl FilterImpl {
                 Some(CoflNestedContainer::ToolCallRoot {
                     raw_object_opened: true,
                 }) => "}",
-                Some(CoflNestedContainer::ToolCallRoot {
-                    raw_object_opened: false,
-                }) => "{}",
                 _ => "{}",
             };
             out.push(FilterOutput {

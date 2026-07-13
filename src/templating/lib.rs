@@ -288,6 +288,7 @@ fn validate_no_multipart(messages: &[Message]) -> Option<MelodyError> {
 /// - JSON serialization of documents fails
 /// - Template parsing fails
 /// - Template rendering fails
+#[allow(clippy::too_many_lines)]
 pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let mut template_tools = tools_to_template(&opts.available_tools)?;
     if let Some(err) = validate_no_multipart(&opts.messages) {
