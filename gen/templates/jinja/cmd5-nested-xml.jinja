@@ -10,19 +10,19 @@
 {%- set convert_first_system_msg = convert_first_system_msg | default(true) -%}
 {%- set skip_thinking = skip_thinking | default(false) -%}
 {{ bos_token }}
-{%- macro xml_text(value) -%}{{ value }}{%- endmacro -%}
+{%- macro xml_text(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;') }}{%- endmacro -%}
 {%- macro xml_attr(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('"', '&quot;') }}{%- endmacro -%}
 {%- macro render_cofl_value(name, value) -%}
 {%- if value is none -%}
 <cofl:value{% if name is not none %} name="{{ xml_attr(name) }}"{% endif %} type="json">null</cofl:value>
 {%- elif value is string -%}
-<cofl:value{% if name is not none %} name="{{ xml_attr(name) }}"{% endif %} type="raw">{{ xml_text(value) }}</cofl:value>
+<cofl:value{% if name is not none %} name="{{ xml_attr(name) }}"{% endif %} type="raw">{{ value }}</cofl:value>
 {%- elif value is mapping -%}
 <cofl:value{% if name is not none %} name="{{ xml_attr(name) }}"{% endif %} type="dict">{%- for param_name, param_value in value|items -%}{{ render_cofl_value(param_name, param_value) }}{%- endfor -%}</cofl:value>
 {%- elif value is sequence and value is not string -%}
 <cofl:value{% if name is not none %} name="{{ xml_attr(name) }}"{% endif %} type="list">{%- for item in value -%}{{ render_cofl_value(none, item) }}{%- endfor -%}</cofl:value>
 {%- else -%}
-<cofl:value{% if name is not none %} name="{{ xml_attr(name) }}"{% endif %} type="json">{{ xml_text(value|tojson) }}</cofl:value>
+<cofl:value{% if name is not none %} name="{{ xml_attr(name) }}"{% endif %} type="json">{{ value|tojson }}</cofl:value>
 {%- endif -%}
 {%- endmacro -%}
 {%- macro render_tool_call_params(arguments) -%}
