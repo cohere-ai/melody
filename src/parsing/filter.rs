@@ -2021,10 +2021,7 @@ mod tests {
 
         let parsed: serde_json::Value =
             serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
-        assert_eq!(
-            parsed["query"],
-            r#"echo "Hello" >> foo.txt && exit"#
-        );
+        assert_eq!(parsed["query"], r#"echo "Hello" >> foo.txt && exit"#);
         assert_eq!(parsed["limit"], 3);
         assert_eq!(parsed["float example"], 3.14);
         assert_eq!(

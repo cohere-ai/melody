@@ -152,7 +152,11 @@ impl FilterImpl {
         }
     }
 
-    fn handle_nested_open_value(&mut self, s: &str, value_pos: usize) -> (Vec<FilterOutput>, usize) {
+    fn handle_nested_open_value(
+        &mut self,
+        s: &str,
+        value_pos: usize,
+    ) -> (Vec<FilterOutput>, usize) {
         let after_open = value_pos + VALUE_OPEN_START.len();
         let Some(close_rel) = s[after_open..].find('>') else {
             return (Vec::new(), 0);
@@ -219,7 +223,11 @@ impl FilterImpl {
         }
     }
 
-    fn handle_nested_close_container(&mut self, s: &str, close_pos: usize) -> (Vec<FilterOutput>, usize) {
+    fn handle_nested_close_container(
+        &mut self,
+        s: &str,
+        close_pos: usize,
+    ) -> (Vec<FilterOutput>, usize) {
         let mut out = Vec::new();
 
         let closing = match self.cofl_nested_action_metadata.containers.last() {
@@ -243,15 +251,17 @@ impl FilterImpl {
 
         self.cofl_nested_action_metadata.containers.pop();
         self.mark_nested_parent_entry_seen();
-        self.cofl_nested_action_metadata.mode = if self.cofl_nested_action_metadata.containers.is_empty()
-            || matches!(
-                self.cofl_nested_action_metadata.containers.last(),
-                Some(CoflNestedContainer::ToolCallRoot { .. })
-            ) {
-            CoflNestedMode::InToolCallBody
-        } else {
-            CoflNestedMode::InContainerBody
-        };
+        self.cofl_nested_action_metadata.mode =
+            if self.cofl_nested_action_metadata.containers.is_empty()
+                || matches!(
+                    self.cofl_nested_action_metadata.containers.last(),
+                    Some(CoflNestedContainer::ToolCallRoot { .. })
+                )
+            {
+                CoflNestedMode::InToolCallBody
+            } else {
+                CoflNestedMode::InContainerBody
+            };
 
         let consumed = close_pos + VALUE_CLOSE.len();
         let (o, r) = self.parse_cofl_nested_actions(&s[consumed..]);
@@ -259,15 +269,15 @@ impl FilterImpl {
         (out, consumed + r)
     }
 
-    fn handle_nested_close_tool_call(&mut self, s: &str, close_pos: usize) -> (Vec<FilterOutput>, usize) {
+    fn handle_nested_close_tool_call(
+        &mut self,
+        s: &str,
+        close_pos: usize,
+    ) -> (Vec<FilterOutput>, usize) {
         let mut out = Vec::new();
 
         if self.stream_tool_actions && !self.stream_processed_params {
-            let closing = match self
-                .cofl_nested_action_metadata
-                .containers
-                .first()
-            {
+            let closing = match self.cofl_nested_action_metadata.containers.first() {
                 Some(CoflNestedContainer::ToolCallRoot {
                     raw_object_opened: true,
                 }) => "}",
@@ -467,7 +477,8 @@ impl FilterImpl {
         }
         let parent = self.cofl_nested_action_metadata.containers.len() - 2;
         match &mut self.cofl_nested_action_metadata.containers[parent] {
-            CoflNestedContainer::Dict { first_entry } | CoflNestedContainer::List { first_entry } => {
+            CoflNestedContainer::Dict { first_entry }
+            | CoflNestedContainer::List { first_entry } => {
                 *first_entry = false;
             }
             CoflNestedContainer::ToolCallRoot { .. } => {}
@@ -517,10 +528,7 @@ mod tests {
 
         let raw = collect_raw(&out);
         let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
-        assert_eq!(
-            parsed["query"],
-            r#"echo "Hello" >> foo.txt && exit"#
-        );
+        assert_eq!(parsed["query"], r#"echo "Hello" >> foo.txt && exit"#);
         assert_eq!(parsed["limit"], 3);
         assert_eq!(parsed["float example"], 3.14);
         assert_eq!(
