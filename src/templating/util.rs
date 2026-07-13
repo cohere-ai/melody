@@ -625,7 +625,10 @@ pub(crate) fn get_minijinja_env<'a>(
 // This function does the majority of work needed to convert from our internal message format to
 // the jinja supported chat completions format
 #[allow(clippy::too_many_lines)]
-fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyError> {
+fn convert_messages_for_jinja(
+    messages: &[Value],
+    raw_tool_call_names: bool,
+) -> Result<Vec<Value>, MelodyError> {
     fn get_vec<'a>(
         val_map: &'a mut Map<String, Value>,
         key: &str,
@@ -673,11 +676,16 @@ fn convert_messages_for_jinja(messages: &[Value]) -> Result<Vec<Value>, MelodyEr
                         .unwrap_or_default()
                         .as_str()
                         .unwrap_or_default();
+                    let name = if raw_tool_call_names {
+                        tool_name.to_string()
+                    } else {
+                        json_escape_string(tool_name)
+                    };
                     *t = json!({
                         "id": tool_call.get("tool_call_id"),
                         "type": "function",
                         "function": {
-                            "name": json_escape_string(tool_name),
+                            "name": name,
                             "arguments": tool_call.get("parameters")
                         }
                     });
@@ -803,8 +811,9 @@ pub(crate) fn get_jinja_vars(
     tools: &[Tool],
     documents: &[Map<String, Value>],
     special_token_map: &BTreeMap<String, String>,
+    raw_tool_call_names: bool,
 ) -> Result<(Vec<Value>, Vec<Map<String, Value>>, Vec<Value>), MelodyError> {
-    let messages = convert_messages_for_jinja(messages)?;
+    let messages = convert_messages_for_jinja(messages, raw_tool_call_names)?;
     let template_tools = tools_to_template_jinja(tools);
     let docs = docs_to_template_jinja(documents, special_token_map);
     Ok((messages, template_tools, docs))

@@ -127,6 +127,11 @@ pub struct RenderCmd4Options<'a> {
     pub additional_template_fields: Map<String, Value>,
     /// Special tokens to escape in the output.
     pub escaped_special_tokens: BTreeMap<String, String>,
+    /// When true, tool call names are left unescaped for templates that apply
+    /// XML attribute escaping (cmd5). Set internally by [`render_cmd5`]; do not
+    /// set manually.
+    #[serde(skip, default)]
+    pub raw_tool_call_names: bool,
 }
 
 static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.tmpl");
@@ -157,6 +162,7 @@ impl Default for RenderCmd4Options<'_> {
             json_mode: false,
             additional_template_fields: Map::new(),
             escaped_special_tokens: BTreeMap::new(),
+            raw_tool_call_names: false,
         }
     }
 }
@@ -300,6 +306,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
             &opts.available_tools,
             &opts.documents,
             &opts.escaped_special_tokens,
+            false,
         )?;
     }
 
@@ -415,6 +422,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
             &opts.available_tools,
             &opts.documents,
             &opts.escaped_special_tokens,
+            opts.raw_tool_call_names,
         )?;
     }
 
@@ -529,6 +537,9 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
     let mut active_opts: RenderCmd5Options<'a> = opts.clone();
     // Honor caller `template_jinja` even when `use_jinja` is false.
     active_opts.use_jinja = true;
+    // cmd5 templates XML-escape tool names via `xml_attr`; skip JSON escaping
+    // in the jinja message prep path (cmd3/cmd4 embed names in JSON instead).
+    active_opts.raw_tool_call_names = true;
 
     if let Some(template_id) = opts.template_id.as_ref() {
         let template_enum = CMD5JinjaTemplates::from_str(template_id)?;
