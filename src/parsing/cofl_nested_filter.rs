@@ -387,7 +387,7 @@ impl FilterImpl {
             // synthetic object wrappers (`{"key": ` / `, "key": `) belong only
             // to the raw JSON accumulator and are discarded here.
             let name = key.unwrap_or_default().to_string();
-            self.cofl_nested_action_metadata.cur_param_name = name.clone();
+            self.cofl_nested_action_metadata.cur_param_name.clone_from(&name);
             (
                 vec![FilterOutput {
                     tool_call_delta: Some(FilterToolCallDelta {
