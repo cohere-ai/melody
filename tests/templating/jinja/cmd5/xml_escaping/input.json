@@ -21,7 +21,7 @@
         {
           "id": "0",
           "name": "run<cmd>&tool",
-          "parameters": "{\"str_param\": \"value with <tag> & \\\"quotes\\\"\", \"num_param\": 42, \"bool_param\": true, \"list_param\": [\"a<b\", \"c&d\"], \"param<>&name\": \"attr test\", \"nested\": {\"key<1>\": \"val>2\"}, \"filters\": {\"artist\": \"The \\\"Sudan\\\" Ensemble\", \"note\": \"line1\\nline2\"}}"
+          "parameters": "{\"str_param\": \"value with <tag> & \\\"quotes\\\" 🌈\", \"num_param\": 42, \"bool_param\": true, \"list_param\": [\"🌈a<b\", \"c&d\"], \"param<>&name\": \"attr test\", \"nested\": {\"key<1>\": \"val>2\"}, \"filters\": {\"artist\": \"The \\\"Sudan\\\" Ensemble\", \"note\": \"line1\\nline2\"}}"
         }
       ]
     },
@@ -31,13 +31,13 @@
       "content": [
         {
           "type": "text",
-          "text": "stdout: <cofl:tool_result_item> & ampersand \"quoted\""
+          "text": "stdout: <cofl:tool_result_item> & ampersand \"quoted\" 🌈"
         },
         {
           "type": "document",
           "document": {
             "status": "ok",
-            "detail": "payload with <xml> & 'chars'"
+            "detail": "payload with <xml> & 'chars' café"
           }
         }
       ]

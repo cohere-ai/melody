@@ -21,7 +21,7 @@
         {
           "id": "0",
           "name": "search \"web\"",
-          "parameters": "{\"query\": \"echo \\\"Hello\\\" >> foo.txt && exit\", \"limit\": 3, \"float example\": 3.14, \"filters\": {\"fresh\": true, \"tags\": [\"music\", \"Sudan\"]}, \"missing\": null, \"empty_dict\": {}, \"empty_list\": []}"
+          "parameters": "{\"query\": \"echo \\\"Hello\\\" >> foo.txt && exit 🌈\", \"limit\": 3, \"float example\": 3.14, \"filters\": {\"fresh\": true, \"tags\": [\"music\", \"Sudan 🌈\"]}, \"missing\": null, \"empty_dict\": {}, \"empty_list\": []}"
         }
       ]
     }

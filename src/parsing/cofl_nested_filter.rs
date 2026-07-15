@@ -545,6 +545,28 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_nested_xml_extra_whitespace_in_open_tags() {
+        let mut f = fresh_nested_filter();
+        // Multiple spaces between tag name and attrs, and between attrs, are fine
+        // because open markers are `"<cofl:tool_call "` / `"<cofl:value "` and
+        // attribute extraction scans the remainder for `key="..."`.
+        let input = r#"<cofl:tool_call            id="0"    name="search"><cofl:value     name="query"   type="raw">hello</cofl:value><cofl:value  name="tags"  type="list"><cofl:value  type="raw">a</cofl:value></cofl:value></cofl:tool_call>"#;
+        let (out, consumed) = f.parse_cofl_nested_actions(input);
+        assert_eq!(consumed, input.len());
+
+        let name = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .find_map(|d| (!d.name.is_empty()).then_some(d.name.as_str()));
+        assert_eq!(name, Some("search"));
+
+        let raw = collect_raw(&out);
+        let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
+        assert_eq!(parsed["query"], "hello");
+        assert_eq!(parsed["tags"], serde_json::json!(["a"]));
+    }
+
+    #[test]
     fn test_parse_nested_xml_streaming_in_pieces() {
         let full = r#"<cofl:tool_call id="0" name="search"><cofl:value name="query" type="raw">hello</cofl:value></cofl:tool_call>"#;
         let mut combined = String::new();
