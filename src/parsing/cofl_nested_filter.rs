@@ -17,7 +17,7 @@ use crate::parsing::cofl_filter::{
     decode_xml_entities, extract_attr, json_escape_string_content, split_xml_entity_holdback,
 };
 use crate::parsing::filter::{FilterImpl, PartialMatchResult, find_partial};
-use crate::parsing::types::{FilterOutput, FilterToolCallDelta};
+use crate::parsing::types::{FilterOutput, FilterToolCallDelta, FilterToolParameter};
 
 pub(crate) const TOOL_CALL_OPEN_START: &str = "<cofl:tool_call ";
 pub(crate) const TOOL_CALL_CLOSE: &str = "</cofl:tool_call>";
@@ -48,6 +48,9 @@ pub(crate) struct FilterCoflNestedAction {
     pub(crate) cur_tool_call_index: usize,
     pub(crate) containers: Vec<CoflNestedContainer>,
     pub(crate) leaf_is_raw: bool,
+    /// Name of the top-level parameter currently being streamed when
+    /// `stream_processed_params` is enabled.
+    pub(crate) cur_param_name: String,
 }
 
 impl FilterCoflNestedAction {
@@ -57,6 +60,7 @@ impl FilterCoflNestedAction {
             cur_tool_call_index: 0,
             containers: Vec::new(),
             leaf_is_raw: false,
+            cur_param_name: String::new(),
         }
     }
 }
@@ -237,16 +241,7 @@ impl FilterImpl {
             }
         };
 
-        if self.stream_tool_actions && !self.stream_processed_params {
-            out.push(FilterOutput {
-                tool_call_delta: Some(FilterToolCallDelta {
-                    index: self.cofl_nested_action_metadata.cur_tool_call_index,
-                    raw_param_delta: closing.to_string(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            });
-        }
+        out.extend(self.emit_nested_stream_delta(closing.to_string()));
 
         self.cofl_nested_action_metadata.containers.pop();
         self.mark_nested_parent_entry_seen();
@@ -275,6 +270,9 @@ impl FilterImpl {
     ) -> (Vec<FilterOutput>, usize) {
         let mut out = Vec::new();
 
+        // Only the raw stream needs a closing brace. The processed-params
+        // stream is naturally closed by the absence of further `param_delta`s
+        // for this tool call's index.
         if self.stream_tool_actions && !self.stream_processed_params {
             let closing = match self.cofl_nested_action_metadata.containers.first() {
                 Some(CoflNestedContainer::ToolCallRoot {
@@ -294,6 +292,7 @@ impl FilterImpl {
 
         self.cofl_nested_action_metadata.cur_tool_call_index += 1;
         self.cofl_nested_action_metadata.containers.clear();
+        self.cofl_nested_action_metadata.cur_param_name.clear();
         self.cofl_nested_action_metadata.mode = CoflNestedMode::BeforeToolCall;
 
         let consumed = close_pos + TOOL_CALL_CLOSE.len();
@@ -332,6 +331,79 @@ impl FilterImpl {
             (out, close_consumed + r)
         } else {
             (out, value_consumed)
+        }
+    }
+
+    fn nested_at_tool_call_root(&self) -> bool {
+        matches!(
+            self.cofl_nested_action_metadata.containers.last(),
+            Some(CoflNestedContainer::ToolCallRoot { .. })
+        )
+    }
+
+    /// Emit either a `param_delta` or `raw_param_delta` chunk, mirroring the
+    /// flat cofl parser: only one of the two streams is populated.
+    fn emit_nested_stream_delta(&self, delta: String) -> Vec<FilterOutput> {
+        if !self.stream_tool_actions || delta.is_empty() {
+            return Vec::new();
+        }
+
+        let tool_call_delta = if self.stream_processed_params {
+            FilterToolCallDelta {
+                index: self.cofl_nested_action_metadata.cur_tool_call_index,
+                param_delta: Some(FilterToolParameter {
+                    name: self.cofl_nested_action_metadata.cur_param_name.clone(),
+                    value_delta: delta,
+                }),
+                ..Default::default()
+            }
+        } else {
+            FilterToolCallDelta {
+                index: self.cofl_nested_action_metadata.cur_tool_call_index,
+                raw_param_delta: delta,
+                ..Default::default()
+            }
+        };
+
+        vec![FilterOutput {
+            tool_call_delta: Some(tool_call_delta),
+            ..Default::default()
+        }]
+    }
+
+    /// Begin a nested entry under `key`, announcing a top-level `param_delta`
+    /// when `stream_processed_params` is set and returning any structural
+    /// prefix that should be prepended to the entry's value.
+    fn begin_nested_entry(&mut self, key: Option<&str>) -> (Vec<FilterOutput>, String) {
+        let at_root = self.nested_at_tool_call_root();
+        let prefix = self.emit_nested_key_prefix(key);
+
+        if !self.stream_tool_actions {
+            return (Vec::new(), String::new());
+        }
+
+        if self.stream_processed_params && at_root {
+            // Top-level params stream as structured name/value pairs. The
+            // synthetic object wrappers (`{"key": ` / `, "key": `) belong only
+            // to the raw JSON accumulator and are discarded here.
+            let name = key.unwrap_or_default().to_string();
+            self.cofl_nested_action_metadata.cur_param_name = name.clone();
+            (
+                vec![FilterOutput {
+                    tool_call_delta: Some(FilterToolCallDelta {
+                        index: self.cofl_nested_action_metadata.cur_tool_call_index,
+                        param_delta: Some(FilterToolParameter {
+                            name,
+                            value_delta: String::new(),
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }],
+                String::new(),
+            )
+        } else {
+            (Vec::new(), prefix)
         }
     }
 
@@ -376,62 +448,28 @@ impl FilterImpl {
         open: &str,
         close: &str,
     ) -> Vec<FilterOutput> {
-        if !self.stream_tool_actions || self.stream_processed_params {
-            return Vec::new();
-        }
-
-        let prefix = self.emit_nested_key_prefix(key);
-        let delta = format!("{prefix}{open}{close}");
-        vec![FilterOutput {
-            tool_call_delta: Some(FilterToolCallDelta {
-                index: self.cofl_nested_action_metadata.cur_tool_call_index,
-                raw_param_delta: delta,
-                ..Default::default()
-            }),
-            ..Default::default()
-        }]
+        let (mut out, prefix) = self.begin_nested_entry(key);
+        out.extend(self.emit_nested_stream_delta(format!("{prefix}{open}{close}")));
+        out
     }
 
     fn emit_nested_container_open(&mut self, key: Option<&str>, open: &str) -> Vec<FilterOutput> {
-        if !self.stream_tool_actions || self.stream_processed_params {
-            return Vec::new();
-        }
-
-        let prefix = self.emit_nested_key_prefix(key);
-        vec![FilterOutput {
-            tool_call_delta: Some(FilterToolCallDelta {
-                index: self.cofl_nested_action_metadata.cur_tool_call_index,
-                raw_param_delta: format!("{prefix}{open}"),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }]
+        let (mut out, prefix) = self.begin_nested_entry(key);
+        out.extend(self.emit_nested_stream_delta(format!("{prefix}{open}")));
+        out
     }
 
     fn emit_nested_leaf_open(&mut self, key: Option<&str>, is_raw: bool) -> Vec<FilterOutput> {
-        if !self.stream_tool_actions || self.stream_processed_params {
-            return Vec::new();
-        }
-
-        let mut delta = self.emit_nested_key_prefix(key);
+        let (mut out, mut delta) = self.begin_nested_entry(key);
         if is_raw {
             delta.push('"');
         }
-        if delta.is_empty() {
-            return Vec::new();
-        }
-        vec![FilterOutput {
-            tool_call_delta: Some(FilterToolCallDelta {
-                index: self.cofl_nested_action_metadata.cur_tool_call_index,
-                raw_param_delta: delta,
-                ..Default::default()
-            }),
-            ..Default::default()
-        }]
+        out.extend(self.emit_nested_stream_delta(delta));
+        out
     }
 
     fn emit_nested_leaf_chunk(&mut self, chunk: &str, is_final: bool) -> Vec<FilterOutput> {
-        if !self.stream_tool_actions || self.stream_processed_params {
+        if !self.stream_tool_actions {
             return Vec::new();
         }
         if chunk.is_empty() && !is_final {
@@ -456,18 +494,7 @@ impl FilterImpl {
             delta.push_str("null");
         }
 
-        if delta.is_empty() {
-            return Vec::new();
-        }
-
-        vec![FilterOutput {
-            tool_call_delta: Some(FilterToolCallDelta {
-                index: self.cofl_nested_action_metadata.cur_tool_call_index,
-                raw_param_delta: delta,
-                ..Default::default()
-            }),
-            ..Default::default()
-        }]
+        self.emit_nested_stream_delta(delta)
     }
 
     fn mark_nested_parent_entry_seen(&mut self) {
@@ -499,11 +526,39 @@ mod tests {
         filter
     }
 
+    fn fresh_nested_processed_filter() -> FilterImpl {
+        let mut filter = fresh_nested_filter();
+        filter.stream_processed_params = true;
+        filter
+    }
+
     fn collect_raw(out: &[FilterOutput]) -> String {
         out.iter()
             .filter_map(|o| o.tool_call_delta.as_ref())
             .map(|d| d.raw_param_delta.as_str())
             .collect()
+    }
+
+    fn collect_processed(out: &[FilterOutput]) -> Vec<(String, String)> {
+        out.iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .filter_map(|d| d.param_delta.as_ref())
+            .map(|p| (p.name.clone(), p.value_delta.clone()))
+            .collect()
+    }
+
+    fn aggregate_processed_values(out: &[FilterOutput]) -> Vec<(String, String)> {
+        let mut aggregated: Vec<(String, String)> = Vec::new();
+        for (name, value) in collect_processed(out) {
+            if let Some((last_name, last_value)) = aggregated.last_mut() {
+                if *last_name == name {
+                    last_value.push_str(&value);
+                    continue;
+                }
+            }
+            aggregated.push((name, value));
+        }
+        aggregated
     }
 
     #[test]
@@ -604,5 +659,73 @@ mod tests {
         }
         assert!(buf.is_empty());
         assert_eq!(combined, r#"{"query": "hello"}"#);
+    }
+
+    #[test]
+    fn test_parse_nested_xml_processed_params_simple() {
+        let mut f = fresh_nested_processed_filter();
+        let input = r#"<cofl:tool_call id="0" name="search"><cofl:value name="query" type="raw">hello</cofl:value><cofl:value name="limit" type="json">3</cofl:value></cofl:tool_call>"#;
+        let (out, consumed) = f.parse_cofl_nested_actions(input);
+        assert_eq!(consumed, input.len());
+
+        assert!(
+            collect_raw(&out).is_empty(),
+            "processed mode must not emit raw_param_delta"
+        );
+
+        let params = aggregate_processed_values(&out);
+        assert_eq!(
+            params,
+            vec![
+                ("query".to_string(), "\"hello\"".to_string()),
+                ("limit".to_string(), "3".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_nested_xml_processed_params_nested_containers() {
+        let mut f = fresh_nested_processed_filter();
+        let input = r#"<cofl:tool_call id="0" name="search"><cofl:value name="filters" type="dict"><cofl:value name="fresh" type="json">true</cofl:value><cofl:value name="tags" type="list"><cofl:value type="raw">music</cofl:value><cofl:value type="raw">Sudan</cofl:value></cofl:value></cofl:value><cofl:value name="empty_dict" type="dict"></cofl:value><cofl:value name="empty_list" type="list"></cofl:value></cofl:tool_call>"#;
+        let (out, consumed) = f.parse_cofl_nested_actions(input);
+        assert_eq!(consumed, input.len());
+
+        assert!(collect_raw(&out).is_empty());
+
+        let params = aggregate_processed_values(&out);
+        assert_eq!(params.len(), 3);
+        assert_eq!(params[0].0, "filters");
+        let filters: serde_json::Value =
+            serde_json::from_str(&params[0].1).expect("filters value is valid JSON");
+        assert_eq!(
+            filters,
+            serde_json::json!({"fresh": true, "tags": ["music", "Sudan"]})
+        );
+        assert_eq!(params[1], ("empty_dict".to_string(), "{}".to_string()));
+        assert_eq!(params[2], ("empty_list".to_string(), "[]".to_string()));
+    }
+
+    #[test]
+    fn test_parse_nested_xml_processed_params_empty_tool_call() {
+        let mut f = fresh_nested_processed_filter();
+        let input = r#"<cofl:tool_call id="0" name="GetReminders"></cofl:tool_call>"#;
+        let (out, consumed) = f.parse_cofl_nested_actions(input);
+        assert_eq!(consumed, input.len());
+
+        // Empty tool calls emit neither raw nor processed argument chunks —
+        // mirroring flat cofl, which only synthesizes `{}` in raw mode.
+        assert!(collect_raw(&out).is_empty());
+        assert!(collect_processed(&out).is_empty());
+
+        let id = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .find_map(|d| (!d.id.is_empty()).then_some(d.id.as_str()));
+        let name = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .find_map(|d| (!d.name.is_empty()).then_some(d.name.as_str()));
+        assert_eq!(id, Some("0"));
+        assert_eq!(name, Some("GetReminders"));
     }
 }

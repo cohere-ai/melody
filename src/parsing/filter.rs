@@ -2033,6 +2033,32 @@ mod tests {
         assert_eq!(parsed["empty_list"], serde_json::json!([]));
     }
 
+    #[test]
+    fn test_process_full_text_cmd5_nested_xml_processed_params() {
+        let opts = FilterOptions::default()
+            .cmd5()
+            .cofl_nested_xml()
+            .stream_processed_params();
+        let mut f = new_filter(opts);
+        let text = r#"<|START_THINKING|>searching<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search"><cofl:value name="query" type="raw">hello</cofl:value><cofl:value name="filters" type="dict"><cofl:value name="fresh" type="json">true</cofl:value><cofl:value name="tags" type="list"><cofl:value type="raw">music</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "search");
+        assert_eq!(result.tool_calls[0].arguments, "");
+
+        let params = &result.tool_calls[0].processed_params;
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0].name, "query");
+        assert_eq!(params[0].value_delta, "\"hello\"");
+        assert_eq!(params[1].name, "filters");
+        let filters: serde_json::Value =
+            serde_json::from_str(&params[1].value_delta).expect("valid JSON");
+        assert_eq!(
+            filters,
+            serde_json::json!({"fresh": true, "tags": ["music"]})
+        );
+    }
+
     /// cmd5 generation prompts include `<|START_THINKING|>`, so the
     /// reasoning block can be implicit (no explicit start token) and the
     /// stream may begin directly with reasoning text terminated by
