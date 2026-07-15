@@ -203,22 +203,23 @@ impl FilterImpl {
             }
         }
 
-        let consumed = if is_empty {
+        // Empty containers consume `</cofl:value>` here. Empty leaves do not —
+        // they leave the close tag for `InLeafBody` so the closing quote / mode
+        // reset run. Consuming the close while still in `InLeafBody` left later
+        // siblings parsed as stray leaf text.
+        let empty_container = is_empty && matches!(value_type, "dict" | "list");
+        let consumed = if empty_container {
             after_tag + VALUE_CLOSE.len()
         } else {
             close_pos + 1
         };
 
-        if is_empty {
+        if empty_container {
             self.mark_nested_parent_entry_seen();
-            let (o, r) = self.parse_cofl_nested_actions(&s[consumed..]);
-            out.extend(o);
-            (out, consumed + r)
-        } else {
-            let (o, r) = self.parse_cofl_nested_actions(&s[consumed..]);
-            out.extend(o);
-            (out, consumed + r)
         }
+        let (o, r) = self.parse_cofl_nested_actions(&s[consumed..]);
+        out.extend(o);
+        (out, consumed + r)
     }
 
     fn handle_nested_close_container(
@@ -450,6 +451,9 @@ impl FilterImpl {
         };
         if is_final && self.cofl_nested_action_metadata.leaf_is_raw {
             delta.push('"');
+        } else if is_final && delta.is_empty() {
+            // Empty `type="json"` body — emit null so the key stays a valid pair.
+            delta.push_str("null");
         }
 
         if delta.is_empty() {
@@ -542,6 +546,26 @@ mod tests {
         let (out, consumed) = f.parse_cofl_nested_actions(input);
         assert_eq!(consumed, input.len());
         assert_eq!(collect_raw(&out), "{}");
+    }
+
+    #[test]
+    fn test_parse_nested_xml_empty_raw_and_json_leaves() {
+        let mut f = fresh_nested_filter();
+        // cmd5-nested-xml emits empty strings as `<cofl:value ... type="raw"></cofl:value>`.
+        let input = r#"<cofl:tool_call id="0" name="run"><cofl:value name="empty_raw" type="raw"></cofl:value><cofl:value name="next" type="raw">after</cofl:value><cofl:value name="empty_json" type="json"></cofl:value><cofl:value name="flag" type="json">true</cofl:value></cofl:tool_call>"#;
+        let (out, consumed) = f.parse_cofl_nested_actions(input);
+        assert_eq!(consumed, input.len());
+        assert_eq!(
+            f.cofl_nested_action_metadata.mode,
+            CoflNestedMode::BeforeToolCall
+        );
+
+        let raw = collect_raw(&out);
+        let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
+        assert_eq!(parsed["empty_raw"], "");
+        assert_eq!(parsed["next"], "after");
+        assert_eq!(parsed["empty_json"], serde_json::Value::Null);
+        assert_eq!(parsed["flag"], true);
     }
 
     #[test]
