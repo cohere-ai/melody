@@ -15,6 +15,7 @@ type filterConfig struct {
 	streamNonGroundedAnswer bool
 	streamProcessedParams   bool
 	coflNoXMLTextDecode     bool
+	coflNestedXML           bool
 	leftTrimmed             bool
 	rightTrimmed            bool
 	prefixTrim              string
@@ -58,6 +59,9 @@ func (cfg *filterConfig) apply(opts *FilterOptions) {
 	}
 	if cfg.coflNoXMLTextDecode {
 		opts.CoflNoXMLTextDecode()
+	}
+	if cfg.coflNestedXML {
+		opts.CoflNestedXML()
 	}
 
 	// Handle trimming options
@@ -154,6 +158,14 @@ func StreamProcessedParams() FilterOption {
 func CoflNoXMLTextDecode() FilterOption {
 	return func(cfg *filterConfig) {
 		cfg.coflNoXMLTextDecode = true
+	}
+}
+
+// CoflNestedXML parses cofl tool parameters as nested <cofl:value> nodes.
+// Use with the cmd5-nested-xml template. Also disables body entity decoding.
+func CoflNestedXML() FilterOption {
+	return func(cfg *filterConfig) {
+		cfg.coflNestedXML = true
 	}
 }
 
