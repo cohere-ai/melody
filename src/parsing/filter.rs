@@ -1959,7 +1959,7 @@ mod tests {
     fn test_process_full_text_cmd5_no_xml_text_decode() {
         let opts = FilterOptions::default().cmd5().cofl_no_xml_text_decode();
         let mut f = new_filter(opts);
-        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with <tag> & "quotes" & &amp;</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a<b", "c&d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key<1>": "val>2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with <tag> & "quotes" & &amp;</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a<b", "c&d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key<1>": "val>2"}</cofl:tool_param><cofl:tool_param name="filters" string="false">{"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 1);
         assert_eq!(result.tool_calls[0].name, "run<cmd>&tool");
@@ -1971,6 +1971,10 @@ mod tests {
         assert_eq!(parsed["list_param"], serde_json::json!(["a<b", "c&d"]));
         assert_eq!(parsed["param<>&name"], "attr test");
         assert_eq!(parsed["nested"], serde_json::json!({"key<1>": "val>2"}));
+        assert_eq!(
+            parsed["filters"],
+            serde_json::json!({"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"})
+        );
     }
 
     /// Round-trip the XML-entity escaping used by the cmd5 template, mirroring
@@ -1978,7 +1982,7 @@ mod tests {
     #[test]
     fn test_process_full_text_cmd5_xml_entity_escaping() {
         let mut f = make_cmd5_filter();
-        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with &lt;tag&gt; &amp; "quotes"</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="bool_param" string="false">true</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a&lt;b", "c&amp;d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key&lt;1&gt;": "val&gt;2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with &lt;tag&gt; &amp; "quotes"</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="bool_param" string="false">true</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a&lt;b", "c&amp;d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key&lt;1&gt;": "val&gt;2"}</cofl:tool_param><cofl:tool_param name="filters" string="false">{"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 1);
         assert_eq!(result.tool_calls[0].id, "0");
@@ -1992,6 +1996,10 @@ mod tests {
         assert_eq!(parsed["list_param"], serde_json::json!(["a<b", "c&d"]));
         assert_eq!(parsed["param<>&name"], "attr test");
         assert_eq!(parsed["nested"], serde_json::json!({"key<1>": "val>2"}));
+        assert_eq!(
+            parsed["filters"],
+            serde_json::json!({"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"})
+        );
     }
 
     /// cmd5 generation prompts include `<|START_THINKING|>`, so the
