@@ -43,8 +43,9 @@ static VALUE_CLOSE_IN_LEAF_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"</\s*cofl:value\s*>").expect("invalid leaf value close regex")
 });
 
-/// Return true when `suffix` (starting at `<`) could still grow into
-/// `</\s*{local_name}\s*>`. Used to hold back incomplete close tags while streaming.
+/// Return true when `suffix` (starting at `<`) is an *incomplete* close tag
+/// (`</\s*{local_name}\s*` with no `>` yet). Used to hold back while streaming;
+/// complete closes are matched by `VALUE_CLOSE_IN_LEAF_RE` instead.
 /// Requires `/` immediately after `<` (no `< /...>`).
 fn is_close_tag_prefix(suffix: &str, local_name: &str) -> bool {
     let bytes = suffix.as_bytes();
@@ -66,18 +67,16 @@ fn is_close_tag_prefix(suffix: &str, local_name: &str) -> bool {
     }
     let remaining = &bytes[i..];
     let name = local_name.as_bytes();
-    if remaining.len() <= name.len() {
+    if remaining.len() < name.len() {
         return name.starts_with(remaining);
     }
     if !remaining.starts_with(name) {
         return false;
     }
-    let after_name = &remaining[name.len()..];
-    let mut j = 0;
-    while j < after_name.len() && after_name[j].is_ascii_whitespace() {
-        j += 1;
-    }
-    j == after_name.len() || (j == after_name.len() - 1 && after_name[j] == b'>')
+    // Name is complete: hold back only while `>` has not arrived yet.
+    remaining[name.len()..]
+        .iter()
+        .all(|&b| b.is_ascii_whitespace())
 }
 
 fn find_leaf_value_close(s: &str) -> PartialMatchResult {
@@ -774,7 +773,10 @@ mod tests {
         assert!(!is_close_tag_prefix("< /cofl:value>", "cofl:value"));
         assert!(is_close_tag_prefix("</", "cofl:value"));
         assert!(is_close_tag_prefix("</ cofl:value", "cofl:value"));
-        assert!(is_close_tag_prefix("</ cofl:value >", "cofl:value"));
+        assert!(is_close_tag_prefix("</ cofl:value ", "cofl:value"));
+        // Complete closes (including a trailing `>`) are the regex's job, not holdback.
+        assert!(!is_close_tag_prefix("</ cofl:value >", "cofl:value"));
+        assert!(!is_close_tag_prefix("</cofl:value>", "cofl:value"));
     }
 
     #[test]
