@@ -16,13 +16,85 @@
 use crate::parsing::cofl_filter::{
     decode_xml_entities, extract_attr, json_escape_string_content, split_xml_entity_holdback,
 };
-use crate::parsing::filter::{FilterImpl, PartialMatchResult, find_partial};
+use crate::parsing::filter::{FilterImpl, PartialMatchResult};
 use crate::parsing::types::{FilterOutput, FilterToolCallDelta, FilterToolParameter};
+use regex::Regex;
+use std::sync::LazyLock;
 
-pub(crate) const TOOL_CALL_OPEN_START: &str = "<cofl:tool_call ";
-pub(crate) const TOOL_CALL_CLOSE: &str = "</cofl:tool_call>";
-const VALUE_OPEN_START: &str = "<cofl:value ";
-const VALUE_CLOSE: &str = "</cofl:value>";
+/// Tag matchers mirror `datatools.renderer.parse_nested_xml`: whitespace is
+/// allowed after `<` before an open tag name, after `/` in a close tag, and
+/// before `>`. Close tags must start with `</` — a space between `<` and `/`
+/// is not accepted. Leading `\s*` on the body/close patterns also consumes
+/// indentation between sibling tags.
+static TOOL_CALL_OPEN_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\s*<\s*cofl:tool_call\s+([^>]*)>").expect("invalid tool_call open regex")
+});
+static VALUE_OPEN_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\s*<\s*cofl:value\s+([^>]*)>").expect("invalid value open regex")
+});
+static TOOL_CALL_CLOSE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\s*</\s*cofl:tool_call\s*>").expect("invalid tool_call close regex")
+});
+static VALUE_CLOSE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\s*</\s*cofl:value\s*>").expect("invalid value close regex")
+});
+/// Leaf bodies must not treat trailing value whitespace as part of the close tag.
+static VALUE_CLOSE_IN_LEAF_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"</\s*cofl:value\s*>").expect("invalid leaf value close regex")
+});
+
+/// Return true when `suffix` (starting at `<`) could still grow into
+/// `</\s*{local_name}\s*>`. Used to hold back incomplete close tags while streaming.
+/// Requires `/` immediately after `<` (no `< /...>`).
+fn is_close_tag_prefix(suffix: &str, local_name: &str) -> bool {
+    let bytes = suffix.as_bytes();
+    if bytes.first().copied() != Some(b'<') {
+        return false;
+    }
+    if bytes.len() == 1 {
+        return true;
+    }
+    if bytes[1] != b'/' {
+        return false;
+    }
+    let mut i = 2;
+    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i == bytes.len() {
+        return true;
+    }
+    let remaining = &bytes[i..];
+    let name = local_name.as_bytes();
+    if remaining.len() <= name.len() {
+        return name.starts_with(remaining);
+    }
+    if !remaining.starts_with(name) {
+        return false;
+    }
+    let after_name = &remaining[name.len()..];
+    let mut j = 0;
+    while j < after_name.len() && after_name[j].is_ascii_whitespace() {
+        j += 1;
+    }
+    j == after_name.len() || (j == after_name.len() - 1 && after_name[j] == b'>')
+}
+
+fn find_leaf_value_close(s: &str) -> PartialMatchResult {
+    if let Some(mat) = VALUE_CLOSE_IN_LEAF_RE.find(s) {
+        return PartialMatchResult::Full {
+            idx: mat.start(),
+            sequence: mat.as_str().to_string(),
+        };
+    }
+    if let Some(lt) = s.rfind('<') {
+        let suffix = &s[lt..];
+        if is_close_tag_prefix(suffix, "cofl:value") {
+            return PartialMatchResult::Partial { idx: lt };
+        }
+    }
+    PartialMatchResult::NoMatch
+}
 
 /// State machine modes for nested cofl value parsing.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -76,19 +148,14 @@ impl FilterImpl {
     }
 
     fn handle_nested_before_tool_call(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let Some(open_pos) = s.find(TOOL_CALL_OPEN_START) else {
+        let Some(caps) = TOOL_CALL_OPEN_RE.captures(s) else {
             if s.trim_end().is_empty() {
                 return (Vec::new(), s.len());
             }
             return (Vec::new(), 0);
         };
-
-        let after_open = open_pos + TOOL_CALL_OPEN_START.len();
-        let Some(close_rel) = s[after_open..].find('>') else {
-            return (Vec::new(), 0);
-        };
-        let close_pos = after_open + close_rel;
-        let attrs = &s[after_open..close_pos];
+        let full = caps.get(0).expect("full match");
+        let attrs = caps.get(1).map(|m| m.as_str()).unwrap_or("");
 
         let id = extract_attr(attrs, "id")
             .map(decode_xml_entities)
@@ -124,52 +191,61 @@ impl FilterImpl {
         }];
         self.cofl_nested_action_metadata.mode = CoflNestedMode::InToolCallBody;
 
-        let consumed = close_pos + 1;
+        let consumed = full.end();
         let (o, r) = self.parse_cofl_nested_actions(&s[consumed..]);
         out.extend(o);
         (out, consumed + r)
     }
 
     fn handle_nested_tool_call_body(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let close_call_pos = s.find(TOOL_CALL_CLOSE);
-        let open_value_pos = s.find(VALUE_OPEN_START);
+        let close_mat = TOOL_CALL_CLOSE_RE.find(s);
+        let open_caps = VALUE_OPEN_RE.captures(s);
+        let open_start = open_caps
+            .as_ref()
+            .and_then(|c| c.get(0))
+            .map(|m| m.start());
 
-        match (close_call_pos, open_value_pos) {
-            (Some(c), Some(v)) if v < c => self.handle_nested_open_value(s, v),
-            (Some(c), _) => self.handle_nested_close_tool_call(s, c),
-            (None, Some(v)) => self.handle_nested_open_value(s, v),
-            (None, None) => (Vec::new(), 0),
+        match (close_mat, open_caps, open_start) {
+            (_, Some(caps), Some(v)) if close_mat.is_none_or(|c| v < c.start()) => {
+                self.handle_nested_open_value(s, &caps)
+            }
+            (Some(c), _, _) => self.handle_nested_close_tool_call(s, c.end()),
+            _ => (Vec::new(), 0),
         }
     }
 
     fn handle_nested_container_body(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let close_value_pos = s.find(VALUE_CLOSE);
-        let open_value_pos = s.find(VALUE_OPEN_START);
+        let close_mat = VALUE_CLOSE_RE.find(s);
+        let open_caps = VALUE_OPEN_RE.captures(s);
+        let open_start = open_caps
+            .as_ref()
+            .and_then(|c| c.get(0))
+            .map(|m| m.start());
 
-        match (close_value_pos, open_value_pos) {
-            (Some(c), Some(v)) if v < c => self.handle_nested_open_value(s, v),
-            (Some(c), _) => self.handle_nested_close_container(s, c),
-            (None, Some(v)) => self.handle_nested_open_value(s, v),
-            (None, None) => (Vec::new(), 0),
+        match (close_mat, open_caps, open_start) {
+            (_, Some(caps), Some(v)) if close_mat.is_none_or(|c| v < c.start()) => {
+                self.handle_nested_open_value(s, &caps)
+            }
+            (Some(c), _, _) => self.handle_nested_close_container(s, c.end()),
+            _ => (Vec::new(), 0),
         }
     }
 
     fn handle_nested_open_value(
         &mut self,
         s: &str,
-        value_pos: usize,
+        caps: &regex::Captures<'_>,
     ) -> (Vec<FilterOutput>, usize) {
-        let after_open = value_pos + VALUE_OPEN_START.len();
-        let Some(close_rel) = s[after_open..].find('>') else {
-            return (Vec::new(), 0);
-        };
-        let close_pos = after_open + close_rel;
-        let attrs = &s[after_open..close_pos];
+        let full = caps.get(0).expect("full match");
+        let attrs = caps.get(1).map(|m| m.as_str()).unwrap_or("");
         let name = extract_attr(attrs, "name").map(decode_xml_entities);
         let value_type = extract_attr(attrs, "type").unwrap_or("raw");
 
-        let after_tag = close_pos + 1;
-        let is_empty = s[after_tag..].starts_with(VALUE_CLOSE);
+        let after_tag = full.end();
+        let empty_close = VALUE_CLOSE_RE
+            .find(&s[after_tag..])
+            .filter(|m| m.start() == 0);
+        let is_empty = empty_close.is_some();
 
         let mut out = Vec::new();
 
@@ -213,9 +289,9 @@ impl FilterImpl {
         // siblings parsed as stray leaf text.
         let empty_container = is_empty && matches!(value_type, "dict" | "list");
         let consumed = if empty_container {
-            after_tag + VALUE_CLOSE.len()
+            after_tag + empty_close.expect("checked is_empty").end()
         } else {
-            close_pos + 1
+            after_tag
         };
 
         if empty_container {
@@ -229,7 +305,7 @@ impl FilterImpl {
     fn handle_nested_close_container(
         &mut self,
         s: &str,
-        close_pos: usize,
+        consumed_end: usize,
     ) -> (Vec<FilterOutput>, usize) {
         let mut out = Vec::new();
 
@@ -257,16 +333,15 @@ impl FilterImpl {
                 CoflNestedMode::InContainerBody
             };
 
-        let consumed = close_pos + VALUE_CLOSE.len();
-        let (o, r) = self.parse_cofl_nested_actions(&s[consumed..]);
+        let (o, r) = self.parse_cofl_nested_actions(&s[consumed_end..]);
         out.extend(o);
-        (out, consumed + r)
+        (out, consumed_end + r)
     }
 
     fn handle_nested_close_tool_call(
         &mut self,
         s: &str,
-        close_pos: usize,
+        consumed_end: usize,
     ) -> (Vec<FilterOutput>, usize) {
         let mut out = Vec::new();
 
@@ -295,15 +370,13 @@ impl FilterImpl {
         self.cofl_nested_action_metadata.cur_param_name.clear();
         self.cofl_nested_action_metadata.mode = CoflNestedMode::BeforeToolCall;
 
-        let consumed = close_pos + TOOL_CALL_CLOSE.len();
-        let (o, r) = self.parse_cofl_nested_actions(&s[consumed..]);
+        let (o, r) = self.parse_cofl_nested_actions(&s[consumed_end..]);
         out.extend(o);
-        (out, consumed + r)
+        (out, consumed_end + r)
     }
 
     fn handle_nested_leaf_body(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let stops = [VALUE_CLOSE.to_string()];
-        let (value_end, close_consumed, is_final) = match find_partial(s, stops.iter()) {
+        let (value_end, close_consumed, is_final) = match find_leaf_value_close(s) {
             PartialMatchResult::NoMatch => (s.len(), s.len(), false),
             PartialMatchResult::Partial { idx } => (idx, idx, false),
             PartialMatchResult::Full { idx, sequence } => (idx, idx + sequence.len(), true),
@@ -632,9 +705,7 @@ mod tests {
     #[test]
     fn test_parse_nested_xml_extra_whitespace_in_open_tags() {
         let mut f = fresh_nested_filter();
-        // Multiple spaces between tag name and attrs, and between attrs, are fine
-        // because open markers are `"<cofl:tool_call "` / `"<cofl:value "` and
-        // attribute extraction scans the remainder for `key="..."`.
+        // Multiple spaces between tag name and attrs, and between attrs, are fine.
         let input = r#"<cofl:tool_call            id="0"    name="search"><cofl:value     name="query"   type="raw">hello</cofl:value><cofl:value  name="tags"  type="list"><cofl:value  type="raw">a</cofl:value></cofl:value></cofl:tool_call>"#;
         let (out, consumed) = f.parse_cofl_nested_actions(input);
         assert_eq!(consumed, input.len());
@@ -649,6 +720,61 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
         assert_eq!(parsed["query"], "hello");
         assert_eq!(parsed["tags"], serde_json::json!(["a"]));
+    }
+
+    /// Matches datatools `test_parse_nested_xml_parses_nested_parameters_with_permissive_whitespace`:
+    /// spaces after `<` / before `>`, spaces inside closing tags, and indented multiline markup.
+    #[test]
+    fn test_parse_nested_xml_permissive_whitespace_like_datatools() {
+        let mut f = fresh_nested_filter();
+        let input = r#"
+        < cofl:tool_call   id="tc-1"   name="search &quot;web&quot;" >
+            < cofl:value   name="query"   type="raw" >weather in Paris</ cofl:value >
+            <cofl:value name="filters" type="dict">
+                < cofl:value   name="fresh"   type="json" > true </ cofl:value >
+                < cofl:value name="tags" type="list">
+                    <cofl:value type="raw">news</cofl:value>
+                    < cofl:value type="json" > 3 </ cofl:value >
+                </ cofl:value >
+            </cofl:value>
+        </ cofl:tool_call >
+    "#;
+        let (out, consumed) = f.parse_cofl_nested_actions(input);
+        assert_eq!(consumed, input.len());
+
+        let id = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .find_map(|d| (!d.id.is_empty()).then_some(d.id.as_str()));
+        let name = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .find_map(|d| (!d.name.is_empty()).then_some(d.name.as_str()));
+        assert_eq!(id, Some("tc-1"));
+        assert_eq!(name, Some("search \"web\""));
+
+        let raw = collect_raw(&out);
+        let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
+        assert_eq!(parsed["query"], "weather in Paris");
+        assert_eq!(
+            parsed["filters"],
+            serde_json::json!({"fresh": true, "tags": ["news", 3]})
+        );
+    }
+
+    #[test]
+    fn test_close_tag_rejects_space_between_lt_and_slash() {
+        // Full close matchers require `</` — `< /cofl:value>` is not a close tag.
+        assert!(!VALUE_CLOSE_RE.is_match(r#"< /cofl:value>"#));
+        assert!(!TOOL_CALL_CLOSE_RE.is_match(r#"< /cofl:tool_call>"#));
+        assert!(!VALUE_CLOSE_IN_LEAF_RE.is_match(r#"hello< /cofl:value>"#));
+
+        // Streaming holdback must match: do not treat `< /` as a partial close.
+        assert!(!is_close_tag_prefix("< /", "cofl:value"));
+        assert!(!is_close_tag_prefix("< /cofl:value>", "cofl:value"));
+        assert!(is_close_tag_prefix("</", "cofl:value"));
+        assert!(is_close_tag_prefix("</ cofl:value", "cofl:value"));
+        assert!(is_close_tag_prefix("</ cofl:value >", "cofl:value"));
     }
 
     #[test]
