@@ -30,7 +30,9 @@ pub(crate) enum CoflNestedMode {
     BeforeToolCall,
     InToolCallBody,
     InContainerBody,
-    InLeafBody,
+    /// Inside a `type="raw"` / `type="json"` leaf. `leaf_is_raw` is only
+    /// meaningful here, so it lives on the variant rather than the struct.
+    InLeafBody { leaf_is_raw: bool },
 }
 
 /// Open container on the nested-value stack.
@@ -47,7 +49,6 @@ pub(crate) struct FilterCoflNestedAction {
     pub(crate) mode: CoflNestedMode,
     pub(crate) cur_tool_call_index: usize,
     pub(crate) containers: Vec<CoflNestedContainer>,
-    pub(crate) leaf_is_raw: bool,
     /// Name of the top-level parameter currently being streamed when
     /// `stream_processed_params` is enabled.
     pub(crate) cur_param_name: String,
@@ -59,7 +60,6 @@ impl FilterCoflNestedAction {
             mode: CoflNestedMode::BeforeToolCall,
             cur_tool_call_index: 0,
             containers: Vec::new(),
-            leaf_is_raw: false,
             cur_param_name: String::new(),
         }
     }
@@ -71,7 +71,7 @@ impl FilterImpl {
             CoflNestedMode::BeforeToolCall => self.handle_nested_before_tool_call(s),
             CoflNestedMode::InToolCallBody => self.handle_nested_tool_call_body(s),
             CoflNestedMode::InContainerBody => self.handle_nested_container_body(s),
-            CoflNestedMode::InLeafBody => self.handle_nested_leaf_body(s),
+            CoflNestedMode::InLeafBody { .. } => self.handle_nested_leaf_body(s),
         }
     }
 
@@ -196,14 +196,14 @@ impl FilterImpl {
             }
             "json" => {
                 out.extend(self.emit_nested_leaf_open(name.as_deref(), false));
-                self.cofl_nested_action_metadata.leaf_is_raw = false;
-                self.cofl_nested_action_metadata.mode = CoflNestedMode::InLeafBody;
+                self.cofl_nested_action_metadata.mode =
+                    CoflNestedMode::InLeafBody { leaf_is_raw: false };
             }
             _ => {
                 // `raw` and unknown types default to raw string bodies.
                 out.extend(self.emit_nested_leaf_open(name.as_deref(), true));
-                self.cofl_nested_action_metadata.leaf_is_raw = true;
-                self.cofl_nested_action_metadata.mode = CoflNestedMode::InLeafBody;
+                self.cofl_nested_action_metadata.mode =
+                    CoflNestedMode::InLeafBody { leaf_is_raw: true };
             }
         }
 
@@ -484,12 +484,16 @@ impl FilterImpl {
             chunk.to_string()
         };
 
-        let mut delta = if self.cofl_nested_action_metadata.leaf_is_raw {
+        let leaf_is_raw = matches!(
+            self.cofl_nested_action_metadata.mode,
+            CoflNestedMode::InLeafBody { leaf_is_raw: true }
+        );
+        let mut delta = if leaf_is_raw {
             json_escape_string_content(&decoded)
         } else {
             decoded
         };
-        if is_final && self.cofl_nested_action_metadata.leaf_is_raw {
+        if is_final && leaf_is_raw {
             delta.push('"');
         } else if is_final && delta.is_empty() {
             // Empty `type="json"` body — emit null so the key stays a valid pair.
