@@ -1,11 +1,11 @@
-{%- macro xml_text(value) -%}{{ value }}{%- endmacro -%}
+{%- macro xml_text(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;') }}{%- endmacro -%}
 {%- macro xml_attr(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('"', '&quot;') }}{%- endmacro -%}
 {%- macro render_tool_call_params(arguments) -%}
 {%- for param_name, param_value in arguments|items -%}
 {%- if param_value is string -%}
-<cofl:tool_param name="{{ xml_attr(param_name) }}" string="true">{{ xml_text(param_value) }}</cofl:tool_param>
+<cofl:tool_param name="{{ xml_attr(param_name) }}" string="true">{{ param_value }}</cofl:tool_param>
 {%- else -%}
-<cofl:tool_param name="{{ xml_attr(param_name) }}" string="false">{{ xml_text(param_value|tojson) }}</cofl:tool_param>
+<cofl:tool_param name="{{ xml_attr(param_name) }}" string="false">{{ param_value|tojson }}</cofl:tool_param>
 {%- endif -%}
 {%- endfor -%}
 {%- endmacro -%}
