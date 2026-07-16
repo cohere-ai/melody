@@ -35,13 +35,11 @@ static VALUE_OPEN_RE: LazyLock<Regex> = LazyLock::new(|| {
 static TOOL_CALL_CLOSE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\s*</\s*cofl:tool_call\s*>").expect("invalid tool_call close regex")
 });
-static VALUE_CLOSE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\s*</\s*cofl:value\s*>").expect("invalid value close regex")
-});
+static VALUE_CLOSE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\s*</\s*cofl:value\s*>").expect("invalid value close regex"));
 /// Leaf bodies must not treat trailing value whitespace as part of the close tag.
-static VALUE_CLOSE_IN_LEAF_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"</\s*cofl:value\s*>").expect("invalid leaf value close regex")
-});
+static VALUE_CLOSE_IN_LEAF_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"</\s*cofl:value\s*>").expect("invalid leaf value close regex"));
 
 /// Return true when `suffix` (starting at `<`) is an *incomplete* close tag
 /// (`</\s*{local_name}\s*` with no `>` yet). Used to hold back while streaming;
@@ -103,7 +101,9 @@ pub(crate) enum CoflNestedMode {
     InContainerBody,
     /// Inside a `type="raw"` / `type="json"` leaf. `leaf_is_raw` is only
     /// meaningful here, so it lives on the variant rather than the struct.
-    InLeafBody { leaf_is_raw: bool },
+    InLeafBody {
+        leaf_is_raw: bool,
+    },
 }
 
 /// Open container on the nested-value stack.
@@ -154,7 +154,7 @@ impl FilterImpl {
             return (Vec::new(), 0);
         };
         let full = caps.get(0).expect("full match");
-        let attrs = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+        let attrs = caps.get(1).map_or("", |m| m.as_str());
 
         let id = extract_attr(attrs, "id")
             .map(decode_xml_entities)
@@ -199,10 +199,7 @@ impl FilterImpl {
     fn handle_nested_tool_call_body(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
         let close_mat = TOOL_CALL_CLOSE_RE.find(s);
         let open_caps = VALUE_OPEN_RE.captures(s);
-        let open_start = open_caps
-            .as_ref()
-            .and_then(|c| c.get(0))
-            .map(|m| m.start());
+        let open_start = open_caps.as_ref().and_then(|c| c.get(0)).map(|m| m.start());
 
         match (close_mat, open_caps, open_start) {
             (_, Some(caps), Some(v)) if close_mat.is_none_or(|c| v < c.start()) => {
@@ -216,10 +213,7 @@ impl FilterImpl {
     fn handle_nested_container_body(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
         let close_mat = VALUE_CLOSE_RE.find(s);
         let open_caps = VALUE_OPEN_RE.captures(s);
-        let open_start = open_caps
-            .as_ref()
-            .and_then(|c| c.get(0))
-            .map(|m| m.start());
+        let open_start = open_caps.as_ref().and_then(|c| c.get(0)).map(|m| m.start());
 
         match (close_mat, open_caps, open_start) {
             (_, Some(caps), Some(v)) if close_mat.is_none_or(|c| v < c.start()) => {
@@ -236,7 +230,7 @@ impl FilterImpl {
         caps: &regex::Captures<'_>,
     ) -> (Vec<FilterOutput>, usize) {
         let full = caps.get(0).expect("full match");
-        let attrs = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+        let attrs = caps.get(1).map_or("", |m| m.as_str());
         let name = extract_attr(attrs, "name").map(decode_xml_entities);
         let value_type = extract_attr(attrs, "type").unwrap_or("raw");
 
