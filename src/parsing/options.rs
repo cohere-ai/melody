@@ -269,6 +269,28 @@ impl FilterOptions {
         self
     }
 
+    /// Start parsing in grounded-answer (content) mode instead of the preset's
+    /// default.
+    ///
+    /// `cmd4` / `cmd5` default to `ToolReason` (thinking) mode because their
+    /// generation prompts already contain `<|START_THINKING|>`, so the model's
+    /// output opens directly with reasoning text. That default is wrong for a
+    /// filter that only sees the post-reasoning output, such as the tool
+    /// parser in vLLM's reasoning->tool pipeline.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::parsing::FilterOptions;
+    ///
+    /// let options = FilterOptions::new().cmd4().start_in_answer();
+    /// ```
+    #[must_use]
+    pub fn start_in_answer(mut self) -> Self {
+        self.default_mode = FilterMode::GroundedAnswer;
+        self
+    }
+
     /// Add inclusive stop sequences.
     ///
     /// Inclusive stops will halt parsing when encountered, but the stop sequence

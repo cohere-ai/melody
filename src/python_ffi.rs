@@ -173,6 +173,13 @@ impl PyFilterOptions {
         }
     }
 
+    /// Start parsing in grounded-answer (content) mode instead of the preset default.
+    fn start_in_answer(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().start_in_answer(),
+        }
+    }
+
     /// Remove a special token from the token map.
     fn remove_token(&self, token: &str) -> Self {
         PyFilterOptions {

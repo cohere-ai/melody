@@ -2143,4 +2143,63 @@ mod tests {
             "expected the rejected ``Answer:`` to be emitted as content, got {content:?}",
         );
     }
+
+    /// Emulates vLLM where the reasoning->tool handoff occurs between two independent filters.
+    /// The reasoning filter (`cmd4().no_tools()`) consumes `<|START_TEXT|>` and
+    /// hands the tool filter only the stripped answer text. A plain `cmd4()`
+    /// tool filter defaults to `ToolReason` (thinking) mode, so that bare answer
+    /// text is misclassified as reasoning and the response content is lost.
+    ///
+    /// `start_in_answer()` makes the tool filter begin in `GroundedAnswer` mode
+    /// so post-reasoning answer text is correctly classified as content.
+    #[test]
+    fn test_reasoning_to_tool_streaming_handoff() {
+        // 1. Reasoning filter processes the batched delta and strips <|START_TEXT|>.
+        let mut reasoning = make_cmd4_no_tools_filter();
+        reasoning.write_decoded("<|START_THINKING|>");
+        reasoning.write_decoded("I think D");
+        let r = reasoning.write_decoded("<|END_THINKING|><|START_TEXT|>Answer: D<|END_TEXT|>");
+        assert_eq!(
+            r.content.as_deref(),
+            Some("Answer: D"),
+            "reasoning filter should surface the answer as content",
+        );
+
+        // 2. Tool filter receives only the bare, prefix-less answer text.
+        let mut tool = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        let t = tool.write_decoded("Answer: D");
+        assert_eq!(
+            t.content.as_deref(),
+            Some("Answer: D"),
+            "start_in_answer tool filter must classify bare answer text as content",
+        );
+        assert!(
+            t.reasoning.is_none(),
+            "answer text must not be reclassified as reasoning: {:?}",
+            t.reasoning,
+        );
+    }
+
+    #[test]
+    fn test_reasoning_to_tool_non_streaming_handoff() {
+        let tool_block = concat!(
+            "<|START_ACTION|>",
+            r#"[{"tool_call_id": "0", "tool_name": "foo", "parameters": {"q": "x"}}]"#,
+            "<|END_ACTION|>",
+        );
+        let content = format!("Answer: D{tool_block}");
+
+        // Plain cmd4 drops the leading answer text.
+        let mut plain = make_cmd4_filter();
+        let r = plain.process_full_text(&content);
+        assert_eq!(r.content, None, "plain cmd4 drops leading answer text");
+        assert_eq!(r.tool_calls.len(), 1);
+
+        // start_in_answer preserves it alongside the tool call.
+        let mut fixed = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        let r = fixed.process_full_text(&content);
+        assert_eq!(r.content.as_deref(), Some("Answer: D"));
+        assert_eq!(r.tool_calls.len(), 1);
+        assert_eq!(r.tool_calls[0].name, "foo");
+    }
 }
