@@ -27,7 +27,7 @@ Issues = "https://github.com/cohere-ai/melody/issues"
 [tool.maturin]
 features = ["pyo3/extension-module", "python_ffi"]
 module-name = "cohere_melody"
-include=["cohere_melody.pyi", "cohere_melody_vllm/parser.py"]
+include=["cohere_melody.pyi"]
 
 [tool.uv]
 managed = false
@@ -37,10 +37,9 @@ managed = false
 testpaths = ["tests"]
 
 [tool.ty.analysis]
-# vllm/cohere_melody may be absent locally; CI installs both before `ty check`.
+# cohere_melody may be absent locally; CI installs it before `ty check`.
 # Configuring this avoids per-import `# ty: ignore` comments that become unused
 # (and fail CI) once those packages are present.
 allowed-unresolved-imports = [
-    "vllm.entrypoints.openai.**",
     "cohere_melody",
 ]
