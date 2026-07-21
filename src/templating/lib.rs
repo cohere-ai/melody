@@ -127,6 +127,11 @@ pub struct RenderCmd4Options<'a> {
     pub additional_template_fields: Map<String, Value>,
     /// Special tokens to escape in the output.
     pub escaped_special_tokens: BTreeMap<String, String>,
+    /// When true, tool call names are left unescaped for templates that apply
+    /// XML attribute escaping (cmd5). Set internally by [`render_cmd5`]; do not
+    /// set manually.
+    #[serde(skip, default)]
+    pub raw_tool_call_names: bool,
 }
 
 static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.tmpl");
@@ -134,6 +139,10 @@ static CMD4V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd
 static CMD4V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v2.jinja");
 static CMD4HF_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-hf.jinja");
 static CMD5_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd5.jinja");
+static CMD5_NO_ESCAPE_JINJA_TEMPLATE: &str =
+    include_str!("../../gen/templates/jinja/cmd5-no-escape.jinja");
+static CMD5_NESTED_XML_JINJA_TEMPLATE: &str =
+    include_str!("../../gen/templates/jinja/cmd5-nested-xml.jinja");
 impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
@@ -153,6 +162,7 @@ impl Default for RenderCmd4Options<'_> {
             json_mode: false,
             additional_template_fields: Map::new(),
             escaped_special_tokens: BTreeMap::new(),
+            raw_tool_call_names: false,
         }
     }
 }
@@ -228,12 +238,16 @@ pub type RenderCmd5Options<'a> = RenderCmd4Options<'a>;
 
 enum CMD5JinjaTemplates {
     CMD5,
+    CMD5NoEscape,
+    CMD5NestedXml,
 }
 
 impl CMD5JinjaTemplates {
     fn get_template(&self) -> &'static str {
         match *self {
             CMD5JinjaTemplates::CMD5 => CMD5_JINJA_TEMPLATE,
+            CMD5JinjaTemplates::CMD5NoEscape => CMD5_NO_ESCAPE_JINJA_TEMPLATE,
+            CMD5JinjaTemplates::CMD5NestedXml => CMD5_NESTED_XML_JINJA_TEMPLATE,
         }
     }
 }
@@ -244,6 +258,8 @@ impl FromStr for CMD5JinjaTemplates {
     fn from_str(o: &str) -> Result<Self, Self::Err> {
         match o {
             "cmd5" => Ok(Self::CMD5),
+            "cmd5-no-escape" => Ok(Self::CMD5NoEscape),
+            "cmd5-nested-xml" => Ok(Self::CMD5NestedXml),
             _ => Err(MelodyError::TemplateValidation(format!(
                 "unknown template id: {o}"
             ))),
@@ -272,6 +288,7 @@ fn validate_no_multipart(messages: &[Message]) -> Option<MelodyError> {
 /// - JSON serialization of documents fails
 /// - Template parsing fails
 /// - Template rendering fails
+#[allow(clippy::too_many_lines)]
 pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
     let mut template_tools = tools_to_template(&opts.available_tools)?;
     if let Some(err) = validate_no_multipart(&opts.messages) {
@@ -290,6 +307,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
             &opts.available_tools,
             &opts.documents,
             &opts.escaped_special_tokens,
+            false,
         )?;
     }
 
@@ -405,6 +423,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
             &opts.available_tools,
             &opts.documents,
             &opts.escaped_special_tokens,
+            opts.raw_tool_call_names,
         )?;
     }
 
@@ -519,6 +538,9 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
     let mut active_opts: RenderCmd5Options<'a> = opts.clone();
     // Honor caller `template_jinja` even when `use_jinja` is false.
     active_opts.use_jinja = true;
+    // cmd5 templates XML-escape tool names via `xml_attr`; skip JSON escaping
+    // in the jinja message prep path (cmd3/cmd4 embed names in JSON instead).
+    active_opts.raw_tool_call_names = true;
 
     if let Some(template_id) = opts.template_id.as_ref() {
         let template_enum = CMD5JinjaTemplates::from_str(template_id)?;
@@ -773,6 +795,66 @@ mod tests {
     }
 
     #[test]
+    fn test_render_cmd5_no_escape_jinja_from_dir() {
+        let mut ran_any = false;
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd5_no_escape") {
+            println!("Running cmd5-no-escape jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd5Options>(&input_json).unwrap();
+            opts.template_id = Some("cmd5-no-escape".to_string());
+            let rendered = render_cmd5(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+            ran_any = true;
+        }
+        assert!(
+            ran_any,
+            "no cmd5-no-escape jinja test fixtures were found in tests/templating/jinja/cmd5_no_escape"
+        );
+    }
+
+    #[test]
+    fn test_render_cmd5_template_id_no_escape() {
+        let opts = RenderCmd5Options {
+            template_id: Some("cmd5-no-escape".to_string()),
+            ..RenderCmd5Options::default()
+        };
+        let rendered = render_cmd5(&opts).unwrap();
+        assert!(
+            rendered.contains("CHATBOT"),
+            "template_id=cmd5-no-escape should render via jinja"
+        );
+    }
+
+    #[test]
+    fn test_render_cmd5_nested_xml_jinja_from_dir() {
+        let mut ran_any = false;
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd5_nested_xml") {
+            println!("Running cmd5-nested-xml jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd5Options>(&input_json).unwrap();
+            opts.template_id = Some("cmd5-nested-xml".to_string());
+            let rendered = render_cmd5(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+            ran_any = true;
+        }
+        assert!(
+            ran_any,
+            "no cmd5-nested-xml jinja test fixtures were found in tests/templating/jinja/cmd5_nested_xml"
+        );
+    }
+
+    #[test]
+    fn test_render_cmd5_template_id_nested_xml() {
+        let opts = RenderCmd5Options {
+            template_id: Some("cmd5-nested-xml".to_string()),
+            ..RenderCmd5Options::default()
+        };
+        let rendered = render_cmd5(&opts).unwrap();
+        assert!(
+            rendered.contains("CHATBOT"),
+            "template_id=cmd5-nested-xml should render via jinja"
+        );
+    }
+
+    #[test]
     fn test_render_cmd5_preserves_custom_template_jinja() {
         // Sentinel template that does not depend on any of the cmd5 substitutions so
         // we can prove the caller-supplied `template_jinja` is what actually got rendered.
@@ -844,6 +926,27 @@ mod tests {
         assert_eq!(rendered, custom_template);
     }
 
+    /// Helper test that rewrites every `output.txt` under `tests/templating/jinja/cmd5_no_escape`
+    /// from the current cmd5-no-escape template output.
+    #[test]
+    #[ignore = "fixture regenerator; run on demand via `--ignored`"]
+    fn regenerate_cmd5_no_escape_jinja_fixtures() {
+        let cases = read_test_cases("jinja/cmd5_no_escape");
+        assert!(
+            !cases.is_empty(),
+            "no cmd5-no-escape jinja input fixtures were found in tests/templating/jinja/cmd5_no_escape"
+        );
+        for (test_name, input_json, _, output_path) in cases {
+            let mut opts = deserialize::<_, RenderCmd5Options>(&input_json).unwrap();
+            opts.template_id = Some("cmd5-no-escape".to_string());
+            let rendered = render_cmd5(&opts).unwrap();
+            let bytes_written = rendered.len();
+            fs::write(&output_path, &rendered)
+                .unwrap_or_else(|e| panic!("failed to write {output_path:?} for {test_name}: {e}"));
+            println!("Wrote fixture: {test_name} ({bytes_written} bytes)");
+        }
+    }
+
     /// Helper test that rewrites every `output.txt` under `tests/templating/jinja/cmd5`
     /// from the current cmd5 template output. It is `#[ignore]`d so it never runs as
     /// part of `cargo test`; opt in by running:
@@ -864,6 +967,27 @@ mod tests {
         );
         for (test_name, input_json, _, output_path) in cases {
             let rendered = render_cmd5_from_input(&input_json);
+            let bytes_written = rendered.len();
+            fs::write(&output_path, &rendered)
+                .unwrap_or_else(|e| panic!("failed to write {output_path:?} for {test_name}: {e}"));
+            println!("Wrote fixture: {test_name} ({bytes_written} bytes)");
+        }
+    }
+
+    /// Helper test that rewrites every `output.txt` under `tests/templating/jinja/cmd5_nested_xml`
+    /// from the current cmd5-nested-xml template output.
+    #[test]
+    #[ignore = "fixture regenerator; run on demand via `--ignored`"]
+    fn regenerate_cmd5_nested_xml_jinja_fixtures() {
+        let cases = read_test_cases("jinja/cmd5_nested_xml");
+        assert!(
+            !cases.is_empty(),
+            "no cmd5-nested-xml jinja input fixtures were found in tests/templating/jinja/cmd5_nested_xml"
+        );
+        for (test_name, input_json, _, output_path) in cases {
+            let mut opts = deserialize::<_, RenderCmd5Options>(&input_json).unwrap();
+            opts.template_id = Some("cmd5-nested-xml".to_string());
+            let rendered = render_cmd5(&opts).unwrap();
             let bytes_written = rendered.len();
             fs::write(&output_path, &rendered)
                 .unwrap_or_else(|e| panic!("failed to write {output_path:?} for {test_name}: {e}"));

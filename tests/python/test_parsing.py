@@ -273,6 +273,25 @@ class TestPyFilterOptions:
         f = PyFilter(opts)
         assert f is not None
 
+    def test_cofl_no_xml_text_decode(self):
+        """Test cofl_no_xml_text_decode() parses unescaped cofl param bodies."""
+        opts = PyFilterOptions().cmd5().cofl_no_xml_text_decode()
+        f = PyFilter(opts)
+        text = (
+            "<|START_THINKING|>think<|END_THINKING|>"
+            '<cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool">'
+            '<cofl:tool_param name="str_param" string="true">'
+            'value with <tag> & "quotes"'
+            "</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"
+        )
+        result = f.process_full_text(text)
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "run<cmd>&tool"
+        import json
+
+        parsed = json.loads(result.tool_calls[0].arguments)
+        assert parsed["str_param"] == 'value with <tag> & "quotes"'
+
     def test_options_are_immutable(self):
         """Test that builder methods return new instances."""
         opts1 = PyFilterOptions()

@@ -159,6 +159,27 @@ impl PyFilterOptions {
         }
     }
 
+    /// Disable XML entity decoding for cofl parameter bodies.
+    fn cofl_no_xml_text_decode(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().cofl_no_xml_text_decode(),
+        }
+    }
+
+    /// Parse cofl tool parameters as nested `<cofl:value>` nodes.
+    fn cofl_nested_xml(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().cofl_nested_xml(),
+        }
+    }
+
+    /// Start parsing in grounded-answer (content) mode instead of the preset default.
+    fn start_in_answer(&self) -> Self {
+        PyFilterOptions {
+            inner: self.inner.clone().start_in_answer(),
+        }
+    }
+
     /// Remove a special token from the token map.
     fn remove_token(&self, token: &str) -> Self {
         PyFilterOptions {

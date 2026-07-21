@@ -1,0 +1,48 @@
+{
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Search the web."
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll search now."
+        }
+      ],
+      "tool_calls": [
+        {
+          "id": "0",
+          "name": "search \"web\"",
+          "parameters": "{\"query\": \"echo \\\"Hello\\\" >> foo.txt && exit 🌈\", \"limit\": 3, \"float example\": 3.14, \"filters\": {\"fresh\": true, \"tags\": [\"music\", \"Sudan 🌈\"]}, \"missing\": null, \"empty_dict\": {}, \"empty_list\": []}"
+        }
+      ]
+    }
+  ],
+  "available_tools": [
+    {
+      "name": "search \"web\"",
+      "description": "Search the web.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string"},
+          "limit": {"type": "integer"},
+          "float example": {"type": "number"},
+          "filters": {"type": "object"},
+          "missing": {},
+          "empty_dict": {"type": "object"},
+          "empty_list": {"type": "array"}
+        }
+      }
+    }
+  ],
+  "reasoning_type": "enabled"
+}

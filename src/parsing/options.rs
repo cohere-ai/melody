@@ -42,6 +42,13 @@ pub struct FilterOptions {
     /// When set, [`FilterMode::ToolAction`] is parsed with the cofl-tagged
     /// parser (cmd5 format) rather than the JSON action parser.
     pub(crate) cofl_tool_action: bool,
+    /// When `false`, cofl parameter bodies are not XML-entity decoded before
+    /// being emitted as tool-call arguments. Attribute values (`id`, `name`)
+    /// are always decoded. Pair with the `cmd5-no-escape` template.
+    pub(crate) cofl_decode_xml_text: bool,
+    /// When set, cofl tool parameters are parsed as nested `<cofl:value>` nodes
+    /// (cmd5-nested-xml format) rather than flat `<cofl:tool_param>` tags.
+    pub(crate) cofl_nested_xml: bool,
 }
 
 impl Default for FilterOptions {
@@ -60,6 +67,8 @@ impl Default for FilterOptions {
             has_tool_call_id: false,
             cmd3_citations: false,
             cofl_tool_action: false,
+            cofl_decode_xml_text: true,
+            cofl_nested_xml: false,
         }
     }
 }
@@ -92,6 +101,8 @@ impl FilterOptions {
     /// not leak into cmd3/cmd4 JSON action parsing.
     fn clear_cofl_tool_action_config(&mut self) {
         self.cofl_tool_action = false;
+        self.cofl_decode_xml_text = true;
+        self.cofl_nested_xml = false;
         self.special_token_map.remove("<cofl:tool_calls>");
         self.special_token_map.remove("</cofl:tool_calls>");
     }
@@ -237,6 +248,8 @@ impl FilterOptions {
         self.stream_tool_actions = true;
         self.clear_json_action_tokens();
         self.cofl_tool_action = true;
+        self.cofl_decode_xml_text = true;
+        self.cofl_nested_xml = false;
         self.special_token_map
             .insert("<|START_TEXT|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
@@ -253,6 +266,28 @@ impl FilterOptions {
             .insert("<|START_RESPONSE|>".to_string(), FilterMode::GroundedAnswer);
         self.special_token_map
             .insert("<|END_RESPONSE|>".to_string(), FilterMode::Ignore);
+        self
+    }
+
+    /// Start parsing in grounded-answer (content) mode instead of the preset's
+    /// default.
+    ///
+    /// `cmd4` / `cmd5` default to `ToolReason` (thinking) mode because their
+    /// generation prompts already contain `<|START_THINKING|>`, so the model's
+    /// output opens directly with reasoning text. That default is wrong for a
+    /// filter that only sees the post-reasoning output, such as the tool
+    /// parser in vLLM's reasoning->tool pipeline.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::parsing::FilterOptions;
+    ///
+    /// let options = FilterOptions::new().cmd4().start_in_answer();
+    /// ```
+    #[must_use]
+    pub fn start_in_answer(mut self) -> Self {
+        self.default_mode = FilterMode::GroundedAnswer;
         self
     }
 
@@ -549,6 +584,51 @@ impl FilterOptions {
         self.special_token_map.remove("<|END_ACTION|>");
         self.special_token_map.remove("<cofl:tool_calls>");
         self.special_token_map.remove("</cofl:tool_calls>");
+        self
+    }
+
+    /// Disable XML entity decoding for cofl parameter bodies.
+    ///
+    /// When disabled, text between `<cofl:tool_param>` tags is passed through
+    /// as-is. Attribute values on cofl tags (`id`, `name`) are still decoded.
+    /// Use with the `cmd5-no-escape` template, which omits XML escaping in
+    /// parameter bodies.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::parsing::FilterOptions;
+    ///
+    /// let options = FilterOptions::new()
+    ///     .cmd5()
+    ///     .cofl_no_xml_text_decode();
+    /// ```
+    #[must_use]
+    pub fn cofl_no_xml_text_decode(mut self) -> Self {
+        self.cofl_decode_xml_text = false;
+        self
+    }
+
+    /// Parse cofl tool parameters as nested `<cofl:value>` nodes.
+    ///
+    /// Use with the `cmd5-nested-xml` template, which encodes scalars,
+    /// objects, and arrays as recursive `<cofl:value type="raw|json|dict|list">`
+    /// elements. Parameter bodies are not XML-entity escaped (attributes
+    /// still are), so this also disables body entity decoding.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cohere_melody::parsing::FilterOptions;
+    ///
+    /// let options = FilterOptions::new()
+    ///     .cmd5()
+    ///     .cofl_nested_xml();
+    /// ```
+    #[must_use]
+    pub fn cofl_nested_xml(mut self) -> Self {
+        self.cofl_nested_xml = true;
+        self.cofl_decode_xml_text = false;
         self
     }
 

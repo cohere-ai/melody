@@ -5,6 +5,7 @@
 
 use crate::parsing::action_filter::FilterAction;
 use crate::parsing::cofl_filter::FilterCoflAction;
+use crate::parsing::cofl_nested_filter;
 use crate::parsing::options::FilterOptions;
 use crate::parsing::types::{
     AccumulatedToolCall, FilterAggregatedResult, FilterMode, FilterOutput, FilterSearchQueryDelta,
@@ -198,6 +199,7 @@ pub struct FilterImpl {
     pub(crate) cur_citation_byte_index: Option<usize>,
     pub(crate) action_metadata: FilterAction,
     pub(crate) cofl_action_metadata: FilterCoflAction,
+    pub(crate) cofl_nested_action_metadata: cofl_nested_filter::FilterCoflNestedAction,
 
     // Search query tracking
     pub(crate) curr_search_query_idx: usize,
@@ -209,6 +211,11 @@ pub struct FilterImpl {
     /// Use the cofl-tagged parser (cmd5) for [`FilterMode::ToolAction`]
     /// instead of the JSON action parser.
     pub(crate) cofl_tool_action: bool,
+    /// Decode XML entities in cofl parameter bodies before emitting tool-call
+    /// arguments. Attribute values are always decoded regardless of this flag.
+    pub(crate) cofl_decode_xml_text: bool,
+    /// Parse cofl tool parameters as nested `<cofl:value>` nodes (cmd5-nested-xml).
+    pub(crate) cofl_nested_xml: bool,
 
     // Chunking configuration
     pub(crate) chunk_size: usize,
@@ -267,11 +274,14 @@ impl FilterImpl {
             cur_citation_byte_index: None,
             action_metadata: FilterAction::new(),
             cofl_action_metadata: FilterCoflAction::new(),
+            cofl_nested_action_metadata: cofl_nested_filter::FilterCoflNestedAction::new(),
             curr_search_query_idx: 0,
             sent_curr_index: false,
             has_tool_call_id: false,
             cmd3_citations: false,
             cofl_tool_action: false,
+            cofl_decode_xml_text: true,
+            cofl_nested_xml: false,
             chunk_size: 1,
             num_tokens_in_chunk: 0,
             buf: Vec::new(),
@@ -290,6 +300,8 @@ impl FilterImpl {
         self.has_tool_call_id = options.has_tool_call_id;
         self.cmd3_citations = options.cmd3_citations;
         self.cofl_tool_action = options.cofl_tool_action;
+        self.cofl_decode_xml_text = options.cofl_decode_xml_text;
+        self.cofl_nested_xml = options.cofl_nested_xml;
         self.default_mode = options.default_mode;
         self.mode = options.default_mode;
 
@@ -1948,12 +1960,36 @@ mod tests {
         assert_eq!(parsed["snippet"], snippet);
     }
 
+    /// Round-trip the no-escape wire format produced by the `cmd5-no-escape`
+    /// template (unescaped bodies, escaped attributes).
+    #[test]
+    fn test_process_full_text_cmd5_no_xml_text_decode() {
+        let opts = FilterOptions::default().cmd5().cofl_no_xml_text_decode();
+        let mut f = new_filter(opts);
+        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with <tag> & "quotes" & &amp;</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a<b", "c&d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key<1>": "val>2"}</cofl:tool_param><cofl:tool_param name="filters" string="false">{"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "run<cmd>&tool");
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["str_param"], "value with <tag> & \"quotes\" & &amp;");
+        assert_eq!(parsed["num_param"], 42);
+        assert_eq!(parsed["list_param"], serde_json::json!(["a<b", "c&d"]));
+        assert_eq!(parsed["param<>&name"], "attr test");
+        assert_eq!(parsed["nested"], serde_json::json!({"key<1>": "val>2"}));
+        assert_eq!(
+            parsed["filters"],
+            serde_json::json!({"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"})
+        );
+    }
+
     /// Round-trip the XML-entity escaping used by the cmd5 template, mirroring
     /// `tests/templating/jinja/cmd5/xml_escaping`.
     #[test]
     fn test_process_full_text_cmd5_xml_entity_escaping() {
         let mut f = make_cmd5_filter();
-        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with &lt;tag&gt; &amp; "quotes"</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="bool_param" string="false">true</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a&lt;b", "c&amp;d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key&lt;1&gt;": "val&gt;2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
+        let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with &lt;tag&gt; &amp; "quotes"</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="bool_param" string="false">true</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a&lt;b", "c&amp;d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key&lt;1&gt;": "val&gt;2"}</cofl:tool_param><cofl:tool_param name="filters" string="false">{"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 1);
         assert_eq!(result.tool_calls[0].id, "0");
@@ -1967,6 +2003,60 @@ mod tests {
         assert_eq!(parsed["list_param"], serde_json::json!(["a<b", "c&d"]));
         assert_eq!(parsed["param<>&name"], "attr test");
         assert_eq!(parsed["nested"], serde_json::json!({"key<1>": "val>2"}));
+        assert_eq!(
+            parsed["filters"],
+            serde_json::json!({"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"})
+        );
+    }
+
+    /// Round-trip nested-xml cofl tool calls from the cmd5-nested-xml template.
+    #[test]
+    fn test_process_full_text_cmd5_nested_xml() {
+        let opts = FilterOptions::default().cmd5().cofl_nested_xml();
+        let mut f = new_filter(opts);
+        let text = r#"<|START_THINKING|>searching<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search &quot;web&quot;"><cofl:value name="query" type="raw">echo "Hello" >> foo.txt && exit</cofl:value><cofl:value name="limit" type="json">3</cofl:value><cofl:value name="float example" type="json">3.14</cofl:value><cofl:value name="filters" type="dict"><cofl:value name="fresh" type="json">true</cofl:value><cofl:value name="tags" type="list"><cofl:value type="raw">music</cofl:value><cofl:value type="raw">Sudan</cofl:value></cofl:value></cofl:value><cofl:value name="missing" type="json">null</cofl:value><cofl:value name="empty_dict" type="dict"></cofl:value><cofl:value name="empty_list" type="list"></cofl:value></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, r#"search "web""#);
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result.tool_calls[0].arguments).expect("valid JSON");
+        assert_eq!(parsed["query"], r#"echo "Hello" >> foo.txt && exit"#);
+        assert_eq!(parsed["limit"], 3);
+        assert_eq!(parsed["float example"], 3.14);
+        assert_eq!(
+            parsed["filters"],
+            serde_json::json!({"fresh": true, "tags": ["music", "Sudan"]})
+        );
+        assert_eq!(parsed["missing"], serde_json::Value::Null);
+        assert_eq!(parsed["empty_dict"], serde_json::json!({}));
+        assert_eq!(parsed["empty_list"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn test_process_full_text_cmd5_nested_xml_processed_params() {
+        let opts = FilterOptions::default()
+            .cmd5()
+            .cofl_nested_xml()
+            .stream_processed_params();
+        let mut f = new_filter(opts);
+        let text = r#"<|START_THINKING|>searching<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search"><cofl:value name="query" type="raw">hello</cofl:value><cofl:value name="filters" type="dict"><cofl:value name="fresh" type="json">true</cofl:value><cofl:value name="tags" type="list"><cofl:value type="raw">music</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>"#;
+        let result = f.process_full_text(text);
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].name, "search");
+        assert_eq!(result.tool_calls[0].arguments, "");
+
+        let params = &result.tool_calls[0].processed_params;
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0].name, "query");
+        assert_eq!(params[0].value_delta, "\"hello\"");
+        assert_eq!(params[1].name, "filters");
+        let filters: serde_json::Value =
+            serde_json::from_str(&params[1].value_delta).expect("valid JSON");
+        assert_eq!(
+            filters,
+            serde_json::json!({"fresh": true, "tags": ["music"]})
+        );
     }
 
     /// cmd5 generation prompts include `<|START_THINKING|>`, so the
@@ -2051,6 +2141,114 @@ mod tests {
         assert!(
             content.contains("Answer:"),
             "expected the rejected ``Answer:`` to be emitted as content, got {content:?}",
+        );
+    }
+
+    /// Emulates vLLM where the reasoning->tool handoff occurs between two independent filters.
+    /// The reasoning filter (`cmd4().no_tools()`) consumes `<|START_TEXT|>` and
+    /// hands the tool filter only the stripped answer text. A plain `cmd4()`
+    /// tool filter defaults to `ToolReason` (thinking) mode, so that bare answer
+    /// text is misclassified as reasoning and the response content is lost.
+    ///
+    /// `start_in_answer()` makes the tool filter begin in `GroundedAnswer` mode
+    /// so post-reasoning answer text is correctly classified as content.
+    #[test]
+    fn test_reasoning_to_tool_streaming_handoff() {
+        // 1. Reasoning filter processes the batched delta and strips <|START_TEXT|>.
+        let mut reasoning = make_cmd4_no_tools_filter();
+        reasoning.write_decoded("<|START_THINKING|>");
+        reasoning.write_decoded("I think D");
+        let r = reasoning.write_decoded("<|END_THINKING|><|START_TEXT|>Answer: D<|END_TEXT|>");
+        assert_eq!(
+            r.content.as_deref(),
+            Some("Answer: D"),
+            "reasoning filter should surface the answer as content",
+        );
+
+        // 2. Tool filter receives only the bare, prefix-less answer text.
+        let mut tool = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        let t = tool.write_decoded("Answer: D");
+        assert_eq!(
+            t.content.as_deref(),
+            Some("Answer: D"),
+            "start_in_answer tool filter must classify bare answer text as content",
+        );
+        assert!(
+            t.reasoning.is_none(),
+            "answer text must not be reclassified as reasoning: {:?}",
+            t.reasoning,
+        );
+    }
+
+    #[test]
+    fn test_reasoning_to_tool_non_streaming_handoff() {
+        let tool_block = concat!(
+            "<|START_ACTION|>",
+            r#"[{"tool_call_id": "0", "tool_name": "foo", "parameters": {"q": "x"}}]"#,
+            "<|END_ACTION|>",
+        );
+        let content = format!("Answer: D{tool_block}");
+
+        // Plain cmd4 drops the leading answer text.
+        let mut plain = make_cmd4_filter();
+        let r = plain.process_full_text(&content);
+        assert_eq!(r.content, None, "plain cmd4 drops leading answer text");
+        assert_eq!(r.tool_calls.len(), 1);
+
+        // start_in_answer preserves it alongside the tool call.
+        let mut fixed = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        let r = fixed.process_full_text(&content);
+        assert_eq!(r.content.as_deref(), Some("Answer: D"));
+        assert_eq!(r.tool_calls.len(), 1);
+        assert_eq!(r.tool_calls[0].name, "foo");
+    }
+
+    /// Nested-xml cmd5 generation with a streamed `type="json"` leaf (e.g.
+    /// `wait: 0.1`) must not append a spurious `null` after the value when
+    /// tokens arrive char-by-char. Reproduces a real `terminal_use` tool call.
+    #[test]
+    fn test_process_full_cmd5_nested_xml_streaming_json_leaf() {
+        let text = "Let's see if qemu-system-x86_64 is installed.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id=\"1\" name=\"terminal_use\"><cofl:value name=\"commands\" type=\"list\"><cofl:value type=\"dict\"><cofl:value name=\"keystrokes\" type=\"raw\">which qemu-system-x86_64\n</cofl:value><cofl:value name=\"wait\" type=\"json\">0.1</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>";
+
+        let mut full = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let full_result = full.process_full_text(text);
+        assert_eq!(
+            full_result.reasoning,
+            Some("Let's see if qemu-system-x86_64 is installed.".into())
+        );
+        assert_eq!(full_result.tool_calls.len(), 1);
+        assert_eq!(full_result.tool_calls[0].name, "terminal_use");
+
+        let expected_args =
+            r#"{"commands": [{"keystrokes": "which qemu-system-x86_64\n", "wait": 0.1}]}"#;
+        assert_eq!(full_result.tool_calls[0].arguments, expected_args);
+
+        let chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+        let mut streamed = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let streamed_result = streamed.process_full(&chars);
+        assert_eq!(streamed_result.tool_calls.len(), 1);
+        assert_eq!(
+            streamed_result.tool_calls[0].arguments, expected_args,
+            "streamed args must match full-text (no trailing null on json leaf)"
+        );
+    }
+
+    #[test]
+    fn test_process_full_cmd5_nested_xml_streaming_json_leaf_null() {
+        let text = "Let's see if qemu-system-x86_64 is installed.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id=\"1\" name=\"terminal_use\"><cofl:value name=\"commands\" type=\"list\"><cofl:value type=\"json\"></cofl:value><cofl:value type=\"json\">null</cofl:value><cofl:value type=\"dict\"><cofl:value name=\"null\" type=\"json\">null</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>";
+
+        let mut full = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let full_result = full.process_full_text(text);
+        let expected_args = r#"{"commands": [null, null, {"null": null}]}"#;
+        assert_eq!(full_result.tool_calls[0].arguments, expected_args);
+
+        let chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+        let mut streamed = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let streamed_result = streamed.process_full(&chars);
+        assert_eq!(streamed_result.tool_calls.len(), 1);
+        assert_eq!(
+            streamed_result.tool_calls[0].arguments, expected_args,
+            "streamed args must match full-text (no trailing null on json leaf)"
         );
     }
 }
