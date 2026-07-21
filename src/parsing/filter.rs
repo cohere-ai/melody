@@ -2208,7 +2208,7 @@ mod tests {
     /// tokens arrive char-by-char. Reproduces a real `terminal_use` tool call.
     #[test]
     fn test_process_full_cmd5_nested_xml_streaming_json_leaf() {
-        let text = "Let's see if qemu-system-x86_64 is installed.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id=\"1\" name=\"terminal_use\"><cofl:value name=\"commands\" type=\"list\"><cofl:value type=\"dict\"><cofl:value name=\"keystrokes\" type=\"raw\">which qemu-system-x86_64\n</cofl:value><cofl:value name=\"wait\" type=\"json\">0.1</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>";
+        let text = "Let's see if qemu-system-x86_64 is installed.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id=\"1\" name=\"terminal_use\"><cofl:value name=\"commands\" type=\"list\"><cofl:value type=\"dict\"><cofl:value name=\"keystrokes\" type=\"raw\">which qemu-system-x86_64\n</cofl:value><cofl:value name=\"null\" type=\"json\">null</cofl:value><cofl:value name=\"wait\" type=\"json\">0.1</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>";
 
         let mut full = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
         let full_result = full.process_full_text(text);
@@ -2220,7 +2220,7 @@ mod tests {
         assert_eq!(full_result.tool_calls[0].name, "terminal_use");
 
         let expected_args =
-            r#"{"commands": [{"keystrokes": "which qemu-system-x86_64\n", "wait": 0.1}]}"#;
+            r#"{"commands": [{"keystrokes": "which qemu-system-x86_64\n", "null": null, "wait": 0.1}]}"#;
         assert_eq!(full_result.tool_calls[0].arguments, expected_args);
 
         let chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
