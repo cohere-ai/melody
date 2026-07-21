@@ -88,7 +88,7 @@ const XML_ENTITIES: &[&str] = &["&amp;", "&lt;", "&gt;", "&quot;", "&apos;"];
 /// Returns `None` if the attribute is missing or its value is unterminated.
 /// Attribute values use `&quot;` rather than literal `"`, so a naive scan is
 /// safe on the wire format.
-fn extract_attr<'a>(tag_inner: &'a str, key: &str) -> Option<&'a str> {
+pub(crate) fn extract_attr<'a>(tag_inner: &'a str, key: &str) -> Option<&'a str> {
     let needle = format!("{key}=\"");
     let start = tag_inner.find(&needle)?;
     let value_start = start + needle.len();
@@ -100,7 +100,7 @@ fn extract_attr<'a>(tag_inner: &'a str, key: &str) -> Option<&'a str> {
 /// Decode XML entities in a complete string (attribute values and flushed
 /// parameter bodies). `&amp;` is decoded last so sequences like `&amp;lt;`
 /// round-trip correctly.
-fn decode_xml_entities(s: &str) -> String {
+pub(crate) fn decode_xml_entities(s: &str) -> String {
     s.replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
@@ -115,7 +115,7 @@ fn decode_xml_entities(s: &str) -> String {
 /// holdback suffix is left in the caller's buffer (via a reduced `consumed`
 /// count) rather than decoded prematurely. When `flush` is true (final chunk
 /// of a param), everything is decoded with no holdback.
-fn split_xml_entity_holdback(s: &str, flush: bool) -> (&str, &str) {
+pub(crate) fn split_xml_entity_holdback(s: &str, flush: bool) -> (&str, &str) {
     if flush || s.is_empty() {
         return (s, "");
     }
@@ -138,7 +138,7 @@ fn split_xml_entity_holdback(s: &str, flush: bool) -> (&str, &str) {
 
 /// JSON-escape the body of a string parameter so it can be emitted between
 /// surrounding `"` quotes as a valid JSON string literal.
-fn json_escape_string_content(s: &str) -> String {
+pub(crate) fn json_escape_string_content(s: &str) -> String {
     use std::fmt::Write as _;
 
     let mut out = String::with_capacity(s.len());
@@ -175,6 +175,10 @@ impl FilterImpl {
     pub(crate) fn parse_cofl_actions(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
         if s.is_empty() {
             return (Vec::new(), 0);
+        }
+
+        if self.cofl_nested_xml {
+            return self.parse_cofl_nested_actions(s);
         }
 
         match self.cofl_action_metadata.mode {
@@ -405,7 +409,11 @@ impl FilterImpl {
 
         // Also hold back a trailing partial XML entity (e.g. `&l` of `&lt;`)
         // in the caller's buffer, same as partial close tags above.
-        let (decodable, entity_holdback) = split_xml_entity_holdback(&s[..value_end], is_final);
+        let (decodable, entity_holdback) = if self.cofl_decode_xml_text {
+            split_xml_entity_holdback(&s[..value_end], is_final)
+        } else {
+            (&s[..value_end], "")
+        };
         let value_consumed = value_end - entity_holdback.len();
 
         let mut out = self.emit_cofl_param_value_chunk(decodable, is_final);
@@ -447,7 +455,11 @@ impl FilterImpl {
             return Vec::new();
         }
 
-        let decoded = decode_xml_entities(chunk);
+        let decoded = if self.cofl_decode_xml_text {
+            decode_xml_entities(chunk)
+        } else {
+            chunk.to_string()
+        };
 
         let mut delta = if self.cofl_action_metadata.cur_param_is_string {
             json_escape_string_content(&decoded)
@@ -502,6 +514,59 @@ mod tests {
         let mut filter = fresh_filter();
         filter.stream_processed_params = true;
         filter
+    }
+
+    fn fresh_filter_no_xml_text_decode() -> FilterImpl {
+        let mut filter = fresh_filter();
+        filter.cofl_decode_xml_text = false;
+        filter
+    }
+
+    #[test]
+    fn test_parse_cofl_actions_no_xml_text_decode_unescaped_body() {
+        let mut f = fresh_filter_no_xml_text_decode();
+        let input = r#"<cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with <tag> & "quotes"</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a<b", "c&d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param></cofl:tool_call>"#;
+        let (out, consumed) = f.parse_cofl_actions(input);
+
+        assert_eq!(consumed, input.len());
+
+        let name = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .find_map(|d| {
+                if d.name.is_empty() {
+                    None
+                } else {
+                    Some(d.name.as_str())
+                }
+            });
+        assert_eq!(name, Some("run<cmd>&tool"));
+
+        let raw: String = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .map(|d| d.raw_param_delta.as_str())
+            .collect();
+        let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
+        assert_eq!(parsed["str_param"], "value with <tag> & \"quotes\"");
+        assert_eq!(parsed["list_param"], serde_json::json!(["a<b", "c&d"]));
+        assert_eq!(parsed["param<>&name"], "attr test");
+    }
+
+    #[test]
+    fn test_parse_cofl_actions_no_xml_text_decode_preserves_entities_in_body() {
+        let mut f = fresh_filter_no_xml_text_decode();
+        let input = r#"<cofl:tool_call id="0" name="search"><cofl:tool_param name="snippet" string="true">literal &lt;entity&gt;</cofl:tool_param></cofl:tool_call>"#;
+        let (out, consumed) = f.parse_cofl_actions(input);
+        assert_eq!(consumed, input.len());
+
+        let raw: String = out
+            .iter()
+            .filter_map(|o| o.tool_call_delta.as_ref())
+            .map(|d| d.raw_param_delta.as_str())
+            .collect();
+        let parsed: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
+        assert_eq!(parsed["snippet"], "literal &lt;entity&gt;");
     }
 
     #[test]

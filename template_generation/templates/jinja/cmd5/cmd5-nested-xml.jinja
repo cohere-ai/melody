@@ -1,0 +1,10 @@
+{% include "reasoning_init.jinja" %}
+{% include "variables.jinja" %}
+{{ bos_token }}
+{% include "macros_tools.jinja" %}
+{% include "macros_content.jinja" %}
+{% include "macros_reasoning.jinja" %}
+{% include "setup.jinja" %}
+
+{% include "platform_turn.jinja" %}
+{% include "messages_loop.jinja" %}{% include "generation_prompt_reasoning.jinja" %}
