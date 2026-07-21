@@ -240,21 +240,9 @@ impl FilterImpl {
         let name = extract_attr(attrs, "name").map(decode_xml_entities);
         let value_type = extract_attr(attrs, "type").unwrap_or("raw");
 
-        let after_tag = full.end();
-        let empty_close = VALUE_CLOSE_RE
-            .find(&s[after_tag..])
-            .filter(|m| m.start() == 0);
-        let is_empty = empty_close.is_some();
-
         let mut out = Vec::new();
 
         match value_type {
-            "dict" if is_empty => {
-                out.extend(self.emit_nested_empty_container(name.as_deref(), "{", "}"));
-            }
-            "list" if is_empty => {
-                out.extend(self.emit_nested_empty_container(name.as_deref(), "[", "]"));
-            }
             "dict" => {
                 out.extend(self.emit_nested_container_open(name.as_deref(), "{"));
                 self.cofl_nested_action_metadata
@@ -286,20 +274,10 @@ impl FilterImpl {
             }
         }
 
-        // Empty containers consume `</cofl:value>` here. Empty leaves do not —
-        // they leave the close tag for `InLeafBody` so the closing quote / mode
-        // reset run. Consuming the close while still in `InLeafBody` left later
-        // siblings parsed as stray leaf text.
-        let empty_container = is_empty && matches!(value_type, "dict" | "list");
-        let consumed = if empty_container {
-            after_tag + empty_close.expect("checked is_empty").end()
-        } else {
-            after_tag
-        };
-
-        if empty_container {
-            self.mark_nested_parent_entry_seen();
-        }
+        // Leave any immediate `</cofl:value>` for the new mode so empty
+        // containers close via `InContainerBody` and empty leaves still run
+        // closing-quote / `null` handling in `InLeafBody`.
+        let consumed = full.end();
         let (o, r) = self.parse_cofl_nested_actions(&s[consumed..]);
         out.extend(o);
         (out, consumed + r)
@@ -520,17 +498,6 @@ impl FilterImpl {
         }
     }
 
-    fn emit_nested_empty_container(
-        &mut self,
-        key: Option<&str>,
-        open: &str,
-        close: &str,
-    ) -> Vec<FilterOutput> {
-        let (mut out, prefix) = self.begin_nested_entry(key);
-        out.extend(self.emit_nested_stream_delta(format!("{prefix}{open}{close}")));
-        out
-    }
-
     fn emit_nested_container_open(&mut self, key: Option<&str>, open: &str) -> Vec<FilterOutput> {
         let (mut out, prefix) = self.begin_nested_entry(key);
         out.extend(self.emit_nested_stream_delta(format!("{prefix}{open}")));
@@ -560,33 +527,31 @@ impl FilterImpl {
             chunk.to_string()
         };
 
-        let (leaf_is_raw, saw_body) = match self.cofl_nested_action_metadata.mode {
+        let (leaf_is_raw, saw_body) = match &mut self.cofl_nested_action_metadata.mode {
             CoflNestedMode::InLeafBody {
                 leaf_is_raw,
                 saw_body,
-            } => (leaf_is_raw, saw_body),
-            _ => (false, false),
+            } => (*leaf_is_raw, saw_body),
+            _ => return Vec::new(),
         };
+
         let mut delta = if leaf_is_raw {
             json_escape_string_content(&decoded)
         } else {
             decoded
         };
-        if is_final && leaf_is_raw {
-            delta.push('"');
-        } else if is_final && delta.is_empty() && !saw_body {
-            // Empty `type="json"` body — emit null so the key stays a valid pair.
-            // Only when no body was streamed earlier; a close-only follow-up
-            // chunk after a non-empty value must not append another `null`.
-            delta.push_str("null");
+
+        // Record body before finalize side-effects so a same-buffer value+close
+        // (`0.1</cofl:value>`) is not mistaken for an empty json leaf.
+        if !delta.is_empty() {
+            *saw_body = true;
         }
 
-        if !delta.is_empty() {
-            if let CoflNestedMode::InLeafBody { saw_body, .. } =
-                &mut self.cofl_nested_action_metadata.mode
-            {
-                *saw_body = true;
-            }
+        if is_final && leaf_is_raw {
+            delta.push('"');
+        } else if is_final && !leaf_is_raw && !*saw_body {
+            // Empty `type="json"` body — emit null so the key stays a valid pair.
+            delta.push_str("null");
         }
 
         self.emit_nested_stream_delta(delta)
