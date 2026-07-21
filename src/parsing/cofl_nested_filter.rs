@@ -101,8 +101,14 @@ pub(crate) enum CoflNestedMode {
     InContainerBody,
     /// Inside a `type="raw"` / `type="json"` leaf. `leaf_is_raw` is only
     /// meaningful here, so it lives on the variant rather than the struct.
+    ///
+    /// `saw_body` tracks whether any body bytes have already been emitted for
+    /// this leaf. Needed so a later close-only chunk (`</cofl:value>` arriving
+    /// alone after the value streamed earlier) does not treat the leaf as
+    /// empty and append a spurious `null` for `type="json"`.
     InLeafBody {
         leaf_is_raw: bool,
+        saw_body: bool,
     },
 }
 
@@ -265,14 +271,18 @@ impl FilterImpl {
             }
             "json" => {
                 out.extend(self.emit_nested_leaf_open(name.as_deref(), false));
-                self.cofl_nested_action_metadata.mode =
-                    CoflNestedMode::InLeafBody { leaf_is_raw: false };
+                self.cofl_nested_action_metadata.mode = CoflNestedMode::InLeafBody {
+                    leaf_is_raw: false,
+                    saw_body: false,
+                };
             }
             _ => {
                 // `raw` and unknown types default to raw string bodies.
                 out.extend(self.emit_nested_leaf_open(name.as_deref(), true));
-                self.cofl_nested_action_metadata.mode =
-                    CoflNestedMode::InLeafBody { leaf_is_raw: true };
+                self.cofl_nested_action_metadata.mode = CoflNestedMode::InLeafBody {
+                    leaf_is_raw: true,
+                    saw_body: false,
+                };
             }
         }
 
@@ -550,10 +560,13 @@ impl FilterImpl {
             chunk.to_string()
         };
 
-        let leaf_is_raw = matches!(
-            self.cofl_nested_action_metadata.mode,
-            CoflNestedMode::InLeafBody { leaf_is_raw: true }
-        );
+        let (leaf_is_raw, saw_body) = match self.cofl_nested_action_metadata.mode {
+            CoflNestedMode::InLeafBody {
+                leaf_is_raw,
+                saw_body,
+            } => (leaf_is_raw, saw_body),
+            _ => (false, false),
+        };
         let mut delta = if leaf_is_raw {
             json_escape_string_content(&decoded)
         } else {
@@ -561,9 +574,19 @@ impl FilterImpl {
         };
         if is_final && leaf_is_raw {
             delta.push('"');
-        } else if is_final && delta.is_empty() {
+        } else if is_final && delta.is_empty() && !saw_body {
             // Empty `type="json"` body — emit null so the key stays a valid pair.
+            // Only when no body was streamed earlier; a close-only follow-up
+            // chunk after a non-empty value must not append another `null`.
             delta.push_str("null");
+        }
+
+        if !delta.is_empty() {
+            if let CoflNestedMode::InLeafBody { saw_body, .. } =
+                &mut self.cofl_nested_action_metadata.mode
+            {
+                *saw_body = true;
+            }
         }
 
         self.emit_nested_stream_delta(delta)
@@ -787,6 +810,53 @@ mod tests {
         }
         assert!(buf.is_empty());
         assert_eq!(combined, r#"{"query": "hello"}"#);
+    }
+
+    /// Streaming a non-empty `type="json"` leaf must not append a trailing
+    /// `null` when the closing tag arrives in a later chunk after the value
+    /// body has already been emitted.
+    #[test]
+    fn test_parse_nested_xml_streaming_json_leaf_no_spurious_null() {
+        let full = r#"<cofl:tool_call id="0" name="terminal_use"><cofl:value name="commands" type="list"><cofl:value type="dict"><cofl:value name="keystrokes" type="raw">which qemu-system-x86_64
+</cofl:value><cofl:value name="wait" type="json">0.1</cofl:value></cofl:value></cofl:value></cofl:tool_call>"#;
+        let mut combined = String::new();
+        let mut f = fresh_nested_filter();
+        let mut buf = String::new();
+        for c in full.chars() {
+            buf.push(c);
+            let (out, consumed) = f.parse_cofl_nested_actions(&buf);
+            combined.push_str(&collect_raw(&out));
+            buf.drain(..consumed);
+        }
+        assert!(buf.is_empty());
+        let parsed: serde_json::Value = serde_json::from_str(&combined).expect("valid JSON");
+        assert_eq!(
+            parsed,
+            serde_json::json!({
+                "commands": [{"keystrokes": "which qemu-system-x86_64\n", "wait": 0.1}]
+            })
+        );
+        assert!(
+            !combined.contains("0.1null"),
+            "spurious null after streamed json leaf: {combined}"
+        );
+    }
+
+    /// Empty `type="json"></cofl:value>` must still emit `null` when streamed
+    /// char-by-char (close tag alone after an empty body).
+    #[test]
+    fn test_parse_nested_xml_streaming_empty_json_still_null() {
+        let full = r#"<cofl:tool_call id="0" name="run"><cofl:value name="empty_json" type="json"></cofl:value></cofl:tool_call>"#;
+        let mut combined = String::new();
+        let mut f = fresh_nested_filter();
+        let mut buf = String::new();
+        for c in full.chars() {
+            buf.push(c);
+            let (out, consumed) = f.parse_cofl_nested_actions(&buf);
+            combined.push_str(&collect_raw(&out));
+            buf.drain(..consumed);
+        }
+        assert_eq!(combined, r#"{"empty_json": null}"#);
     }
 
     #[test]

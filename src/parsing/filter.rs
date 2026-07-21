@@ -2144,6 +2144,7 @@ mod tests {
         );
     }
 
+<<<<<<< Updated upstream
     /// Emulates vLLM where the reasoning->tool handoff occurs between two independent filters.
     /// The reasoning filter (`cmd4().no_tools()`) consumes `<|START_TEXT|>` and
     /// hands the tool filter only the stripped answer text. A plain `cmd4()`
@@ -2202,4 +2203,35 @@ mod tests {
         assert_eq!(r.tool_calls.len(), 1);
         assert_eq!(r.tool_calls[0].name, "foo");
     }
+=======
+    /// Nested-xml cmd5 generation with a streamed `type="json"` leaf (e.g.
+    /// `wait: 0.1`) must not append a spurious `null` after the value when
+    /// tokens arrive char-by-char. Reproduces a real `terminal_use` tool call.
+    #[test]
+    fn test_process_full_cmd5_nested_xml_streaming_json_leaf() {
+        let text = "Let's see if qemu-system-x86_64 is installed.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id=\"1\" name=\"terminal_use\"><cofl:value name=\"commands\" type=\"list\"><cofl:value type=\"dict\"><cofl:value name=\"keystrokes\" type=\"raw\">which qemu-system-x86_64\n</cofl:value><cofl:value name=\"wait\" type=\"json\">0.1</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>";
+
+        let mut full = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let full_result = full.process_full_text(text);
+        assert_eq!(
+            full_result.reasoning,
+            Some("Let's see if qemu-system-x86_64 is installed.".into())
+        );
+        assert_eq!(full_result.tool_calls.len(), 1);
+        assert_eq!(full_result.tool_calls[0].name, "terminal_use");
+
+        let expected_args =
+            r#"{"commands": [{"keystrokes": "which qemu-system-x86_64\n", "wait": 0.1}]}"#;
+        assert_eq!(full_result.tool_calls[0].arguments, expected_args);
+
+        let chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+        let mut streamed = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let streamed_result = streamed.process_full(&chars);
+        assert_eq!(streamed_result.tool_calls.len(), 1);
+        assert_eq!(
+            streamed_result.tool_calls[0].arguments, expected_args,
+            "streamed args must match full-text (no trailing null on json leaf)"
+        );
+    }
+>>>>>>> Stashed changes
 }
