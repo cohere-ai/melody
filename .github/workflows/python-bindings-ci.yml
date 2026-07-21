@@ -79,6 +79,18 @@ jobs:
         vllm-version: ${{ fromJson(needs.vllm-versions.outputs.versions) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - name: Cache pip downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-vllm-${{ matrix.vllm-version }}-${{ hashFiles('pyproject.toml', 'cohere_melody.pyi') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-vllm-${{ matrix.vllm-version }}-
+            ${{ runner.os }}-pip-
       - name: Download sdist
         uses: actions/download-artifact@v4
         with:
@@ -90,10 +102,11 @@ jobs:
           set -e
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install --no-cache-dir ty
-          # Install the vLLM wheel without its full CUDA dependency tree (~10+ GB on CI).
-          pip install --no-cache-dir vllm==${{ matrix.vllm-version }} --no-deps
-          pip install --no-cache-dir dist/cohere_melody-*.tar.gz --force-reinstall
+          pip install ty
+          pip install \
+            "https://github.com/vllm-project/vllm/releases/download/v${{ matrix.vllm-version }}/vllm-${{ matrix.vllm-version }}%2Bcpu-cp38-abi3-manylinux_2_34_x86_64.whl" \
+            --extra-index-url https://download.pytorch.org/whl/cpu
+          pip install dist/cohere_melody-*.tar.gz --force-reinstall
           mapfile -t parser_files < <(python3 <<'PY'
           import sys
           from importlib import metadata
@@ -103,7 +116,10 @@ jobs:
               "vllm/tool_parsers/cohere_command_tool_parser.py",
           ]
           distribution = metadata.distribution("vllm")
-          vllm_files = {str(path): distribution.locate_file(path) for path in distribution.files or []}
+          vllm_files = {
+              str(path): distribution.locate_file(path)
+              for path in distribution.files or []
+          }
           missing = [path for path in required_files if path not in vllm_files]
           if missing:
               raise SystemExit(
