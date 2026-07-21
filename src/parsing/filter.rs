@@ -2239,8 +2239,7 @@ mod tests {
 
         let mut full = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
         let full_result = full.process_full_text(text);
-        let expected_args =
-            r#"{"commands": [null, null, {"null": null}]}"#;
+        let expected_args = r#"{"commands": [null, null, {"null": null}]}"#;
         assert_eq!(full_result.tool_calls[0].arguments, expected_args);
 
         let chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
