@@ -2144,7 +2144,6 @@ mod tests {
         );
     }
 
-<<<<<<< Updated upstream
     /// Emulates vLLM where the reasoning->tool handoff occurs between two independent filters.
     /// The reasoning filter (`cmd4().no_tools()`) consumes `<|START_TEXT|>` and
     /// hands the tool filter only the stripped answer text. A plain `cmd4()`
@@ -2203,7 +2202,7 @@ mod tests {
         assert_eq!(r.tool_calls.len(), 1);
         assert_eq!(r.tool_calls[0].name, "foo");
     }
-=======
+
     /// Nested-xml cmd5 generation with a streamed `type="json"` leaf (e.g.
     /// `wait: 0.1`) must not append a spurious `null` after the value when
     /// tokens arrive char-by-char. Reproduces a real `terminal_use` tool call.
@@ -2233,5 +2232,4 @@ mod tests {
             "streamed args must match full-text (no trailing null on json leaf)"
         );
     }
->>>>>>> Stashed changes
 }
