@@ -96,42 +96,22 @@ jobs:
         with:
           name: cohere-melody-sdist
           path: dist
-      - name: Check vllm parser integration (vllm==${{ matrix.vllm-version }})
+      - name: Test vllm parser integration (vllm==${{ matrix.vllm-version }})
         shell: bash
         run: |
           set -e
+          test_files=()
+          while IFS= read -r test_file; do
+            test_files+=("${test_file}")
+          done < <(python3 .github/download_vllm_test_files.py "${{ matrix.vllm-version }}")
+          if [[ "${#test_files[@]}" -eq 0 ]]; then
+            exit 0
+          fi
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install ty
+          pip install pytest
           pip install \
             "https://github.com/vllm-project/vllm/releases/download/v${{ matrix.vllm-version }}/vllm-${{ matrix.vllm-version }}%2Bcpu-cp38-abi3-manylinux_2_34_x86_64.whl" \
             --extra-index-url https://download.pytorch.org/whl/cpu
           pip install dist/cohere_melody-*.tar.gz --force-reinstall
-          mapfile -t parser_files < <(python3 <<'PY'
-          import sys
-          from importlib import metadata
-
-          required_files = [
-              "vllm/reasoning/cohere_command_reasoning_parser.py",
-              "vllm/tool_parsers/cohere_command_tool_parser.py",
-          ]
-          distribution = metadata.distribution("vllm")
-          vllm_files = {
-              str(path): distribution.locate_file(path)
-              for path in distribution.files or []
-          }
-          missing = [path for path in required_files if path not in vllm_files]
-          if missing:
-              raise SystemExit(
-                  f"vllm {metadata.version('vllm')} is missing upstream Cohere parser files: {missing}"
-              )
-          print(
-              f"cohere_melody {metadata.version('cohere_melody')} is installed "
-              f"with vllm {metadata.version('vllm')}",
-              file=sys.stderr,
-          )
-          for path in required_files:
-              print(vllm_files[path])
-          PY
-          )
-          ty check cohere_melody.pyi "${parser_files[@]}"
+          pytest "${test_files[@]}"
