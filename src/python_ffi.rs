@@ -181,7 +181,6 @@ impl PyFilterOptions {
     ///
     /// Does not change nested vs flat parsing. cmd5 defaults to false; pass
     /// `True` with `cofl_nested_xml(False)` for cmd5-strict.
-    #[pyo3(signature = (enabled=true))]
     fn cofl_decode_xml_text(&self, enabled: bool) -> Self {
         PyFilterOptions {
             inner: self.inner.clone().cofl_decode_xml_text(enabled),
@@ -192,7 +191,6 @@ impl PyFilterOptions {
     ///
     /// Nested is the cmd5 default. Pass `False` for cmd5-no-escape; chain
     /// `cofl_decode_xml_text(True)` for cmd5-strict.
-    #[pyo3(signature = (enabled=true))]
     fn cofl_nested_xml(&self, enabled: bool) -> Self {
         PyFilterOptions {
             inner: self.inner.clone().cofl_nested_xml(enabled),
