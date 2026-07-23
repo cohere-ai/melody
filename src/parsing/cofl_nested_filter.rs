@@ -1,4 +1,4 @@
-//! Nested-xml cofl tool-call parsing for the cmd5-nested-xml template.
+//! Nested-xml cofl tool-call parsing for the default cmd5 template.
 //!
 //! Tool parameters are encoded as recursive `<cofl:value>` nodes rather than
 //! flat `<cofl:tool_param>` tags:
@@ -666,7 +666,7 @@ mod tests {
     #[test]
     fn test_parse_nested_xml_empty_raw_and_json_leaves() {
         let mut f = fresh_nested_filter();
-        // cmd5-nested-xml emits empty strings as `<cofl:value ... type="raw"></cofl:value>`.
+        // cmd5 emits empty strings as `<cofl:value ... type="raw"></cofl:value>`.
         let input = r#"<cofl:tool_call id="0" name="run"><cofl:value name="empty_raw" type="raw"></cofl:value><cofl:value name="next" type="raw">after</cofl:value><cofl:value name="empty_json" type="json"></cofl:value><cofl:value name="flag" type="json">true</cofl:value></cofl:tool_call>"#;
         let (out, consumed) = f.parse_cofl_nested_actions(input);
         assert_eq!(consumed, input.len());

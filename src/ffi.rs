@@ -394,16 +394,20 @@ pub unsafe extern "C" fn melody_filter_options_cofl_no_xml_text_decode(
     }
 }
 
-/// Parse cofl tool parameters as nested `<cofl:value>` nodes.
+/// Parse cofl tool parameters as nested `<cofl:value>` nodes when `enabled`
+/// is true, or flat `<cofl:tool_param>` tags when false.
 ///
 /// # Safety
 /// `options` must be a valid pointer returned from `melody_filter_options_new`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_options_cofl_nested_xml(options: *mut CFilterOptions) {
+pub unsafe extern "C" fn melody_filter_options_cofl_nested_xml(
+    options: *mut CFilterOptions,
+    enabled: bool,
+) {
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = std::mem::take(opts).cofl_nested_xml();
+            *opts = std::mem::take(opts).cofl_nested_xml(enabled);
         }
     }
 }

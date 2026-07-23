@@ -214,7 +214,7 @@ pub struct FilterImpl {
     /// Decode XML entities in cofl parameter bodies before emitting tool-call
     /// arguments. Attribute values are always decoded regardless of this flag.
     pub(crate) cofl_decode_xml_text: bool,
-    /// Parse cofl tool parameters as nested `<cofl:value>` nodes (cmd5-nested-xml).
+    /// Parse cofl tool parameters as nested `<cofl:value>` nodes (default cmd5).
     pub(crate) cofl_nested_xml: bool,
 
     // Chunking configuration
@@ -1203,6 +1203,10 @@ mod tests {
         new_filter(FilterOptions::default().cmd5())
     }
 
+    fn make_cmd5_strict_filter() -> FilterImpl {
+        new_filter(FilterOptions::default().cmd5().cofl_nested_xml(false))
+    }
+
     fn make_cmd5_no_tools_filter() -> FilterImpl {
         new_filter(FilterOptions::default().cmd5().no_tools())
     }
@@ -1777,7 +1781,7 @@ mod tests {
 
     #[test]
     fn test_process_full_text_cmd5_tool_call_with_string_param() {
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let text = r#"<|START_THINKING|>I should search.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="call_0" name="web_search"><cofl:tool_param name="query" string="true">test</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.reasoning, Some("I should search.".into()));
@@ -1789,7 +1793,7 @@ mod tests {
 
     #[test]
     fn test_process_full_text_cmd5_tool_call_mixed_param_types() {
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let text = r#"<|START_THINKING|>thinking<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="DeleteReminder"><cofl:tool_param name="reminder_id" string="true">12-abc</cofl:tool_param><cofl:tool_param name="force" string="false">true</cofl:tool_param><cofl:tool_param name="limit" string="false">3</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 1);
@@ -1826,7 +1830,7 @@ mod tests {
             r#"<|START_THINKING|>run commands<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="17" name="execute_command"><cofl:tool_param name="commands" string="false">{commands_wire}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#
         );
 
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let result = f.process_full_text(&text);
         assert_eq!(result.tool_calls.len(), 1);
         assert_eq!(result.tool_calls[0].id, "17");
@@ -1838,7 +1842,7 @@ mod tests {
 
         // Streaming one character at a time must produce the same arguments.
         let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
-        let mut f2 = make_cmd5_filter();
+        let mut f2 = make_cmd5_strict_filter();
         let streamed = f2.process_full(&chunks);
         assert_eq!(streamed.tool_calls.len(), 1);
         assert_eq!(
@@ -1849,7 +1853,7 @@ mod tests {
 
     #[test]
     fn test_process_full_text_cmd5_multiple_tool_calls() {
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let text = r#"<|START_THINKING|>parallel<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="GetReminders"></cofl:tool_call><cofl:tool_call id="1" name="GetTodos"><cofl:tool_param name="filter" string="true">open</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 2);
@@ -1870,7 +1874,7 @@ mod tests {
     fn test_process_full_text_cmd5_tool_call_with_emoji_params() {
         let text = r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="send"><cofl:tool_param name="message" string="true">Hello 🌈 world! ☕</cofl:tool_param><cofl:tool_param name="tags" string="false">["🌈", "🦄"]</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
 
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 1);
         assert_eq!(result.tool_calls[0].id, "0");
@@ -1887,7 +1891,7 @@ mod tests {
         // the per-chunk JSON escaping in `emit_cofl_param_value_chunk`
         // accidentally splitting a multi-byte UTF-8 emoji.
         let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
-        let mut f2 = make_cmd5_filter();
+        let mut f2 = make_cmd5_strict_filter();
         let streamed = f2.process_full(&chunks);
         assert_eq!(
             streamed.tool_calls[0].arguments,
@@ -1900,7 +1904,7 @@ mod tests {
         // When stream_processed_params is enabled the raw_param_delta
         // stream is suppressed and the structured `processed_params` are
         // populated instead, mirroring action_filter behaviour.
-        let opts = FilterOptions::default().cmd5().stream_processed_params();
+        let opts = FilterOptions::default().cmd5().cofl_nested_xml(false).stream_processed_params();
         let mut f = new_filter(opts);
         let text = r#"<|START_THINKING|>thinking<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="DeleteReminder"><cofl:tool_param name="reminder_id" string="true">12-abc</cofl:tool_param><cofl:tool_param name="force" string="false">true</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
@@ -1922,9 +1926,9 @@ mod tests {
         let text = r#"<|START_THINKING|>think.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search"><cofl:tool_param name="q" string="true">hello</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
 
-        let mut f1 = make_cmd5_filter();
+        let mut f1 = make_cmd5_strict_filter();
         let r_full_text = f1.process_full_text(text);
-        let mut f2 = make_cmd5_filter();
+        let mut f2 = make_cmd5_strict_filter();
         let r_full = f2.process_full(&chunks);
 
         assert_eq!(r_full_text.reasoning, r_full.reasoning);
@@ -1941,7 +1945,7 @@ mod tests {
     /// JSON string (`""`), with both the opening and closing `"` emitted.
     #[test]
     fn test_process_full_text_cmd5_empty_string_param_value() {
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let text = r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="set_note"><cofl:tool_param name="note" string="true"></cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 1);
@@ -1952,11 +1956,11 @@ mod tests {
     }
 
     /// A `string="true"` parameter body with XML-entity escaped `<` and `>`
-    /// (as produced by the cmd5 template's `xml_text` macro) must decode to
+    /// (as produced by the cmd5-strict template's `xml_text` macro) must decode to
     /// the original characters in the tool-call arguments.
     #[test]
     fn test_process_full_text_cmd5_string_param_value_with_angle_brackets() {
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let snippet = "if (a < b) { return <T>(); }";
         let wire = "if (a &lt; b) { return &lt;T&gt;(); }";
         let text = format!(
@@ -1993,11 +1997,11 @@ mod tests {
         );
     }
 
-    /// Round-trip the XML-entity escaping used by the cmd5 template, mirroring
-    /// `tests/templating/jinja/cmd5/xml_escaping`.
+    /// Round-trip the XML-entity escaping used by the cmd5-strict template, mirroring
+    /// `tests/templating/jinja/cmd5_strict/xml_escaping`.
     #[test]
     fn test_process_full_text_cmd5_xml_entity_escaping() {
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with &lt;tag&gt; &amp; "quotes"</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="bool_param" string="false">true</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a&lt;b", "c&amp;d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key&lt;1&gt;": "val&gt;2"}</cofl:tool_param><cofl:tool_param name="filters" string="false">{"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 1);
@@ -2018,11 +2022,10 @@ mod tests {
         );
     }
 
-    /// Round-trip nested-xml cofl tool calls from the cmd5-nested-xml template.
+    /// Round-trip nested-xml cofl tool calls from the default cmd5 template.
     #[test]
     fn test_process_full_text_cmd5_nested_xml() {
-        let opts = FilterOptions::default().cmd5().cofl_nested_xml();
-        let mut f = new_filter(opts);
+        let mut f = make_cmd5_filter();
         let text = r#"<|START_THINKING|>searching<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search &quot;web&quot;"><cofl:value name="query" type="raw">echo "Hello" >> foo.txt && exit</cofl:value><cofl:value name="limit" type="json">3</cofl:value><cofl:value name="float example" type="json">3.14</cofl:value><cofl:value name="filters" type="dict"><cofl:value name="fresh" type="json">true</cofl:value><cofl:value name="tags" type="list"><cofl:value type="raw">music</cofl:value><cofl:value type="raw">Sudan</cofl:value></cofl:value></cofl:value><cofl:value name="missing" type="json">null</cofl:value><cofl:value name="empty_dict" type="dict"></cofl:value><cofl:value name="empty_list" type="list"></cofl:value></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.tool_calls.len(), 1);
@@ -2046,7 +2049,6 @@ mod tests {
     fn test_process_full_text_cmd5_nested_xml_processed_params() {
         let opts = FilterOptions::default()
             .cmd5()
-            .cofl_nested_xml()
             .stream_processed_params();
         let mut f = new_filter(opts);
         let text = r#"<|START_THINKING|>searching<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search"><cofl:value name="query" type="raw">hello</cofl:value><cofl:value name="filters" type="dict"><cofl:value name="fresh" type="json">true</cofl:value><cofl:value name="tags" type="list"><cofl:value type="raw">music</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>"#;
@@ -2074,7 +2076,7 @@ mod tests {
     /// `<|END_THINKING|>`. Mirrors the cmd4 implicit-reasoning test.
     #[test]
     fn test_process_full_text_cmd5_implicit_reasoning_then_tool_call() {
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let text = r#"Plan first.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="call_0" name="web_search"><cofl:tool_param name="query" string="true">test</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.reasoning, Some("Plan first.".into()));
@@ -2123,7 +2125,7 @@ mod tests {
     /// special-token state machine.
     #[test]
     fn test_process_full_text_cmd5_empty_tool_calls_block() {
-        let mut f = make_cmd5_filter();
+        let mut f = make_cmd5_strict_filter();
         let text = r#"<|START_THINKING|>think<|END_THINKING|><cofl:tool_calls></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
         assert_eq!(result.reasoning, Some("think".into()));
@@ -2219,7 +2221,7 @@ mod tests {
     fn test_process_full_cmd5_nested_xml_streaming_json_leaf() {
         let text = "Let's see if qemu-system-x86_64 is installed.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id=\"1\" name=\"terminal_use\"><cofl:value name=\"commands\" type=\"list\"><cofl:value type=\"dict\"><cofl:value name=\"keystrokes\" type=\"raw\">which qemu-system-x86_64\n</cofl:value><cofl:value name=\"wait\" type=\"json\">0.1</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>";
 
-        let mut full = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let mut full = make_cmd5_filter();
         let full_result = full.process_full_text(text);
         assert_eq!(
             full_result.reasoning,
@@ -2233,7 +2235,7 @@ mod tests {
         assert_eq!(full_result.tool_calls[0].arguments, expected_args);
 
         let chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
-        let mut streamed = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let mut streamed = make_cmd5_filter();
         let streamed_result = streamed.process_full(&chars);
         assert_eq!(streamed_result.tool_calls.len(), 1);
         assert_eq!(
@@ -2246,13 +2248,13 @@ mod tests {
     fn test_process_full_cmd5_nested_xml_streaming_json_leaf_null() {
         let text = "Let's see if qemu-system-x86_64 is installed.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id=\"1\" name=\"terminal_use\"><cofl:value name=\"commands\" type=\"list\"><cofl:value type=\"json\"></cofl:value><cofl:value type=\"json\">null</cofl:value><cofl:value type=\"dict\"><cofl:value name=\"null\" type=\"json\">null</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>";
 
-        let mut full = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let mut full = make_cmd5_filter();
         let full_result = full.process_full_text(text);
         let expected_args = r#"{"commands": [null, null, {"null": null}]}"#;
         assert_eq!(full_result.tool_calls[0].arguments, expected_args);
 
         let chars: Vec<String> = text.chars().map(|c| c.to_string()).collect();
-        let mut streamed = new_filter(FilterOptions::default().cmd5().cofl_nested_xml());
+        let mut streamed = make_cmd5_filter();
         let streamed_result = streamed.process_full(&chars);
         assert_eq!(streamed_result.tool_calls.len(), 1);
         assert_eq!(

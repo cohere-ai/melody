@@ -15,7 +15,7 @@ type filterConfig struct {
 	streamNonGroundedAnswer bool
 	streamProcessedParams   bool
 	coflNoXMLTextDecode     bool
-	coflNestedXML           bool
+	coflNestedXML           *bool
 	leftTrimmed             bool
 	rightTrimmed            bool
 	prefixTrim              string
@@ -60,8 +60,8 @@ func (cfg *filterConfig) apply(opts *FilterOptions) {
 	if cfg.coflNoXMLTextDecode {
 		opts.CoflNoXMLTextDecode()
 	}
-	if cfg.coflNestedXML {
-		opts.CoflNestedXML()
+	if cfg.coflNestedXML != nil {
+		opts.SetCoflNestedXML(*cfg.coflNestedXML)
 	}
 
 	// Handle trimming options
@@ -155,17 +155,20 @@ func StreamProcessedParams() FilterOption {
 }
 
 // CoflNoXMLTextDecode disables XML entity decoding for cofl parameter bodies.
+// Also switches to flat <cofl:tool_param> parsing. Use with cmd5-no-escape.
 func CoflNoXMLTextDecode() FilterOption {
 	return func(cfg *filterConfig) {
 		cfg.coflNoXMLTextDecode = true
 	}
 }
 
-// CoflNestedXML parses cofl tool parameters as nested <cofl:value> nodes.
-// Use with the cmd5-nested-xml template. Also disables body entity decoding.
-func CoflNestedXML() FilterOption {
+// CoflNestedXML enables or disables nested <cofl:value> cofl parameter parsing.
+// Nested mode is the default for HandleMultiHopCmd5 / Cmd5. Pass false for
+// cmd5-strict (flat tool_param tags with entity decoding).
+func CoflNestedXML(enabled bool) FilterOption {
 	return func(cfg *filterConfig) {
-		cfg.coflNestedXML = true
+		v := enabled
+		cfg.coflNestedXML = &v
 	}
 }
 

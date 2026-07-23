@@ -111,6 +111,7 @@ func (opts *FilterOptions) StreamProcessedParams() *FilterOptions {
 }
 
 // CoflNoXMLTextDecode disables XML entity decoding for cofl parameter bodies.
+// Also switches to flat <cofl:tool_param> parsing. Use with cmd5-no-escape.
 func (opts *FilterOptions) CoflNoXMLTextDecode() *FilterOptions {
 	if opts.ptr != nil {
 		C.melody_filter_options_cofl_no_xml_text_decode(opts.ptr)
@@ -118,10 +119,16 @@ func (opts *FilterOptions) CoflNoXMLTextDecode() *FilterOptions {
 	return opts
 }
 
-// CoflNestedXML parses cofl tool parameters as nested <cofl:value> nodes.
+// CoflNestedXML enables nested <cofl:value> parsing (cmd5 default).
 func (opts *FilterOptions) CoflNestedXML() *FilterOptions {
+	return opts.SetCoflNestedXML(true)
+}
+
+// SetCoflNestedXML enables or disables nested <cofl:value> cofl parameter parsing.
+// Pass false for cmd5-strict (flat tool_param tags with entity decoding).
+func (opts *FilterOptions) SetCoflNestedXML(enabled bool) *FilterOptions {
 	if opts.ptr != nil {
-		C.melody_filter_options_cofl_nested_xml(opts.ptr)
+		C.melody_filter_options_cofl_nested_xml(opts.ptr, C.bool(enabled))
 	}
 	return opts
 }

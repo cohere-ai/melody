@@ -155,13 +155,13 @@ class TestPyFilterOptions:
         assert result.reasoning == "Hello"
 
     def test_cmd5_option(self):
-        """Test cmd5() builder method parses cofl tool calls."""
+        """Test cmd5() builder method parses nested cofl tool calls by default."""
         opts = PyFilterOptions().cmd5()
         f = PyFilter(opts)
         text = (
             "<|START_THINKING|>I should search.<|END_THINKING|>"
             '<cofl:tool_calls><cofl:tool_call id="call_0" name="web_search">'
-            '<cofl:tool_param name="query" string="true">test</cofl:tool_param>'
+            '<cofl:value name="query" type="raw">test</cofl:value>'
             "</cofl:tool_call></cofl:tool_calls>"
         )
         result = f.process_full_text(text)
@@ -172,11 +172,11 @@ class TestPyFilterOptions:
         assert result.tool_calls[0].arguments == '{"query": "test"}'
 
     def test_cmd5_static_factory(self):
-        """Test PyFilter.cmd5() factory parses cofl tool calls."""
+        """Test PyFilter.cmd5() factory parses nested cofl tool calls."""
         f = PyFilter.cmd5()
         text = (
             '<cofl:tool_calls><cofl:tool_call id="0" name="search">'
-            '<cofl:tool_param name="q" string="true">hello</cofl:tool_param>'
+            '<cofl:value name="q" type="raw">hello</cofl:value>'
             "</cofl:tool_call></cofl:tool_calls>"
         )
         result = f.process_full_text(text)
@@ -274,7 +274,7 @@ class TestPyFilterOptions:
         assert f is not None
 
     def test_cofl_no_xml_text_decode(self):
-        """Test cofl_no_xml_text_decode() parses unescaped cofl param bodies."""
+        """Test cofl_no_xml_text_decode() parses unescaped flat cofl params (cmd5-no-escape)."""
         opts = PyFilterOptions().cmd5().cofl_no_xml_text_decode()
         f = PyFilter(opts)
         text = (
@@ -291,6 +291,20 @@ class TestPyFilterOptions:
 
         parsed = json.loads(result.tool_calls[0].arguments)
         assert parsed["str_param"] == 'value with <tag> & "quotes"'
+
+    def test_cofl_nested_xml_disabled_for_strict(self):
+        """Test cofl_nested_xml(False) parses flat cmd5-strict tool params."""
+        opts = PyFilterOptions().cmd5().cofl_nested_xml(False)
+        f = PyFilter(opts)
+        text = (
+            "<|START_THINKING|>think<|END_THINKING|>"
+            '<cofl:tool_calls><cofl:tool_call id="0" name="search">'
+            '<cofl:tool_param name="q" string="true">hello</cofl:tool_param>'
+            "</cofl:tool_call></cofl:tool_calls>"
+        )
+        result = f.process_full_text(text)
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].arguments == '{"q": "hello"}'
 
     def test_options_are_immutable(self):
         """Test that builder methods return new instances."""

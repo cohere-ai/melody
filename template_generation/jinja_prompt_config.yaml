@@ -99,7 +99,7 @@ cmd5:
     variables.jinja:
       path: cmd4/shared/variables.jinja
     macros_tools.jinja:
-      path: cmd5/cofl/macros_tools.jinja
+      path: cmd5/cofl/macros_tools_nested_xml.jinja
     macros_content.jinja:
       path: cmd4/shared/macros_content.jinja
     macros_reasoning.jinja:
@@ -135,15 +135,15 @@ cmd5-no-escape:
     generation_prompt_reasoning.jinja:
       path: cmd4/shared/generation_prompt_reasoning.jinja
 
-cmd5-nested-xml:
-  path: cmd5/cmd5-nested-xml.jinja
+cmd5-strict:
+  path: cmd5/cmd5-strict.jinja
   includes:
     reasoning_init.jinja:
       path: cmd4/shared/reasoning_init.jinja
     variables.jinja:
       path: cmd4/shared/variables.jinja
     macros_tools.jinja:
-      path: cmd5/cofl/macros_tools_nested_xml.jinja
+      path: cmd5/cofl/macros_tools.jinja
     macros_content.jinja:
       path: cmd4/shared/macros_content.jinja
     macros_reasoning.jinja:

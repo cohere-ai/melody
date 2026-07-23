@@ -184,10 +184,12 @@ impl PyFilterOptions {
         }
     }
 
-    /// Parse cofl tool parameters as nested `<cofl:value>` nodes.
-    fn cofl_nested_xml(&self) -> Self {
+    /// Parse cofl tool parameters as nested `<cofl:value>` nodes when enabled
+    /// (the cmd5 default). Pass `enabled=False` for flat cmd5-strict params.
+    #[pyo3(signature = (enabled=true))]
+    fn cofl_nested_xml(&self, enabled: bool) -> Self {
         PyFilterOptions {
-            inner: self.inner.clone().cofl_nested_xml(),
+            inner: self.inner.clone().cofl_nested_xml(enabled),
         }
     }
 
@@ -514,7 +516,7 @@ mod tests {
         let text = concat!(
             "<|START_THINKING|>thinking<|END_THINKING|>",
             "<cofl:tool_calls><cofl:tool_call id=\"0\" name=\"search\">",
-            "<cofl:tool_param name=\"q\" string=\"true\">hello</cofl:tool_param>",
+            "<cofl:value name=\"q\" type=\"raw\">hello</cofl:value>",
             "</cofl:tool_call></cofl:tool_calls>"
         );
         let result = filter.process_full_text(text);
