@@ -46,9 +46,8 @@ pub struct FilterOptions {
     pub(crate) cofl_tool_action: bool,
     /// When `false`, cofl parameter bodies are not XML-entity decoded before
     /// being emitted as tool-call arguments. Attribute values (`id`, `name`)
-    /// are always decoded. Pair with the `cmd5-no-escape` template (via
-    /// [`FilterOptions::cofl_no_xml_text_decode`], which also disables nested
-    /// xml).
+    /// are always decoded. Pair with the `cmd5-no-escape` template via
+    /// [`FilterOptions::cofl_no_xml_text_decode`].
     pub(crate) cofl_decode_xml_text: bool,
     /// When set, cofl tool parameters are parsed as nested `<cofl:value>` nodes
     /// (default cmd5 format) rather than flat `<cofl:tool_param>` tags.
@@ -642,9 +641,6 @@ impl FilterOptions {
     ///
     /// // cmd5-strict
     /// let strict = FilterOptions::new().cmd5().cofl_nested_xml(false);
-    ///
-    /// // explicit nested (already the cmd5 default)
-    /// let nested = FilterOptions::new().cmd5().cofl_nested_xml(true);
     /// ```
     #[must_use]
     pub fn cofl_nested_xml(mut self, enabled: bool) -> Self {

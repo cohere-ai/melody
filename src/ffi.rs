@@ -394,8 +394,7 @@ pub unsafe extern "C" fn melody_filter_options_cofl_no_xml_text_decode(
     }
 }
 
-/// Parse cofl tool parameters as nested `<cofl:value>` nodes when `enabled`
-/// is true, or flat `<cofl:tool_param>` tags when false.
+/// Enable or disable nested `<cofl:value>` cofl parameter parsing.
 ///
 /// # Safety
 /// `options` must be a valid pointer returned from `melody_filter_options_new`

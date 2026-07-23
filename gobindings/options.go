@@ -61,7 +61,7 @@ func (cfg *filterConfig) apply(opts *FilterOptions) {
 		opts.CoflNoXMLTextDecode()
 	}
 	if cfg.coflNestedXML != nil {
-		opts.SetCoflNestedXML(*cfg.coflNestedXML)
+		opts.CoflNestedXML(*cfg.coflNestedXML)
 	}
 
 	// Handle trimming options
@@ -163,8 +163,7 @@ func CoflNoXMLTextDecode() FilterOption {
 }
 
 // CoflNestedXML enables or disables nested <cofl:value> cofl parameter parsing.
-// Nested mode is the default for HandleMultiHopCmd5 / Cmd5. Pass false for
-// cmd5-strict (flat tool_param tags with entity decoding).
+// Nested mode is the default for Cmd5. Pass false for cmd5-strict.
 func CoflNestedXML(enabled bool) FilterOption {
 	return func(cfg *filterConfig) {
 		v := enabled

@@ -1904,7 +1904,10 @@ mod tests {
         // When stream_processed_params is enabled the raw_param_delta
         // stream is suppressed and the structured `processed_params` are
         // populated instead, mirroring action_filter behaviour.
-        let opts = FilterOptions::default().cmd5().cofl_nested_xml(false).stream_processed_params();
+        let opts = FilterOptions::default()
+            .cmd5()
+            .cofl_nested_xml(false)
+            .stream_processed_params();
         let mut f = new_filter(opts);
         let text = r#"<|START_THINKING|>thinking<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="DeleteReminder"><cofl:tool_param name="reminder_id" string="true">12-abc</cofl:tool_param><cofl:tool_param name="force" string="false">true</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
