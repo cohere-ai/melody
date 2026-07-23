@@ -120,7 +120,7 @@ func (opts *FilterOptions) CoflNoXMLTextDecode() *FilterOptions {
 }
 
 // CoflNestedXML enables or disables nested <cofl:value> cofl parameter parsing.
-// Nested mode is the default for Cmd5. Pass false for cmd5-strict.
+// Nested mode is the default for Cmd5. Pass false for cmd5-strict or cmd5-no-escape.
 func (opts *FilterOptions) CoflNestedXML(enabled bool) *FilterOptions {
 	if opts.ptr != nil {
 		C.melody_filter_options_cofl_nested_xml(opts.ptr, C.bool(enabled))
