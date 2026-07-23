@@ -274,8 +274,8 @@ class TestPyFilterOptions:
         assert f is not None
 
     def test_cofl_no_xml_text_decode(self):
-        """Test cofl_no_xml_text_decode() parses unescaped flat cofl params (cmd5-no-escape)."""
-        opts = PyFilterOptions().cmd5().cofl_no_xml_text_decode()
+        """Test flat + no-decode parses unescaped cofl params (cmd5-no-escape)."""
+        opts = PyFilterOptions().cmd5().cofl_nested_xml(False).cofl_no_xml_text_decode()
         f = PyFilter(opts)
         text = (
             "<|START_THINKING|>think<|END_THINKING|>"

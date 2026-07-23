@@ -52,8 +52,8 @@ pub struct FilterOptions {
     /// When set, cofl tool parameters are parsed as nested `<cofl:value>` nodes
     /// (default cmd5 format) rather than flat `<cofl:tool_param>` tags.
     /// Enabled by [`FilterOptions::cmd5`]; disable with
-    /// [`FilterOptions::cofl_nested_xml`]`(false)` for `cmd5-strict`, or
-    /// [`FilterOptions::cofl_no_xml_text_decode`] for `cmd5-no-escape`.
+    /// [`FilterOptions::cofl_nested_xml`]`(false)` for flat formats
+    /// (`cmd5-strict` / `cmd5-no-escape`).
     pub(crate) cofl_nested_xml: bool,
     /// Optional lookup table for resolving citation indices back to their
     /// original document identifiers. Indexed as
@@ -607,9 +607,9 @@ impl FilterOptions {
 
     /// Disable XML entity decoding for cofl parameter bodies.
     ///
-    /// Also switches to flat `<cofl:tool_param>` parsing (clears the nested-xml
-    /// mode enabled by default in [`FilterOptions::cmd5`]). Attribute values on
-    /// cofl tags (`id`, `name`) are still decoded. Use with `cmd5-no-escape`.
+    /// Attribute values on cofl tags (`id`, `name`) are still decoded. Does not
+    /// change nested vs flat parsing — pair with
+    /// [`FilterOptions::cofl_nested_xml`]`(false)` for `cmd5-no-escape`.
     ///
     /// # Examples
     ///
@@ -618,11 +618,11 @@ impl FilterOptions {
     ///
     /// let options = FilterOptions::new()
     ///     .cmd5()
+    ///     .cofl_nested_xml(false)
     ///     .cofl_no_xml_text_decode();
     /// ```
     #[must_use]
     pub fn cofl_no_xml_text_decode(mut self) -> Self {
-        self.cofl_nested_xml = false;
         self.cofl_decode_xml_text = false;
         self
     }
@@ -630,8 +630,8 @@ impl FilterOptions {
     /// Enable or disable nested `<cofl:value>` cofl parameter parsing.
     ///
     /// Nested mode is the default for [`FilterOptions::cmd5`]. Pass `false` for
-    /// the flat `<cofl:tool_param>` wire format used by `cmd5-strict` (entity
-    /// decoding on). For `cmd5-no-escape`, prefer
+    /// flat `<cofl:tool_param>` parsing (`cmd5-strict`, with body entity
+    /// decoding on). For `cmd5-no-escape`, chain
     /// [`FilterOptions::cofl_no_xml_text_decode`].
     ///
     /// # Examples
@@ -641,6 +641,12 @@ impl FilterOptions {
     ///
     /// // cmd5-strict
     /// let strict = FilterOptions::new().cmd5().cofl_nested_xml(false);
+    ///
+    /// // cmd5-no-escape
+    /// let no_escape = FilterOptions::new()
+    ///     .cmd5()
+    ///     .cofl_nested_xml(false)
+    ///     .cofl_no_xml_text_decode();
     /// ```
     #[must_use]
     pub fn cofl_nested_xml(mut self, enabled: bool) -> Self {

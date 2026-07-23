@@ -1980,7 +1980,10 @@ mod tests {
     /// template (unescaped bodies, escaped attributes).
     #[test]
     fn test_process_full_text_cmd5_no_xml_text_decode() {
-        let opts = FilterOptions::default().cmd5().cofl_no_xml_text_decode();
+        let opts = FilterOptions::default()
+            .cmd5()
+            .cofl_nested_xml(false)
+            .cofl_no_xml_text_decode();
         let mut f = new_filter(opts);
         let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with <tag> & "quotes" & &amp;</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a<b", "c&d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key<1>": "val>2"}</cofl:tool_param><cofl:tool_param name="filters" string="false">{"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);

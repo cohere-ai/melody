@@ -179,7 +179,8 @@ impl PyFilterOptions {
 
     /// Disable XML entity decoding for cofl parameter bodies.
     ///
-    /// Also switches to flat `<cofl:tool_param>` parsing. Use with cmd5-no-escape.
+    /// Does not change nested vs flat parsing. For cmd5-no-escape, also call
+    /// `cofl_nested_xml(False)`.
     fn cofl_no_xml_text_decode(&self) -> Self {
         PyFilterOptions {
             inner: self.inner.clone().cofl_no_xml_text_decode(),
