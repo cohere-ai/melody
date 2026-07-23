@@ -378,18 +378,19 @@ pub unsafe extern "C" fn melody_filter_options_stream_processed_params(
     }
 }
 
-/// Disables XML entity decoding for cofl parameter bodies.
+/// Enable or disable XML entity decoding for cofl parameter bodies.
 ///
 /// # Safety
 /// `options` must be a valid pointer returned from `melody_filter_options_new`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn melody_filter_options_cofl_no_xml_text_decode(
+pub unsafe extern "C" fn melody_filter_options_cofl_decode_xml_text(
     options: *mut CFilterOptions,
+    enabled: bool,
 ) {
     if !options.is_null() {
         unsafe {
             let opts = &mut *(options.cast::<FilterOptions>());
-            *opts = std::mem::take(opts).cofl_no_xml_text_decode();
+            *opts = std::mem::take(opts).cofl_decode_xml_text(enabled);
         }
     }
 }

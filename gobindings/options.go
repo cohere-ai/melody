@@ -14,7 +14,7 @@ type filterConfig struct {
 	streamToolActions       bool
 	streamNonGroundedAnswer bool
 	streamProcessedParams   bool
-	coflNoXMLTextDecode     bool
+	coflDecodeXMLText       *bool
 	coflNestedXML           *bool
 	leftTrimmed             bool
 	rightTrimmed            bool
@@ -60,8 +60,8 @@ func (cfg *filterConfig) apply(opts *FilterOptions) {
 	if cfg.coflNestedXML != nil {
 		opts.CoflNestedXML(*cfg.coflNestedXML)
 	}
-	if cfg.coflNoXMLTextDecode {
-		opts.CoflNoXMLTextDecode()
+	if cfg.coflDecodeXMLText != nil {
+		opts.CoflDecodeXMLText(*cfg.coflDecodeXMLText)
 	}
 
 	// Handle trimming options
@@ -154,18 +154,19 @@ func StreamProcessedParams() FilterOption {
 	}
 }
 
-// CoflNoXMLTextDecode disables XML entity decoding for cofl parameter bodies.
-// Does not change nested vs flat parsing. For cmd5-no-escape, also use
-// CoflNestedXML(false).
-func CoflNoXMLTextDecode() FilterOption {
+// CoflDecodeXMLText enables or disables XML entity decoding for cofl parameter
+// bodies. cmd5 defaults to false; pass true with CoflNestedXML(false) for
+// cmd5-strict.
+func CoflDecodeXMLText(enabled bool) FilterOption {
 	return func(cfg *filterConfig) {
-		cfg.coflNoXMLTextDecode = true
+		v := enabled
+		cfg.coflDecodeXMLText = &v
 	}
 }
 
 // CoflNestedXML enables or disables nested <cofl:value> cofl parameter parsing.
-// Nested mode is the default for Cmd5. Pass false for cmd5-strict; chain
-// CoflNoXMLTextDecode for cmd5-no-escape.
+// Nested mode is the default for Cmd5. Pass false for cmd5-no-escape; chain
+// CoflDecodeXMLText(true) for cmd5-strict.
 func CoflNestedXML(enabled bool) FilterOption {
 	return func(cfg *filterConfig) {
 		v := enabled

@@ -1204,7 +1204,12 @@ mod tests {
     }
 
     fn make_cmd5_strict_filter() -> FilterImpl {
-        new_filter(FilterOptions::default().cmd5().cofl_nested_xml(false))
+        new_filter(
+            FilterOptions::default()
+                .cmd5()
+                .cofl_nested_xml(false)
+                .cofl_decode_xml_text(true),
+        )
     }
 
     fn make_cmd5_no_tools_filter() -> FilterImpl {
@@ -1907,6 +1912,7 @@ mod tests {
         let opts = FilterOptions::default()
             .cmd5()
             .cofl_nested_xml(false)
+            .cofl_decode_xml_text(true)
             .stream_processed_params();
         let mut f = new_filter(opts);
         let text = r#"<|START_THINKING|>thinking<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="DeleteReminder"><cofl:tool_param name="reminder_id" string="true">12-abc</cofl:tool_param><cofl:tool_param name="force" string="false">true</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
@@ -1979,11 +1985,8 @@ mod tests {
     /// Round-trip the no-escape wire format produced by the `cmd5-no-escape`
     /// template (unescaped bodies, escaped attributes).
     #[test]
-    fn test_process_full_text_cmd5_no_xml_text_decode() {
-        let opts = FilterOptions::default()
-            .cmd5()
-            .cofl_nested_xml(false)
-            .cofl_no_xml_text_decode();
+    fn test_process_full_text_cmd5_no_escape() {
+        let opts = FilterOptions::default().cmd5().cofl_nested_xml(false);
         let mut f = new_filter(opts);
         let text = r#"<|START_THINKING|>I'll call the tool now.<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="run&lt;cmd&gt;&amp;tool"><cofl:tool_param name="str_param" string="true">value with <tag> & "quotes" & &amp;</cofl:tool_param><cofl:tool_param name="num_param" string="false">42</cofl:tool_param><cofl:tool_param name="list_param" string="false">["a<b", "c&d"]</cofl:tool_param><cofl:tool_param name="param&lt;&gt;&amp;name" string="true">attr test</cofl:tool_param><cofl:tool_param name="nested" string="false">{"key<1>": "val>2"}</cofl:tool_param><cofl:tool_param name="filters" string="false">{"artist": "The \"Sudan\" Ensemble", "note": "line1\nline2"}</cofl:tool_param></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
@@ -2053,9 +2056,7 @@ mod tests {
 
     #[test]
     fn test_process_full_text_cmd5_nested_xml_processed_params() {
-        let opts = FilterOptions::default()
-            .cmd5()
-            .stream_processed_params();
+        let opts = FilterOptions::default().cmd5().stream_processed_params();
         let mut f = new_filter(opts);
         let text = r#"<|START_THINKING|>searching<|END_THINKING|><cofl:tool_calls><cofl:tool_call id="0" name="search"><cofl:value name="query" type="raw">hello</cofl:value><cofl:value name="filters" type="dict"><cofl:value name="fresh" type="json">true</cofl:value><cofl:value name="tags" type="list"><cofl:value type="raw">music</cofl:value></cofl:value></cofl:value></cofl:tool_call></cofl:tool_calls>"#;
         let result = f.process_full_text(text);
