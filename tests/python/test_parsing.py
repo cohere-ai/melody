@@ -294,7 +294,9 @@ class TestPyFilterOptions:
 
     def test_cofl_nested_xml_disabled_for_strict(self):
         """Test flat + decode for cmd5-strict tool params."""
-        opts = PyFilterOptions().cmd5().cofl_nested_xml(False).cofl_decode_xml_text(True)
+        opts = (
+            PyFilterOptions().cmd5().cofl_nested_xml(False).cofl_decode_xml_text(True)
+        )
         f = PyFilter(opts)
         text = (
             "<|START_THINKING|>think<|END_THINKING|>"
