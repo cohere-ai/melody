@@ -89,22 +89,35 @@ jobs:
         vllm-version: ${{ fromJson(needs.vllm-versions.outputs.versions) }}
     steps:
       - uses: actions/checkout@v4
+      - id: vllm-tests
+        name: Download vllm parser tests
+        shell: bash
+        run: |
+          set -e
+          test_file_output="$(python3 .github/download_vllm_test_files.py "${{ matrix.vllm-version }}")"
+          if [[ -z "${test_file_output}" ]]; then
+            echo "No vLLM parser test files found; skipping"
+            echo "has_tests=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          {
+            echo "has_tests=true"
+            echo "files<<EOF"
+            echo "${test_file_output}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
       - name: Download Python distributions
+        if: steps.vllm-tests.outputs.has_tests == 'true'
         uses: actions/download-artifact@v4
         with:
           name: cohere-melody-dist
           path: dist
       - name: Test vllm parser integration (vllm==${{ matrix.vllm-version }})
+        if: steps.vllm-tests.outputs.has_tests == 'true'
         shell: bash
         run: |
           set -e
-          test_files=()
-          while IFS= read -r test_file; do
-            test_files+=("${test_file}")
-          done < <(python3 .github/download_vllm_test_files.py "${{ matrix.vllm-version }}")
-          if [[ "${#test_files[@]}" -eq 0 ]]; then
-            exit 0
-          fi
+          mapfile -t test_files <<< "${{ steps.vllm-tests.outputs.files }}"
           image="vllm/vllm-openai-cpu:v${{ matrix.vllm-version }}-x86_64"
           docker pull "${image}"
           docker run --rm \
