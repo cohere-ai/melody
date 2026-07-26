@@ -1,26 +1,39 @@
 import json
+import re
 import urllib.request
 
 from packaging.version import Version
 
-PYPI_VLLM_URL = "https://pypi.org/pypi/vllm/json"
+DOCKER_TAGS_URL = (
+    "https://hub.docker.com/v2/repositories/vllm/vllm-openai-cpu/tags?page_size=100"
+)
+X86_VERSION_TAG = re.compile(r"^v(?P<version>\d+\.\d+\.\d+)-x86_64$")
 VERSION_COUNT = 3
 
 
 def latest_vllm_versions() -> list[str]:
-    with urllib.request.urlopen(PYPI_VLLM_URL, timeout=10) as response:
-        data = json.load(response)
-
     versions = []
-    for raw_version, files in data["releases"].items():
-        version = Version(raw_version)
-        if version.is_prerelease or version.is_devrelease:
-            continue
-        if not any(not file.get("yanked", False) for file in files):
-            continue
-        versions.append(version)
+    url = DOCKER_TAGS_URL
+    while url is not None:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            data = json.load(response)
 
-    return [str(version) for version in sorted(versions, reverse=True)[:VERSION_COUNT]]
+        for tag in data["results"]:
+            match = X86_VERSION_TAG.match(tag["name"])
+            if match is None:
+                continue
+            version = Version(match.group("version"))
+            if version.is_prerelease or version.is_devrelease:
+                continue
+            versions.append(version)
+
+        url = data["next"]
+
+    versions = sorted(set(versions), reverse=True)
+    if len(versions) < VERSION_COUNT:
+        raise RuntimeError(f"Only found {len(versions)} vLLM CPU Docker versions")
+
+    return [str(version) for version in versions[:VERSION_COUNT]]
 
 
 if __name__ == "__main__":
