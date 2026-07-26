@@ -79,18 +79,6 @@ jobs:
         vllm-version: ${{ fromJson(needs.vllm-versions.outputs.versions) }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-      - name: Cache pip downloads
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-vllm-${{ matrix.vllm-version }}-${{ hashFiles('pyproject.toml', 'cohere_melody.pyi') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-vllm-${{ matrix.vllm-version }}-
-            ${{ runner.os }}-pip-
       - name: Download sdist
         uses: actions/download-artifact@v4
         with:
@@ -107,11 +95,12 @@ jobs:
           if [[ "${#test_files[@]}" -eq 0 ]]; then
             exit 0
           fi
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install pytest
-          pip install \
-            "https://github.com/vllm-project/vllm/releases/download/v${{ matrix.vllm-version }}/vllm-${{ matrix.vllm-version }}%2Bcpu-cp38-abi3-manylinux_2_34_x86_64.whl" \
-            --extra-index-url https://download.pytorch.org/whl/cpu
-          pip install dist/cohere_melody-*.tar.gz --force-reinstall
-          pytest "${test_files[@]}"
+          image="vllm/vllm-openai-cpu:v${{ matrix.vllm-version }}-x86_64"
+          docker pull "${image}"
+          docker run --rm \
+            --entrypoint /bin/bash \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            "${image}" \
+            -lc 'set -e; python3 -m pip install pytest; python3 -m pip install dist/cohere_melody-*.tar.gz --force-reinstall; python3 -m pytest "$@"' \
+            bash "${test_files[@]}"
