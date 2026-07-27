@@ -7,6 +7,7 @@ from packaging.version import Version
 DOCKER_TAGS_URL = (
     "https://hub.docker.com/v2/repositories/vllm/vllm-openai-cpu/tags?page_size=100"
 )
+USER_AGENT = "github-actions-ci/1.0"
 VERSION_TAG = re.compile(r"^v(?P<version>\d+\.\d+\.\d+)$")
 VERSION_COUNT = 3
 
@@ -15,7 +16,14 @@ def latest_vllm_versions() -> list[str]:
     versions = []
     url = DOCKER_TAGS_URL
     while url is not None:
-        with urllib.request.urlopen(url, timeout=10) as response:
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": USER_AGENT,
+            },
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
             data = json.load(response)
 
         for tag in data["results"]:

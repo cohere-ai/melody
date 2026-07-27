@@ -77,8 +77,10 @@ jobs:
         shell: bash
         run: |
           set -e
-          python3 -m pip install --upgrade packaging
-          versions="$(python3 .github/latest_vllm_versions.py)"
+          python3 -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade packaging
+          versions="$(python .github/latest_vllm_versions.py)"
           echo "versions=${versions}" >> "$GITHUB_OUTPUT"
 
   py-check:
