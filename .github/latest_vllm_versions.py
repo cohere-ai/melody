@@ -7,7 +7,7 @@ from packaging.version import Version
 DOCKER_TAGS_URL = (
     "https://hub.docker.com/v2/repositories/vllm/vllm-openai-cpu/tags?page_size=100"
 )
-X86_VERSION_TAG = re.compile(r"^v(?P<version>\d+\.\d+\.\d+)-x86_64$")
+VERSION_TAG = re.compile(r"^v(?P<version>\d+\.\d+\.\d+)$")
 VERSION_COUNT = 3
 
 
@@ -19,8 +19,10 @@ def latest_vllm_versions() -> list[str]:
             data = json.load(response)
 
         for tag in data["results"]:
-            match = X86_VERSION_TAG.match(tag["name"])
+            match = VERSION_TAG.match(tag["name"])
             if match is None:
+                continue
+            if not any(image.get("architecture") == "amd64" for image in tag["images"]):
                 continue
             version = Version(match.group("version"))
             if version.is_prerelease or version.is_devrelease:

@@ -118,7 +118,7 @@ jobs:
         run: |
           set -e
           mapfile -t test_files <<< "${{ steps.vllm-tests.outputs.files }}"
-          image="vllm/vllm-openai-cpu:v${{ matrix.vllm-version }}-x86_64"
+          image="vllm/vllm-openai-cpu:v${{ matrix.vllm-version }}"
           docker pull "${image}"
           docker run --rm \
             --entrypoint /bin/bash \
