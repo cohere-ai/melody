@@ -1,0 +1,49 @@
+name: sync templates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gen/templates/**"
+      - ".github/workflows/sync-templates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: sync-templates-to-s3
+  cancel-in-progress: false
+
+env:
+  CAIOS_REGION: US-EAST-01A
+  CAIOS_ORG_ID: ${{ secrets.CAIOS_ORG_ID }}
+  CAIOS_AUDIENCE: https://coreweave.com/iam
+  CAIOS_PROFILE: caios
+  S3_URI: s3://us-east-01a/github/melody/templates/
+  TEMPLATE_SOURCE_DIR: gen/templates
+
+jobs:
+  sync:
+     # prevent manual runs from syncing templates from another branch/ref
+    if: github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to CoreWeave CAIOS
+        uses: coreweave/actions-public/auth/caios-login@v1.1.0
+        with:
+          region: ${{ env.CAIOS_REGION }}
+          org-id: ${{ env.CAIOS_ORG_ID }}
+          audience: ${{ env.CAIOS_AUDIENCE }}
+          profile: ${{ env.CAIOS_PROFILE }}
+
+      - name: Sync templates to S3
+        run: aws s3 sync "${TEMPLATE_SOURCE_DIR}/" "${S3_URI}" --delete --only-show-errors
+        env:
+          AWS_PROFILE: ${{ env.CAIOS_PROFILE }}
