@@ -26,7 +26,9 @@ jobs:
       - name: Check for modified files
         run: |
           PATHS=(
-            ':src/templating/templates/**'
+            ':template_generation/templates/**'
+            ':template_generation/template_registry.yaml'
+            ':gen/templates/**'
             ':tests/templating/jinja/python/**'
             ':*.jinja'
             ':*.py'

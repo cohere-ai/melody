@@ -46,3 +46,4 @@ __pycache__/
 *.pyd
 *.whl
 *.egg-info/
+dist/

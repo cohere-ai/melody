@@ -1,0 +1,162 @@
+{
+  "archive_layout": "{name}/{name}@{revision}.jinja",
+  "id_format": "{name}@{revision}",
+  "latest_layout": "{name}/latest.jinja",
+  "schema_version": 1,
+  "templates": {
+    "cmd3-default-thinking": {
+      "archive": {
+        "jinja": "cmd3-default-thinking/cmd3-default-thinking@1.jinja",
+        "latest_jinja": "cmd3-default-thinking/latest.jinja",
+        "latest_liquid": "cmd3-default-thinking/latest.tmpl",
+        "liquid": "cmd3-default-thinking/cmd3-default-thinking@1.tmpl"
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd3-default-thinking/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja",
+        "liquid"
+      ],
+      "id": "cmd3-default-thinking@1",
+      "revision": 1
+    },
+    "cmd3-legacy": {
+      "archive": {
+        "jinja": "cmd3-legacy/cmd3-legacy@1.jinja",
+        "latest_jinja": "cmd3-legacy/latest.jinja",
+        "latest_liquid": "cmd3-legacy/latest.tmpl",
+        "liquid": "cmd3-legacy/cmd3-legacy@1.tmpl"
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd3-legacy/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja",
+        "liquid"
+      ],
+      "id": "cmd3-legacy@1",
+      "revision": 1
+    },
+    "cmd3-legacy-hf": {
+      "archive": {
+        "jinja": "cmd3-legacy-hf/cmd3-legacy-hf@1.jinja",
+        "latest_jinja": "cmd3-legacy-hf/latest.jinja",
+        "latest_liquid": null,
+        "liquid": null
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd3-legacy-hf/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja"
+      ],
+      "id": "cmd3-legacy-hf@1",
+      "revision": 1
+    },
+    "cmd3-reasoning": {
+      "archive": {
+        "jinja": "cmd3-reasoning/cmd3-reasoning@1.jinja",
+        "latest_jinja": "cmd3-reasoning/latest.jinja",
+        "latest_liquid": "cmd3-reasoning/latest.tmpl",
+        "liquid": "cmd3-reasoning/cmd3-reasoning@1.tmpl"
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd3-reasoning/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja",
+        "liquid"
+      ],
+      "id": "cmd3-reasoning@1",
+      "revision": 1
+    },
+    "cmd4-classic": {
+      "archive": {
+        "jinja": "cmd4-classic/cmd4-classic@1.jinja",
+        "latest_jinja": "cmd4-classic/latest.jinja",
+        "latest_liquid": "cmd4-classic/latest.tmpl",
+        "liquid": "cmd4-classic/cmd4-classic@1.tmpl"
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd4-classic/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja",
+        "liquid"
+      ],
+      "id": "cmd4-classic@1",
+      "revision": 1
+    },
+    "cmd4-hf": {
+      "archive": {
+        "jinja": "cmd4-hf/cmd4-hf@1.jinja",
+        "latest_jinja": "cmd4-hf/latest.jinja",
+        "latest_liquid": null,
+        "liquid": null
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd4-hf/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja"
+      ],
+      "id": "cmd4-hf@1",
+      "revision": 1
+    },
+    "cmd4-reasoning": {
+      "archive": {
+        "jinja": "cmd4-reasoning/cmd4-reasoning@1.jinja",
+        "latest_jinja": "cmd4-reasoning/latest.jinja",
+        "latest_liquid": null,
+        "liquid": null
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd4-reasoning/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja"
+      ],
+      "id": "cmd4-reasoning@1",
+      "revision": 1
+    },
+    "cmd5": {
+      "archive": {
+        "jinja": "cmd5/cmd5@1.jinja",
+        "latest_jinja": "cmd5/latest.jinja",
+        "latest_liquid": null,
+        "liquid": null
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd5/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja"
+      ],
+      "id": "cmd5@1",
+      "revision": 1
+    },
+    "cmd5-no-escape": {
+      "archive": {
+        "jinja": "cmd5-no-escape/cmd5-no-escape@1.jinja",
+        "latest_jinja": "cmd5-no-escape/latest.jinja",
+        "latest_liquid": null,
+        "liquid": null
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd5-no-escape/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja"
+      ],
+      "id": "cmd5-no-escape@1",
+      "revision": 1
+    },
+    "cmd5-strict": {
+      "archive": {
+        "jinja": "cmd5-strict/cmd5-strict@1.jinja",
+        "latest_jinja": "cmd5-strict/latest.jinja",
+        "latest_liquid": null,
+        "liquid": null
+      },
+      "curl_hint": "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd5-strict/latest.jinja",
+      "deprecated": false,
+      "engines": [
+        "jinja"
+      ],
+      "id": "cmd5-strict@1",
+      "revision": 1
+    }
+  }
+}

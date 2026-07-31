@@ -85,12 +85,38 @@ let options = templating::RenderCmd4Options {
             citations: vec![],
         },
     ],
+    // Prefer capability ids: cmd4-reasoning, cmd4-classic@1, cmd5-no-escape.
+    template_id: Some("cmd4-reasoning".to_string()),
+    use_jinja: true,
     ..Default::default()
 };
 
 // Render prompt
 let prompt = templating::render_cmd4(&options).unwrap();
 ```
+
+#### Template IDs
+
+Built-in templates use `{name}@{revision}` (same as the archive path without `.jinja`):
+
+| Form | Example | Meaning |
+|------|---------|---------|
+| Exact pin | `cmd4-reasoning@1` | That revision only |
+| Latest | `cmd4-reasoning` | Highest revision of that name |
+
+For CURL, prefer archive `latest.jinja` symlinks (or pin `@N`); see
+[`template_generation/ARCHIVE.md`](template_generation/ARCHIVE.md).
+
+Registry source of truth: [`template_generation/template_registry.yaml`](template_generation/template_registry.yaml).
+Regenerate with `make generate-dev`. Melody embeds templates from the immutable
+archive at `gen/templates/archive/` (see
+[`template_generation/ARCHIVE.md`](template_generation/ARCHIVE.md)). Changing
+content for an existing `{name}@{revision}` fails generation until you bump
+`revision` (enforced by `gen/template_revision_locks.json`).
+
+**Default change:** empty `template_jinja` for cmd3/cmd4 now falls back to
+`cmd3-reasoning` / `cmd4-reasoning`, not the former classic/legacy templates.
+Pin `cmd3-legacy` or `cmd4-classic` when you need the previous default.
 
 ## Releasing
 
