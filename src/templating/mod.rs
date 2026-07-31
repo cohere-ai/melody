@@ -9,13 +9,10 @@
 //!
 //! # Template IDs
 //!
-//! Built-in templates are selected via `template_id` using:
-//! - `{name}@{revision}` — exact pin (e.g. `cmd4-reasoning@1`)
-//! - `{name}` — latest revision (e.g. `cmd4-reasoning`)
-//!
-//! Immutable archive files live at
-//! `gen/templates/archive/{name}/{name}@{revision}.jinja`
-//! and are embedded directly into Melody.
+//! Built-in templates can be selected via `template_id` using `{name}` or
+//! `{name}@{revision}` (e.g. `cmd4-reasoning`, `cmd4-reasoning@1`). Bodies are
+//! embedded from `gen/templates/archive/` at build time; see
+//! `template_generation/template_registry.yaml` (build config only).
 
 mod lib;
 
@@ -24,28 +21,9 @@ pub mod types;
 
 mod util;
 
-#[path = "../../gen/template_registry.rs"]
-mod template_registry;
+#[path = "../../gen/embedded_templates.rs"]
+mod embedded_templates;
 
 pub use lib::*;
-pub use template_registry::{ResolvedTemplate, TemplateMeta};
 pub use types::*;
 pub use util::PromptRenderIds;
-
-use crate::errors::MelodyError;
-
-/// Resolve a template id to a built-in template.
-///
-/// Accepted forms: `{name}@{revision}` and `{name}`.
-///
-/// # Errors
-///
-/// Returns [`MelodyError::TemplateValidation`] when the id is unknown.
-pub fn resolve_template_id(id: &str) -> Result<&'static ResolvedTemplate, MelodyError> {
-    template_registry::resolve_template_id(id).map_err(MelodyError::TemplateValidation)
-}
-
-/// List registered templates.
-pub fn list_templates() -> Vec<TemplateMeta> {
-    template_registry::list_templates()
-}

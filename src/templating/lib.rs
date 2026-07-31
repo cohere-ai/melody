@@ -1,7 +1,5 @@
 use crate::errors::MelodyError;
-use crate::templating::template_registry::{
-    resolve_template_id, template_jinja, template_liquid,
-};
+use crate::templating::embedded_templates::{lookup_jinja, lookup_liquid};
 use crate::templating::types::{
     CitationQuality, Document, Grounding, Message, ReasoningType, SafetyMode, Tool,
 };
@@ -13,28 +11,21 @@ use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 
-fn resolve_err(err: String) -> MelodyError {
-    MelodyError::TemplateValidation(err)
-}
-
 fn jinja_for_id(template_id: &str) -> Result<&'static str, MelodyError> {
-    let resolved = resolve_template_id(template_id).map_err(resolve_err)?;
-    resolved.jinja.ok_or_else(|| {
-        MelodyError::TemplateValidation(format!(
-            "template id '{template_id}' has no jinja engine"
-        ))
+    lookup_jinja(template_id).ok_or_else(|| {
+        MelodyError::TemplateValidation(format!("unknown template id: {template_id}"))
     })
 }
 
 fn require_liquid(template_id: &str) -> &'static str {
-    template_liquid(template_id)
-        .unwrap_or_else(|_| panic!("missing liquid template for id '{template_id}'"))
+    lookup_liquid(template_id)
+        .unwrap_or_else(|| panic!("missing liquid template for id '{template_id}'"))
 }
 
 #[cfg(test)]
 fn require_jinja(template_id: &str) -> &'static str {
-    template_jinja(template_id)
-        .unwrap_or_else(|_| panic!("missing jinja template for id '{template_id}'"))
+    lookup_jinja(template_id)
+        .unwrap_or_else(|| panic!("missing jinja template for id '{template_id}'"))
 }
 
 /// Options for cmd3 rendering.
@@ -290,7 +281,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         add_jinja_substitutions_cmd3(&mut substitutions, opts);
 
         let mut active_template = if opts.template_jinja.is_empty() {
-            template_jinja("cmd3-reasoning").map_err(resolve_err)?
+            jinja_for_id("cmd3-reasoning")?
         } else {
             opts.template_jinja
         };
@@ -386,7 +377,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
         add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
         let mut active_template = if opts.template_jinja.is_empty() {
-            template_jinja("cmd4-reasoning").map_err(resolve_err)?
+            jinja_for_id("cmd4-reasoning")?
         } else {
             opts.template_jinja
         };
@@ -459,7 +450,7 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
     } else if active_opts.template_jinja.is_empty() {
         // Pin the cmd5 default before delegating to `render_cmd4`, whose own
         // empty-string fallback would otherwise pick cmd4-reasoning.
-        active_opts.template_jinja = template_jinja("cmd5").map_err(resolve_err)?;
+        active_opts.template_jinja = jinja_for_id("cmd5")?;
     }
 
     render_cmd4(&active_opts)
@@ -914,28 +905,22 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_template_id_forms() {
-        use crate::templating::{list_templates, resolve_template_id};
+    fn test_lookup_embedded_templates() {
+        use crate::templating::embedded_templates::{lookup_jinja, lookup_liquid};
 
-        let pinned = resolve_template_id("cmd4-reasoning@1").unwrap();
-        assert_eq!(pinned.meta.id, "cmd4-reasoning@1");
-        assert_eq!(pinned.meta.name, "cmd4-reasoning");
-        assert!(pinned.jinja.is_some());
-
-        let latest = resolve_template_id("cmd4-reasoning").unwrap();
-        assert_eq!(latest.meta.id, "cmd4-reasoning@1");
-
-        let classic = resolve_template_id("cmd4-classic").unwrap();
-        assert_eq!(classic.meta.id, "cmd4-classic@1");
-
-        assert!(resolve_template_id("cmd5").is_ok());
-        assert!(resolve_template_id("cmd5-no-escape").is_ok());
-        assert!(resolve_template_id("cmd4").is_err());
-        assert!(resolve_template_id("cmd4-does-not-exist").is_err());
-        assert!(resolve_template_id("cmd4-v2").is_err());
-
-        let all = list_templates();
-        assert!(all.iter().any(|m| m.name == "cmd4-reasoning"));
-        assert!(all.iter().any(|m| m.name == "cmd4-classic"));
+        assert!(lookup_jinja("cmd4-reasoning@1").is_some());
+        assert!(lookup_jinja("cmd4-reasoning").is_some());
+        assert_eq!(
+            lookup_jinja("cmd4-reasoning"),
+            lookup_jinja("cmd4-reasoning@1")
+        );
+        assert!(lookup_jinja("cmd4-classic").is_some());
+        assert!(lookup_liquid("cmd4-classic").is_some());
+        assert!(lookup_jinja("cmd5").is_some());
+        assert!(lookup_jinja("cmd5-no-escape").is_some());
+        assert!(lookup_jinja("cmd4").is_none());
+        assert!(lookup_jinja("cmd4-does-not-exist").is_none());
+        assert!(lookup_jinja("cmd4-v2").is_none());
+        assert!(lookup_liquid("cmd5").is_none());
     }
 }

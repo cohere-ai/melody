@@ -1,11 +1,13 @@
-# Single source of truth for Melody prompt templates.
+# Build config for Melody prompt templates (not a runtime registry).
 #
-# Archive: gen/templates/archive/{name}/{name}@{revision}.jinja
-# Floating: {name}/latest.jinja → {name}@{revision}.jinja
-# IDs: {name}@{revision} (pin) or {name} (latest revision)
-# Melody embeds pinned @N files via include_str!.
-# Revision immutability: append-only archive + gen/template_revision_locks.json
-# — changing content for an existing revision fails; bump `revision` instead.
+# `make generate-dev` reads this file and writes:
+#   - gen/templates/archive/{name}/{name}@{revision}.jinja (+ latest.jinja symlink)
+#   - gen/embedded_templates.rs (include_str! + lookup_jinja/lookup_liquid)
+#   - gen/templates/manifest.json
+#   - gen/template_revision_locks.json
+#
+# IDs for template_id / CURL: {name}@{revision} (pin) or {name} (current revision).
+# Changing content for an existing revision fails; bump `revision` instead.
 
 templates:
   cmd3-legacy:

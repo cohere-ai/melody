@@ -7,7 +7,8 @@ gen/templates/archive/{name}/{name}@{revision}.jinja
 ```
 
 `make generate-dev` writes the **current** revision only and never deletes older
-`@N` files. Melody embeds pinned `@N` files via `include_str!`.
+`@N` files. Melody embeds pinned `@N` files via `include_str!` in
+`gen/embedded_templates.rs` (build config: `template_registry.yaml`).
 
 Floating pointer (git symlink, updated on each bump):
 

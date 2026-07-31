@@ -107,9 +107,9 @@ Built-in templates use `{name}@{revision}` (same as the archive path without `.j
 For CURL, prefer archive `latest.jinja` symlinks (or pin `@N`); see
 [`template_generation/ARCHIVE.md`](template_generation/ARCHIVE.md).
 
-Registry source of truth: [`template_generation/template_registry.yaml`](template_generation/template_registry.yaml).
-Regenerate with `make generate-dev`. Melody embeds templates from the immutable
-archive at `gen/templates/archive/` (see
+Build config: [`template_generation/template_registry.yaml`](template_generation/template_registry.yaml)
+(`make generate-dev` → archive + `gen/embedded_templates.rs`). Melody embeds
+templates from `gen/templates/archive/` (see
 [`template_generation/ARCHIVE.md`](template_generation/ARCHIVE.md)). Changing
 content for an existing `{name}@{revision}` fails generation until you bump
 `revision` (enforced by `gen/template_revision_locks.json`).
