@@ -37,96 +37,69 @@ struct EntryConfig {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum LiquidTemplateConfig {
-    RawTemplate(String),
-    Config {
-        #[serde(default)]
-        path: Option<String>,
-        #[serde(default)]
-        variables: HashMap<String, LiquidTemplateConfig>,
-    },
+struct LiquidTemplateConfig {
+    path: String,
+    #[serde(default)]
+    variables: HashMap<String, LiquidTemplateConfig>,
 }
 
 impl LiquidTemplateConfig {
     fn get_template_string(&self, base_dir: &str) -> Result<String> {
-        match self {
-            Self::RawTemplate(s) => Ok(s.clone()),
-            Self::Config { path, variables } => {
-                let full_path = format!(
-                    "{base_dir}/{}",
-                    path.as_ref().context("Template path is required but not provided")?
-                );
-                let content = fs::read_to_string(&full_path)
-                    .with_context(|| format!("Failed to read file: {full_path}"))?;
-                if variables.is_empty() {
-                    return Ok(content);
-                }
-                let mut keys: Vec<_> = variables.keys().collect();
-                keys.sort();
-                let captures = keys
-                    .into_iter()
-                    .map(|key| {
-                        let body = variables[key]
-                            .get_template_string(base_dir)?
-                            .trim_end_matches('\n')
-                            .to_string();
-                        Ok(format!("{{% capture {key} %}}{body}{{% endcapture %}}"))
-                    })
-                    .collect::<Result<Vec<_>>>()?
-                    .join("");
-                Ok(format!("{captures}{content}"))
-            }
+        let full_path = format!("{base_dir}/{}", self.path);
+        let content = fs::read_to_string(&full_path)
+            .with_context(|| format!("Failed to read file: {full_path}"))?;
+        if self.variables.is_empty() {
+            return Ok(content);
         }
+        let mut keys: Vec<_> = self.variables.keys().collect();
+        keys.sort();
+        let captures = keys
+            .into_iter()
+            .map(|key| {
+                let body = self.variables[key]
+                    .get_template_string(base_dir)?
+                    .trim_end_matches('\n')
+                    .to_string();
+                Ok(format!("{{% capture {key} %}}{body}{{% endcapture %}}"))
+            })
+            .collect::<Result<Vec<_>>>()?
+            .join("");
+        Ok(format!("{captures}{content}"))
     }
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum JinjaTemplateConfig {
-    RawTemplate(String),
-    Config {
-        #[serde(default)]
-        path: Option<String>,
-        #[serde(default)]
-        includes: HashMap<String, JinjaTemplateConfig>,
-    },
+struct JinjaTemplateConfig {
+    path: String,
+    #[serde(default)]
+    includes: HashMap<String, JinjaTemplateConfig>,
 }
 
 impl JinjaTemplateConfig {
     fn get_template_string(&self, base_dir: &str) -> Result<String> {
-        match self {
-            Self::RawTemplate(s) => Ok(s.clone()),
-            Self::Config { path, includes } => {
-                let full_path = format!(
-                    "{base_dir}/{}",
-                    path.as_ref().context("Template path is required but not provided")?
-                );
-                let mut content = fs::read_to_string(&full_path)
-                    .with_context(|| format!("Failed to read file: {full_path}"))?;
-                for (key, include_config) in includes {
-                    let include_content = include_config
-                        .get_template_string(base_dir)?
-                        .trim_end_matches('\n')
-                        .to_string();
-                    for pattern in [
-                        format!(r#"\{{%\s*include\s*"{key}"\s*%\}}"#),
-                        format!(r#"\s*\{{%-\s*include\s*"{key}"\s*%\}}\s*"#),
-                    ] {
-                        let re = regex::Regex::new(&pattern)
-                            .with_context(|| format!("Failed to create regex for include: {key}"))?;
-                        content = re
-                            .replace_all(&content, regex::NoExpand(include_content.as_str()))
-                            .into_owned();
-                    }
-                }
-                Ok(content)
+        let full_path = format!("{base_dir}/{}", self.path);
+        let mut content = fs::read_to_string(&full_path)
+            .with_context(|| format!("Failed to read file: {full_path}"))?;
+        for (key, include_config) in &self.includes {
+            let include_content = include_config
+                .get_template_string(base_dir)?
+                .trim_end_matches('\n')
+                .to_string();
+            for pattern in [
+                format!(r#"\{{%\s*include\s*"{key}"\s*%\}}"#),
+                format!(r#"\s*\{{%-\s*include\s*"{key}"\s*%\}}\s*"#),
+            ] {
+                let re = regex::Regex::new(&pattern)
+                    .with_context(|| format!("Failed to create regex for include: {key}"))?;
+                content = re
+                    .replace_all(&content, regex::NoExpand(include_content.as_str()))
+                    .into_owned();
             }
         }
+        Ok(content)
     }
 }
 
-/// One compiled template revision (jinja and/or liquid bodies).
 struct Compiled {
     name: String,
     revision: u32,
@@ -139,16 +112,7 @@ impl Compiled {
         format!("{}@{}", self.name, self.revision)
     }
 
-    fn static_name(&self, engine: &str) -> String {
-        format!(
-            "TPL_{}_{engine}",
-            format!("{}_{}", self.name, self.revision)
-                .to_uppercase()
-                .replace(['-', '/'], "_")
-        )
-    }
-
-    /// `(archive-relative path, body, file extension for latest symlink)`.
+    /// `(archive-relative path, body, extension for latest symlink)`.
     fn artifacts(&self) -> Vec<(String, &str, &str)> {
         let mut out = Vec::new();
         if let Some(body) = &self.jinja {
@@ -241,27 +205,12 @@ fn enforce_locks(compiled: &[Compiled]) -> Result<()> {
     }
     if dirty {
         fs::create_dir_all("gen")?;
-        fs::write(LOCK_PATH, format!("{}\n", serde_json::to_string_pretty(&locks)?))?;
+        fs::write(
+            LOCK_PATH,
+            format!("{}\n", serde_json::to_string_pretty(&locks)?),
+        )?;
         println!("Updated {LOCK_PATH}");
     }
-    Ok(())
-}
-
-fn write_archive_file(path: &Path, content: &str) -> Result<()> {
-    if path.exists() {
-        let existing = fs::read_to_string(path)?;
-        if existing == content {
-            return Ok(());
-        }
-        bail!(
-            "{} already exists with different content; bump `revision`",
-            path.display()
-        );
-    }
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(path, content)?;
     Ok(())
 }
 
@@ -290,7 +239,12 @@ fn write_archive(compiled: &[Compiled]) -> Result<()> {
     fs::create_dir_all(&root)?;
     for t in compiled {
         for (rel, body, ext) in t.artifacts() {
-            write_archive_file(&root.join(&rel), body)?;
+            let path = root.join(&rel);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            // Locks already enforce immutability; always write the locked-correct bytes.
+            fs::write(&path, body).with_context(|| format!("Failed to write {}", path.display()))?;
             write_latest_symlink(
                 &root.join(&t.name),
                 &format!("latest.{ext}"),
@@ -305,44 +259,45 @@ fn write_embeds(compiled: &[Compiled]) -> Result<()> {
     let mut out = String::from(
         "// @generated by template_generation. Do not edit by hand.\n\
          // Build config: template_generation/template_registry.yaml\n\n\
-         #![allow(dead_code)]\n#![allow(clippy::all)]\n\n",
+         #![allow(dead_code)]\n#![allow(clippy::all)]\n",
     );
 
-    for t in compiled {
-        if t.jinja.is_some() {
-            let path = format!("templates/archive/{0}/{0}@{1}.jinja", t.name, t.revision);
-            out.push_str(&format!(
-                "pub static {}: &str = include_str!({path:?});\n",
-                t.static_name("JINJA")
-            ));
-        }
-        if t.liquid.is_some() {
-            let path = format!("templates/archive/{0}/{0}@{1}.tmpl", t.name, t.revision);
-            out.push_str(&format!(
-                "pub static {}: &str = include_str!({path:?});\n",
-                t.static_name("LIQUID")
-            ));
-        }
-    }
-
-    let emit_lookup = |out: &mut String, fn_name: &str, engine: &str, items: &[&Compiled]| {
+    let emit_lookup = |out: &mut String, fn_name: &str, engine: &str, items: &[(String, String, String)]| {
         out.push_str(&format!(
             "\n/// Look up an embedded {engine} template by id (`{{name}}` or `{{name}}@{{revision}}`).\n\
              pub fn {fn_name}(id: &str) -> Option<&'static str> {{\n    match id {{\n"
         ));
-        for t in items {
+        for (name, id, path) in items {
             out.push_str(&format!(
-                "        {:?} | {:?} => Some({}),\n",
-                t.name,
-                t.id(),
-                t.static_name(&engine.to_uppercase())
+                "        {name:?} | {id:?} => Some(include_str!({path:?})),\n"
             ));
         }
         out.push_str("        _ => None,\n    }\n}\n");
     };
 
-    let jinja: Vec<_> = compiled.iter().filter(|t| t.jinja.is_some()).collect();
-    let liquid: Vec<_> = compiled.iter().filter(|t| t.liquid.is_some()).collect();
+    let jinja: Vec<_> = compiled
+        .iter()
+        .filter(|t| t.jinja.is_some())
+        .map(|t| {
+            (
+                t.name.clone(),
+                t.id(),
+                format!("templates/archive/{0}/{0}@{1}.jinja", t.name, t.revision),
+            )
+        })
+        .collect();
+    let liquid: Vec<_> = compiled
+        .iter()
+        .filter(|t| t.liquid.is_some())
+        .map(|t| {
+            (
+                t.name.clone(),
+                t.id(),
+                format!("templates/archive/{0}/{0}@{1}.tmpl", t.name, t.revision),
+            )
+        })
+        .collect();
+
     emit_lookup(&mut out, "lookup_jinja", "jinja", &jinja);
     emit_lookup(&mut out, "lookup_liquid", "liquid", &liquid);
 

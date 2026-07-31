@@ -4,34 +4,19 @@
 #![allow(dead_code)]
 #![allow(clippy::all)]
 
-pub static TPL_CMD3_DEFAULT_THINKING_1_JINJA: &str = include_str!("templates/archive/cmd3-default-thinking/cmd3-default-thinking@1.jinja");
-pub static TPL_CMD3_DEFAULT_THINKING_1_LIQUID: &str = include_str!("templates/archive/cmd3-default-thinking/cmd3-default-thinking@1.tmpl");
-pub static TPL_CMD3_LEGACY_1_JINJA: &str = include_str!("templates/archive/cmd3-legacy/cmd3-legacy@1.jinja");
-pub static TPL_CMD3_LEGACY_1_LIQUID: &str = include_str!("templates/archive/cmd3-legacy/cmd3-legacy@1.tmpl");
-pub static TPL_CMD3_LEGACY_HF_1_JINJA: &str = include_str!("templates/archive/cmd3-legacy-hf/cmd3-legacy-hf@1.jinja");
-pub static TPL_CMD3_REASONING_1_JINJA: &str = include_str!("templates/archive/cmd3-reasoning/cmd3-reasoning@1.jinja");
-pub static TPL_CMD3_REASONING_1_LIQUID: &str = include_str!("templates/archive/cmd3-reasoning/cmd3-reasoning@1.tmpl");
-pub static TPL_CMD4_CLASSIC_1_JINJA: &str = include_str!("templates/archive/cmd4-classic/cmd4-classic@1.jinja");
-pub static TPL_CMD4_CLASSIC_1_LIQUID: &str = include_str!("templates/archive/cmd4-classic/cmd4-classic@1.tmpl");
-pub static TPL_CMD4_HF_1_JINJA: &str = include_str!("templates/archive/cmd4-hf/cmd4-hf@1.jinja");
-pub static TPL_CMD4_REASONING_1_JINJA: &str = include_str!("templates/archive/cmd4-reasoning/cmd4-reasoning@1.jinja");
-pub static TPL_CMD5_1_JINJA: &str = include_str!("templates/archive/cmd5/cmd5@1.jinja");
-pub static TPL_CMD5_NO_ESCAPE_1_JINJA: &str = include_str!("templates/archive/cmd5-no-escape/cmd5-no-escape@1.jinja");
-pub static TPL_CMD5_STRICT_1_JINJA: &str = include_str!("templates/archive/cmd5-strict/cmd5-strict@1.jinja");
-
 /// Look up an embedded jinja template by id (`{name}` or `{name}@{revision}`).
 pub fn lookup_jinja(id: &str) -> Option<&'static str> {
     match id {
-        "cmd3-default-thinking" | "cmd3-default-thinking@1" => Some(TPL_CMD3_DEFAULT_THINKING_1_JINJA),
-        "cmd3-legacy" | "cmd3-legacy@1" => Some(TPL_CMD3_LEGACY_1_JINJA),
-        "cmd3-legacy-hf" | "cmd3-legacy-hf@1" => Some(TPL_CMD3_LEGACY_HF_1_JINJA),
-        "cmd3-reasoning" | "cmd3-reasoning@1" => Some(TPL_CMD3_REASONING_1_JINJA),
-        "cmd4-classic" | "cmd4-classic@1" => Some(TPL_CMD4_CLASSIC_1_JINJA),
-        "cmd4-hf" | "cmd4-hf@1" => Some(TPL_CMD4_HF_1_JINJA),
-        "cmd4-reasoning" | "cmd4-reasoning@1" => Some(TPL_CMD4_REASONING_1_JINJA),
-        "cmd5" | "cmd5@1" => Some(TPL_CMD5_1_JINJA),
-        "cmd5-no-escape" | "cmd5-no-escape@1" => Some(TPL_CMD5_NO_ESCAPE_1_JINJA),
-        "cmd5-strict" | "cmd5-strict@1" => Some(TPL_CMD5_STRICT_1_JINJA),
+        "cmd3-default-thinking" | "cmd3-default-thinking@1" => Some(include_str!("templates/archive/cmd3-default-thinking/cmd3-default-thinking@1.jinja")),
+        "cmd3-legacy" | "cmd3-legacy@1" => Some(include_str!("templates/archive/cmd3-legacy/cmd3-legacy@1.jinja")),
+        "cmd3-legacy-hf" | "cmd3-legacy-hf@1" => Some(include_str!("templates/archive/cmd3-legacy-hf/cmd3-legacy-hf@1.jinja")),
+        "cmd3-reasoning" | "cmd3-reasoning@1" => Some(include_str!("templates/archive/cmd3-reasoning/cmd3-reasoning@1.jinja")),
+        "cmd4-classic" | "cmd4-classic@1" => Some(include_str!("templates/archive/cmd4-classic/cmd4-classic@1.jinja")),
+        "cmd4-hf" | "cmd4-hf@1" => Some(include_str!("templates/archive/cmd4-hf/cmd4-hf@1.jinja")),
+        "cmd4-reasoning" | "cmd4-reasoning@1" => Some(include_str!("templates/archive/cmd4-reasoning/cmd4-reasoning@1.jinja")),
+        "cmd5" | "cmd5@1" => Some(include_str!("templates/archive/cmd5/cmd5@1.jinja")),
+        "cmd5-no-escape" | "cmd5-no-escape@1" => Some(include_str!("templates/archive/cmd5-no-escape/cmd5-no-escape@1.jinja")),
+        "cmd5-strict" | "cmd5-strict@1" => Some(include_str!("templates/archive/cmd5-strict/cmd5-strict@1.jinja")),
         _ => None,
     }
 }
@@ -39,10 +24,10 @@ pub fn lookup_jinja(id: &str) -> Option<&'static str> {
 /// Look up an embedded liquid template by id (`{name}` or `{name}@{revision}`).
 pub fn lookup_liquid(id: &str) -> Option<&'static str> {
     match id {
-        "cmd3-default-thinking" | "cmd3-default-thinking@1" => Some(TPL_CMD3_DEFAULT_THINKING_1_LIQUID),
-        "cmd3-legacy" | "cmd3-legacy@1" => Some(TPL_CMD3_LEGACY_1_LIQUID),
-        "cmd3-reasoning" | "cmd3-reasoning@1" => Some(TPL_CMD3_REASONING_1_LIQUID),
-        "cmd4-classic" | "cmd4-classic@1" => Some(TPL_CMD4_CLASSIC_1_LIQUID),
+        "cmd3-default-thinking" | "cmd3-default-thinking@1" => Some(include_str!("templates/archive/cmd3-default-thinking/cmd3-default-thinking@1.tmpl")),
+        "cmd3-legacy" | "cmd3-legacy@1" => Some(include_str!("templates/archive/cmd3-legacy/cmd3-legacy@1.tmpl")),
+        "cmd3-reasoning" | "cmd3-reasoning@1" => Some(include_str!("templates/archive/cmd3-reasoning/cmd3-reasoning@1.tmpl")),
+        "cmd4-classic" | "cmd4-classic@1" => Some(include_str!("templates/archive/cmd4-classic/cmd4-classic@1.tmpl")),
         _ => None,
     }
 }
