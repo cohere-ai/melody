@@ -69,7 +69,7 @@ def get_cmd3_v3_tests() -> list[tuple[str, str, str]]:
 
 def get_cmd4_v1_tests() -> list[tuple[str, str, str]]:
     # get all .json files from the test_dir
-    chat_template = "templates/archive/cmd4-classic/cmd4-classic@1.jinja"
+    chat_template = "templates/archive/cmd4/cmd4@1.jinja"
     rag_test_dir = "liquid_tests/rag/cmd4-v1"
     return get_tests(chat_template, rag_test_dir)
 

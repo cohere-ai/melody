@@ -9,10 +9,11 @@
 //!
 //! # Template IDs
 //!
-//! Built-in templates can be selected via `template_id` using `{name}` or
-//! `{name}@{revision}` (e.g. `cmd4-reasoning`, `cmd4-reasoning@1`). Bodies are
-//! embedded from `gen/templates/archive/` at build time; see
-//! `template_generation/template_registry.yaml` (build config only).
+//! Built-in templates can be selected via `template_id` using `{name}` (current
+//! revision) or `{name}@{revision}` for any revision still present in
+//! `gen/templates/archive/` (e.g. `cmd4`, `cmd4@1`). Only the current revision is
+//! built from sources in `template_registry.yaml`; older revisions are frozen
+//! raw archive files.
 
 mod lib;
 

@@ -11,9 +11,9 @@ pub fn lookup_jinja(id: &str) -> Option<&'static str> {
         "cmd3-legacy" | "cmd3-legacy@1" => Some(include_str!("templates/archive/cmd3-legacy/cmd3-legacy@1.jinja")),
         "cmd3-legacy-hf" | "cmd3-legacy-hf@1" => Some(include_str!("templates/archive/cmd3-legacy-hf/cmd3-legacy-hf@1.jinja")),
         "cmd3-reasoning" | "cmd3-reasoning@1" => Some(include_str!("templates/archive/cmd3-reasoning/cmd3-reasoning@1.jinja")),
-        "cmd4-classic" | "cmd4-classic@1" => Some(include_str!("templates/archive/cmd4-classic/cmd4-classic@1.jinja")),
+        "cmd4@1" => Some(include_str!("templates/archive/cmd4/cmd4@1.jinja")),
+        "cmd4" | "cmd4@2" => Some(include_str!("templates/archive/cmd4/cmd4@2.jinja")),
         "cmd4-hf" | "cmd4-hf@1" => Some(include_str!("templates/archive/cmd4-hf/cmd4-hf@1.jinja")),
-        "cmd4-reasoning" | "cmd4-reasoning@1" => Some(include_str!("templates/archive/cmd4-reasoning/cmd4-reasoning@1.jinja")),
         "cmd5" | "cmd5@1" => Some(include_str!("templates/archive/cmd5/cmd5@1.jinja")),
         "cmd5-no-escape" | "cmd5-no-escape@1" => Some(include_str!("templates/archive/cmd5-no-escape/cmd5-no-escape@1.jinja")),
         "cmd5-strict" | "cmd5-strict@1" => Some(include_str!("templates/archive/cmd5-strict/cmd5-strict@1.jinja")),
@@ -27,7 +27,7 @@ pub fn lookup_liquid(id: &str) -> Option<&'static str> {
         "cmd3-default-thinking" | "cmd3-default-thinking@1" => Some(include_str!("templates/archive/cmd3-default-thinking/cmd3-default-thinking@1.tmpl")),
         "cmd3-legacy" | "cmd3-legacy@1" => Some(include_str!("templates/archive/cmd3-legacy/cmd3-legacy@1.tmpl")),
         "cmd3-reasoning" | "cmd3-reasoning@1" => Some(include_str!("templates/archive/cmd3-reasoning/cmd3-reasoning@1.tmpl")),
-        "cmd4-classic" | "cmd4-classic@1" => Some(include_str!("templates/archive/cmd4-classic/cmd4-classic@1.tmpl")),
+        "cmd4@1" => Some(include_str!("templates/archive/cmd4/cmd4@1.tmpl")),
         _ => None,
     }
 }

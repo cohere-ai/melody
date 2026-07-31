@@ -85,8 +85,8 @@ let options = templating::RenderCmd4Options {
             citations: vec![],
         },
     ],
-    // Prefer capability ids: cmd4-reasoning, cmd4-classic@1, cmd5-no-escape.
-    template_id: Some("cmd4-reasoning".to_string()),
+    // Prefer capability ids: cmd4, cmd4@1, cmd5-no-escape.
+    template_id: Some("cmd4".to_string()),
     use_jinja: true,
     ..Default::default()
 };
@@ -97,31 +97,30 @@ let prompt = templating::render_cmd4(&options).unwrap();
 
 #### Template IDs
 
-Built-in templates use `{name}@{revision}` (same as the archive path without `.jinja`):
+Only the **current** revision is built from sources in
+[`template_registry.yaml`](template_generation/template_registry.yaml). Older
+revisions stay as frozen raw files under `gen/templates/archive/` (no build
+config). Melody embeds every archive revision still on disk for a name.
 
 | Form | Example | Meaning |
 |------|---------|---------|
-| Exact pin | `cmd4-reasoning@1` | That revision only |
-| Latest | `cmd4-reasoning` | Highest revision of that name |
+| Current | `cmd4` or `cmd4@2` | Registry `revision` (floating `latest.*`) |
+| Older pin | `cmd4@1` | Frozen archive file, still embedded while present |
 
 ```bash
-# latest (floating)
+# current (floating symlink)
 curl -fsSL \
-  "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd4-reasoning/latest.jinja"
+  "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd4/latest.jinja"
 
-# pin (immutable)
+# immutable pin
 curl -fsSL \
-  "https://raw.githubusercontent.com/cohere-ai/melody/refs/tags/vX.Y.Z/gen/templates/archive/cmd4-reasoning/cmd4-reasoning@1.jinja"
+  "https://raw.githubusercontent.com/cohere-ai/melody/refs/tags/vX.Y.Z/gen/templates/archive/cmd4/cmd4@1.jinja"
 ```
 
-Build config: [`template_generation/template_registry.yaml`](template_generation/template_registry.yaml)
-(`make generate-dev` → archive + `gen/embedded_templates.rs`). Melody embeds
-from `gen/templates/archive/`. Changing content for an existing `{name}@{revision}`
-fails until you bump `revision` (`gen/template_revision_locks.json`).
-
-**Default change:** empty `template_jinja` for cmd3/cmd4 now falls back to
-`cmd3-reasoning` / `cmd4-reasoning`, not the former classic/legacy templates.
-Pin `cmd3-legacy` or `cmd4-classic` when you need the previous default.
+`make generate-dev` rebuilds the current revision, leaves older archive files
+alone, and refreshes embeds/locks. Changing a locked file’s content fails;
+bump `revision` to publish a new current, or delete a frozen file from git to
+retire it from Melody.
 
 ## Releasing
 

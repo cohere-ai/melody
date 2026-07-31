@@ -6,10 +6,10 @@
   "cmd3-legacy/cmd3-legacy@1.tmpl": "sha256:0e09db64cf2abebf4d1281772889b72b0b2353ff661b29c781c48725cc1581e9",
   "cmd3-reasoning/cmd3-reasoning@1.jinja": "sha256:baa8539e81abf0b339e7bfcb83b00cc88ba1145ac899ea952499360a12b0dc72",
   "cmd3-reasoning/cmd3-reasoning@1.tmpl": "sha256:cc963ec657f58e5fda5b57ec19b23d72b04bed21f7d3bfa81b28ed3c83f796d9",
-  "cmd4-classic/cmd4-classic@1.jinja": "sha256:507aa405321fe8e6fb879e11bb86232f593bd6c78504069d489c8b18963084f7",
-  "cmd4-classic/cmd4-classic@1.tmpl": "sha256:011b7a5e2b035696932be679df45ce80691a4b0c45377d29af5259a826f05e21",
+  "cmd4/cmd4@1.jinja": "sha256:507aa405321fe8e6fb879e11bb86232f593bd6c78504069d489c8b18963084f7",
+  "cmd4/cmd4@1.tmpl": "sha256:011b7a5e2b035696932be679df45ce80691a4b0c45377d29af5259a826f05e21",
   "cmd4-hf/cmd4-hf@1.jinja": "sha256:e7798e17133da30eb566ee3373b9578bf86809c5f2418116b91f22c2509cb7b7",
-  "cmd4-reasoning/cmd4-reasoning@1.jinja": "sha256:0babc67b3230935b368c61b1e303dff3c098eba43972149ed93487ee99588bec",
+  "cmd4/cmd4@2.jinja": "sha256:0babc67b3230935b368c61b1e303dff3c098eba43972149ed93487ee99588bec",
   "cmd5-no-escape/cmd5-no-escape@1.jinja": "sha256:a4bc898fb76ffd3306110371bd3f600d2b6a4dabb26b370360425bdee4c3f558",
   "cmd5-strict/cmd5-strict@1.jinja": "sha256:4d5e153d92db8f70c465fd9bd338df9b70bec1170fd72f83582cbe3cb50a72ad",
   "cmd5/cmd5@1.jinja": "sha256:109f13863ec6e2fa02b8564b9d5082cdcff7bc8910ed70ef33316eb2a1397c5c"

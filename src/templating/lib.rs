@@ -15,11 +15,11 @@ fn jinja_for_id(template_id: &str, family: &str) -> Result<&'static str, MelodyE
     let body = lookup_jinja(template_id).ok_or_else(|| {
         MelodyError::TemplateValidation(format!("unknown template id: {template_id}"))
     })?;
-    // Resolve to the canonical name so pins like cmd4-reasoning@1 still check cleanly.
+    // Resolve to the canonical name so pins like cmd4@1 still check cleanly.
     let name = template_id.split_once('@').map(|(n, _)| n).unwrap_or(template_id);
     let ok = match family {
         "cmd3" => name.starts_with("cmd3-"),
-        "cmd4" => name.starts_with("cmd4-"),
+        "cmd4" => name == "cmd4" || name.starts_with("cmd4-"),
         "cmd5" => name == "cmd5" || name.starts_with("cmd5-"),
         _ => false,
     };
@@ -54,7 +54,7 @@ pub struct RenderCmd3Options<'a> {
     /// Liquid template string to use for rendering.
     pub template: &'a str,
     /// Jinja template string. An empty string is treated as "caller did not
-    /// provide a template" and the renderer falls back to `cmd3-reasoning`.
+    /// provide a template" and the renderer falls back to `cmd3-legacy`.
     pub template_jinja: &'a str,
     /// Whether to use jinja template
     pub use_jinja: bool,
@@ -116,12 +116,12 @@ impl Default for RenderCmd3Options<'_> {
 pub struct RenderCmd4Options<'a> {
     /// Messages to include in the rendered prompt.
     pub messages: Vec<Message>,
-    /// Optional template ID (`cmd4-reasoning`, `cmd4-classic@1`, ...).
+    /// Optional template ID (`cmd4`, `cmd4@1`, ...).
     pub template_id: Option<String>,
     /// Liquid template string to use for rendering.
     pub template: &'a str,
     /// Jinja template string. An empty string is treated as "caller did not
-    /// provide a template" and the renderer falls back to `cmd4-reasoning` when called via [`render_cmd4`].
+    /// provide a template" and the renderer falls back to `cmd4@1` when called via [`render_cmd4`].
     pub template_jinja: &'a str,
     /// Whether to use jinja template
     pub use_jinja: bool,
@@ -159,8 +159,8 @@ impl Default for RenderCmd4Options<'_> {
         Self {
             messages: Vec::new(),
             template_id: None,
-            // Liquid default stays on classic for compatibility with liquid callers.
-            template: require_liquid("cmd4-classic"),
+            // Liquid default stays on cmd4@1 for compatibility with liquid callers.
+            template: require_liquid("cmd4@1"),
             template_jinja: "",
             use_jinja: false,
             dev_instruction: None,
@@ -295,7 +295,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         add_jinja_substitutions_cmd3(&mut substitutions, opts);
 
         let mut active_template = if opts.template_jinja.is_empty() {
-            jinja_for_id("cmd3-reasoning", "cmd3")?
+            jinja_for_id("cmd3-legacy", "cmd3")?
         } else {
             opts.template_jinja
         };
@@ -391,7 +391,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
         add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
         let mut active_template = if opts.template_jinja.is_empty() {
-            jinja_for_id("cmd4-reasoning", "cmd4")?
+            jinja_for_id("cmd4@1", "cmd4")?
         } else {
             opts.template_jinja
         };
@@ -439,9 +439,9 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
     // unused default is not treated as a caller-provided liquid template. A
     // leftover liquid `template` field is likewise ignored when `template_id` or
     // non-empty `template_jinja` selects a jinja path.
-    let cmd4_classic_liquid = require_liquid("cmd4-classic");
+    let cmd4_v1_liquid = require_liquid("cmd4@1");
     if !opts.use_jinja
-        && opts.template != cmd4_classic_liquid
+        && opts.template != cmd4_v1_liquid
         && opts.template_id.is_none()
         && opts.template_jinja.is_empty()
     {
@@ -463,7 +463,7 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
         active_opts.template_id = None;
     } else if active_opts.template_jinja.is_empty() {
         // Pin the cmd5 default before delegating to `render_cmd4`, whose own
-        // empty-string fallback would otherwise pick cmd4-reasoning.
+        // empty-string fallback would otherwise pick cmd4@1.
         active_opts.template_jinja = jinja_for_id("cmd5", "cmd5")?;
     }
 
@@ -597,7 +597,7 @@ mod tests {
             println!("Running cmd4 v2 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
-            opts.template_jinja = require_jinja("cmd4-reasoning");
+            opts.template_jinja = require_jinja("cmd4");
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
@@ -648,9 +648,9 @@ mod tests {
             println!("Running cmd4 jinja liquid test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
-            // Liquid fixtures match cmd4-classic jinja output.
+            // Liquid fixtures match cmd4@1 jinja output.
             if test_name != "template_provided" {
-                opts.template_id = Some("cmd4-classic".to_string());
+                opts.template_id = Some("cmd4@1".to_string());
             }
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
@@ -664,7 +664,7 @@ mod tests {
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
             if test_name != "template_provided" {
-                opts.template_jinja = require_jinja("cmd4-reasoning");
+                opts.template_jinja = require_jinja("cmd4");
             }
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
@@ -922,33 +922,33 @@ mod tests {
     fn test_lookup_embedded_templates() {
         use crate::templating::embedded_templates::{lookup_jinja, lookup_liquid};
 
-        assert!(lookup_jinja("cmd4-reasoning@1").is_some());
-        assert!(lookup_jinja("cmd4-reasoning").is_some());
-        assert_eq!(
-            lookup_jinja("cmd4-reasoning"),
-            lookup_jinja("cmd4-reasoning@1")
-        );
-        assert!(lookup_jinja("cmd4-classic").is_some());
-        assert!(lookup_liquid("cmd4-classic").is_some());
+        assert!(lookup_jinja("cmd4@2").is_some());
+        assert!(lookup_jinja("cmd4").is_some());
+        assert_eq!(lookup_jinja("cmd4"), lookup_jinja("cmd4@2"));
+        assert!(lookup_jinja("cmd4@1").is_some());
+        assert_ne!(lookup_jinja("cmd4@1"), lookup_jinja("cmd4@2"));
+        assert!(lookup_liquid("cmd4@1").is_some());
+        assert!(lookup_liquid("cmd4").is_none()); // current cmd4@2 is jinja-only
         assert!(lookup_jinja("cmd5").is_some());
         assert!(lookup_jinja("cmd5-no-escape").is_some());
-        assert!(lookup_jinja("cmd4").is_none());
         assert!(lookup_jinja("cmd4-does-not-exist").is_none());
         assert!(lookup_jinja("cmd4-v2").is_none());
+        assert!(lookup_jinja("cmd4-classic").is_none());
         assert!(lookup_liquid("cmd5").is_none());
     }
 
     #[test]
     fn test_jinja_for_id_rejects_cross_family() {
         assert!(jinja_for_id("cmd5", "cmd3").is_err());
-        assert!(jinja_for_id("cmd4-reasoning", "cmd3").is_err());
+        assert!(jinja_for_id("cmd4", "cmd3").is_err());
         assert!(jinja_for_id("cmd5", "cmd4").is_err());
         assert!(jinja_for_id("cmd3-reasoning", "cmd4").is_err());
-        assert!(jinja_for_id("cmd4-reasoning", "cmd5").is_err());
+        assert!(jinja_for_id("cmd4", "cmd5").is_err());
         assert!(jinja_for_id("cmd3-legacy", "cmd5").is_err());
 
         assert!(jinja_for_id("cmd3-reasoning", "cmd3").is_ok());
-        assert!(jinja_for_id("cmd4-reasoning@1", "cmd4").is_ok());
+        assert!(jinja_for_id("cmd4@1", "cmd4").is_ok());
+        assert!(jinja_for_id("cmd4", "cmd4").is_ok());
         assert!(jinja_for_id("cmd5", "cmd5").is_ok());
         assert!(jinja_for_id("cmd5-no-escape", "cmd5").is_ok());
     }
@@ -967,7 +967,7 @@ mod tests {
         );
 
         let err = render_cmd5(&RenderCmd5Options {
-            template_id: Some("cmd4-reasoning".to_string()),
+            template_id: Some("cmd4".to_string()),
             ..Default::default()
         })
         .unwrap_err();
@@ -977,7 +977,7 @@ mod tests {
         );
 
         let err = render_cmd3(&RenderCmd3Options {
-            template_id: Some("cmd4-classic".to_string()),
+            template_id: Some("cmd4@1".to_string()),
             use_jinja: true,
             ..Default::default()
         })

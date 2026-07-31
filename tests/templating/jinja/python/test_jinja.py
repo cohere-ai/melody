@@ -105,7 +105,7 @@ def get_template_info(template_path: str) -> tuple[str, str]:
             "jinja_tests/cmd3_reasoning_hf/chat_merged_template",
         ),
         (
-            "templates/archive/cmd4-classic/cmd4-classic@1.jinja",
+            "templates/archive/cmd4/cmd4@1.jinja",
             "jinja_tests/cmd4_v1/chat_template",
         ),
     ],

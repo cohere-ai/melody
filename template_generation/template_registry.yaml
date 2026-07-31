@@ -1,12 +1,15 @@
 # Build config for Melody prompt templates (not a runtime registry).
 #
 # `make generate-dev` reads this file and writes:
-#   - gen/templates/archive/{name}/{name}@{revision}.jinja (+ latest.jinja symlink)
-#   - gen/embedded_templates.rs (include_str! + lookup_jinja/lookup_liquid)
+#   - gen/templates/archive/{name}/{name}@{revision}.{jinja,tmpl} for the current revision
+#   - latest.* symlinks → current
+#   - gen/embedded_templates.rs (current + any older archive files still on disk)
 #   - gen/template_revision_locks.json
 #
-# IDs for template_id / CURL: {name}@{revision} (pin) or {name} (current revision).
-# Changing content for an existing revision fails; bump `revision` instead.
+# Only the current revision is built from sources here. Older `{name}@{N}` files in
+# the archive are frozen raw templates — do not recreate their build config; leave
+# the files alone (or delete them from git when retiring). Changing content for an
+# existing locked revision fails; bump `revision` to publish a new current.
 
 templates:
   cmd3-legacy:
@@ -70,38 +73,10 @@ templates:
           chat_merged_template.jinja:
             path: cmd3/chat_merged_template.jinja
 
-  cmd4-classic:
-    revision: 1
-    entry:
-      jinja:
-        path: cmd4/cmd4-classic.jinja
-        includes:
-          variables.jinja:
-            path: cmd4/shared/variables.jinja
-          macros_tools.jinja:
-            path: cmd4/action/macros_tools.jinja
-          macros_content.jinja:
-            path: cmd4/shared/macros_content.jinja
-          macros_reasoning.jinja:
-            path: cmd4/shared/macros_reasoning.jinja
-          setup.jinja:
-            path: cmd4/shared/setup.jinja
-          platform_turn.jinja:
-            path: cmd4/shared/platform_turn.jinja
-          messages_loop.jinja:
-            path: cmd4/action/messages_loop.jinja
-          generation_prompt_v1.jinja:
-            path: cmd4/shared/generation_prompt_v1.jinja
-      liquid:
-        path: cmd4/cmd4-classic.tmpl
-        variables:
-          grounding_preamble:
-            path: cmd4/vars/grounding_preamble.tmpl
-          document_injector_tool:
-            path: cmd4/vars/document_injector_tool.tmpl
-
-  cmd4-reasoning:
-    revision: 1
+  # Current = former cmd4-v2 / cmd4-reasoning. Frozen cmd4@1 (former cmd4-v1 /
+  # cmd4-classic) lives only as raw files under gen/templates/archive/cmd4/.
+  cmd4:
+    revision: 2
     entry:
       jinja:
         path: cmd4/cmd4-reasoning.jinja
