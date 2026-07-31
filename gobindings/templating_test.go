@@ -110,6 +110,11 @@ func TestTemplating_RenderCMD4_DirCases_Jinja(t *testing.T) {
 			err := json.Unmarshal(tc.input, &opts)
 			require.NoError(t, err)
 			opts.UseJinja = true
+			// Liquid fixtures match cmd4@1 jinja; empty jinja default is cmd4@2.
+			if tc.name != "template_provided" {
+				id := "cmd4@1"
+				opts.TemplateID = &id
+			}
 			got, err := RenderCMD4(opts)
 			require.NoError(t, err)
 			require.Equal(t, tc.output, got)
