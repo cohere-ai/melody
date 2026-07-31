@@ -114,12 +114,12 @@ curl -fsSL \
 
 # immutable pin
 curl -fsSL \
-  "https://raw.githubusercontent.com/cohere-ai/melody/refs/tags/vX.Y.Z/gen/templates/archive/cmd4/cmd4@1.jinja"
+  "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd4/cmd4@1.jinja"
 ```
 
 `make generate-dev` rebuilds the current revision, leaves older archive files
 alone, and refreshes embeds/locks. Changing a locked file’s content fails;
-bump `revision` to publish a new current. Delete a frozen file from git only
+bump `revision` to publish a new one. Delete a frozen file from git only
 when nothing still references it (e.g. Melody’s liquid default still uses
 `cmd4@1` because there is no cmd4 liquid for `@2`).
 
