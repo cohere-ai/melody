@@ -104,15 +104,20 @@ Built-in templates use `{name}@{revision}` (same as the archive path without `.j
 | Exact pin | `cmd4-reasoning@1` | That revision only |
 | Latest | `cmd4-reasoning` | Highest revision of that name |
 
-For CURL, prefer archive `latest.jinja` symlinks (or pin `@N`); see
-[`template_generation/ARCHIVE.md`](template_generation/ARCHIVE.md).
+```bash
+# latest (floating)
+curl -fsSL \
+  "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd4-reasoning/latest.jinja"
+
+# pin (immutable)
+curl -fsSL \
+  "https://raw.githubusercontent.com/cohere-ai/melody/refs/tags/vX.Y.Z/gen/templates/archive/cmd4-reasoning/cmd4-reasoning@1.jinja"
+```
 
 Build config: [`template_generation/template_registry.yaml`](template_generation/template_registry.yaml)
 (`make generate-dev` → archive + `gen/embedded_templates.rs`). Melody embeds
-templates from `gen/templates/archive/` (see
-[`template_generation/ARCHIVE.md`](template_generation/ARCHIVE.md)). Changing
-content for an existing `{name}@{revision}` fails generation until you bump
-`revision` (enforced by `gen/template_revision_locks.json`).
+from `gen/templates/archive/`. Changing content for an existing `{name}@{revision}`
+fails until you bump `revision` (`gen/template_revision_locks.json`).
 
 **Default change:** empty `template_jinja` for cmd3/cmd4 now falls back to
 `cmd3-reasoning` / `cmd4-reasoning`, not the former classic/legacy templates.

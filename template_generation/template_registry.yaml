@@ -3,7 +3,6 @@
 # `make generate-dev` reads this file and writes:
 #   - gen/templates/archive/{name}/{name}@{revision}.jinja (+ latest.jinja symlink)
 #   - gen/embedded_templates.rs (include_str! + lookup_jinja/lookup_liquid)
-#   - gen/templates/manifest.json
 #   - gen/template_revision_locks.json
 #
 # IDs for template_id / CURL: {name}@{revision} (pin) or {name} (current revision).

@@ -1,7 +1,6 @@
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use serde::Deserialize;
-use serde_json::{Map, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -29,8 +28,6 @@ struct Registry {
 #[derive(Debug, Deserialize)]
 struct TemplateConfig {
     revision: u32,
-    #[serde(default)]
-    deprecated: bool,
     entry: EntryConfig,
 }
 
@@ -147,7 +144,6 @@ impl JinjaTemplateConfig {
 struct CompiledTemplate {
     name: String,
     revision: u32,
-    deprecated: bool,
     jinja: Option<String>,
     liquid: Option<String>,
 }
@@ -212,7 +208,6 @@ fn compile_registry(registry: &Registry, args: &Args) -> Result<Vec<CompiledTemp
         compiled.push(CompiledTemplate {
             name: name.clone(),
             revision: template.revision,
-            deprecated: template.deprecated,
             jinja,
             liquid,
         });
@@ -462,51 +457,6 @@ fn write_embedded_templates(compiled: &[CompiledTemplate]) -> Result<()> {
     Ok(())
 }
 
-fn write_manifest(compiled: &[CompiledTemplate]) -> Result<()> {
-    let mut templates = Map::new();
-    for v in compiled {
-        let mut engines = Vec::new();
-        if v.jinja.is_some() {
-            engines.push(json!("jinja"));
-        }
-        if v.liquid.is_some() {
-            engines.push(json!("liquid"));
-        }
-        templates.insert(
-            v.name.clone(),
-            json!({
-                "revision": v.revision,
-                "id": v.canonical_id(),
-                "deprecated": v.deprecated,
-                "engines": engines,
-                "archive": {
-                    "jinja": v.jinja.as_ref().map(|_| v.archive_jinja_rel()),
-                    "liquid": v.liquid.as_ref().map(|_| v.archive_liquid_rel()),
-                    "latest_jinja": v.jinja.as_ref().map(|_| format!("{}/latest.jinja", v.name)),
-                    "latest_liquid": v.liquid.as_ref().map(|_| format!("{}/latest.tmpl", v.name)),
-                },
-                "curl_hint": format!(
-                    "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/{}/latest.jinja",
-                    v.name
-                ),
-            }),
-        );
-    }
-
-    let manifest = json!({
-        "schema_version": 1,
-        "id_format": "{name}@{revision}",
-        "archive_layout": "{name}/{name}@{revision}.jinja",
-        "latest_layout": "{name}/latest.jinja",
-        "templates": templates,
-    });
-
-    let pretty = serde_json::to_string_pretty(&manifest)?;
-    fs::write("gen/templates/manifest.json", pretty)
-        .with_context(|| "Failed to write gen/templates/manifest.json")?;
-    Ok(())
-}
-
 fn main() {
     let args = Args::parse();
 
@@ -526,7 +476,6 @@ fn run(args: &Args) -> Result<()> {
     enforce_revision_locks(&compiled)?;
     write_outputs(&compiled)?;
     write_embedded_templates(&compiled)?;
-    write_manifest(&compiled)?;
 
     println!(
         "Generated {} templates from {}",
