@@ -14,191 +14,182 @@
 templates:
   cmd3-legacy:
     revision: 1
-    entry:
-      jinja:
-        path: cmd3/chat_merged_template_v1.jinja
-        includes:
-          chat_merged_template.jinja:
-            path: cmd3/chat_merged_template.jinja
-      liquid:
-        path: cmd3/cmd3-v1.tmpl
-        variables: &cmd3_liquid_vars
-          rag_augmented_generation_tool:
-            path: cmd3/vars/rag_augmented_generation_tool.tmpl
-          contextual_safety_preamble:
-            path: cmd3/vars/contextual_safety_preamble.tmpl
-          strict_safety_preamble:
-            path: cmd3/vars/strict_safety_preamble.tmpl
-          rag_preamble_citation_mode_fast:
-            path: cmd3/vars/rag_preamble_citation_mode_fast.tmpl
-          rag_preamble_citation_mode_none:
-            path: cmd3/vars/rag_preamble_citation_mode_none.tmpl
-          rag_preamble_skip_thinking_citation_mode_fast:
-            path: cmd3/vars/rag_preamble_skip_thinking_citation_mode_fast.tmpl
-          rag_preamble_skip_thinking_citation_mode_none:
-            path: cmd3/vars/rag_preamble_skip_thinking_citation_mode_none.tmpl
-          reasoning_preamble:
-            path: cmd3/vars/reasoning_preamble.tmpl
+    jinja:
+      path: cmd3/chat_merged_template_v1.jinja
+      includes:
+        chat_merged_template.jinja:
+          path: cmd3/chat_merged_template.jinja
+    liquid:
+      path: cmd3/cmd3-v1.tmpl
+      variables: &cmd3_liquid_vars
+        rag_augmented_generation_tool:
+          path: cmd3/vars/rag_augmented_generation_tool.tmpl
+        contextual_safety_preamble:
+          path: cmd3/vars/contextual_safety_preamble.tmpl
+        strict_safety_preamble:
+          path: cmd3/vars/strict_safety_preamble.tmpl
+        rag_preamble_citation_mode_fast:
+          path: cmd3/vars/rag_preamble_citation_mode_fast.tmpl
+        rag_preamble_citation_mode_none:
+          path: cmd3/vars/rag_preamble_citation_mode_none.tmpl
+        rag_preamble_skip_thinking_citation_mode_fast:
+          path: cmd3/vars/rag_preamble_skip_thinking_citation_mode_fast.tmpl
+        rag_preamble_skip_thinking_citation_mode_none:
+          path: cmd3/vars/rag_preamble_skip_thinking_citation_mode_none.tmpl
+        reasoning_preamble:
+          path: cmd3/vars/reasoning_preamble.tmpl
 
   cmd3-reasoning:
     revision: 1
-    entry:
-      jinja:
-        path: cmd3/chat_merged_template_v2.jinja
-        includes:
-          chat_merged_template.jinja:
-            path: cmd3/chat_merged_template.jinja
-      liquid:
-        path: cmd3/cmd3-v2.tmpl
-        variables: *cmd3_liquid_vars
+    jinja:
+      path: cmd3/chat_merged_template_v2.jinja
+      includes:
+        chat_merged_template.jinja:
+          path: cmd3/chat_merged_template.jinja
+    liquid:
+      path: cmd3/cmd3-v2.tmpl
+      variables: *cmd3_liquid_vars
 
   cmd3-default-thinking:
     revision: 1
-    entry:
-      jinja:
-        path: cmd3/chat_merged_template_default_thinking.jinja
-        includes:
-          chat_merged_template.jinja:
-            path: cmd3/chat_merged_template.jinja
-      liquid:
-        path: cmd3/cmd3-v3.tmpl
-        variables: *cmd3_liquid_vars
+    jinja:
+      path: cmd3/chat_merged_template_default_thinking.jinja
+      includes:
+        chat_merged_template.jinja:
+          path: cmd3/chat_merged_template.jinja
+    liquid:
+      path: cmd3/cmd3-v3.tmpl
+      variables: *cmd3_liquid_vars
 
   cmd3-legacy-hf:
     revision: 1
-    entry:
-      jinja:
-        path: cmd3/chat_merged_template_v1_huggingface.jinja
-        includes:
-          chat_merged_template.jinja:
-            path: cmd3/chat_merged_template.jinja
+    jinja:
+      path: cmd3/chat_merged_template_v1_huggingface.jinja
+      includes:
+        chat_merged_template.jinja:
+          path: cmd3/chat_merged_template.jinja
 
   # Current = former cmd4-v2 / cmd4-reasoning. Frozen cmd4@1 (former cmd4-v1 /
   # cmd4-classic) lives only as raw files under gen/templates/archive/cmd4/.
   cmd4:
     revision: 2
-    entry:
-      jinja:
-        path: cmd4/cmd4-reasoning.jinja
-        includes:
-          reasoning_init.jinja:
-            path: cmd4/shared/reasoning_init.jinja
-          variables.jinja:
-            path: cmd4/shared/variables.jinja
-          macros_tools.jinja:
-            path: cmd4/action/macros_tools.jinja
-          macros_content.jinja:
-            path: cmd4/shared/macros_content.jinja
-          macros_reasoning.jinja:
-            path: cmd4/shared/macros_reasoning.jinja
-          setup.jinja:
-            path: cmd4/shared/setup.jinja
-          platform_turn.jinja:
-            path: cmd4/shared/platform_turn.jinja
-          messages_loop.jinja:
-            path: cmd4/action/messages_loop.jinja
-          generation_prompt_reasoning.jinja:
-            path: cmd4/shared/generation_prompt_reasoning.jinja
+    jinja:
+      path: cmd4/cmd4-reasoning.jinja
+      includes:
+        reasoning_init.jinja:
+          path: cmd4/shared/reasoning_init.jinja
+        variables.jinja:
+          path: cmd4/shared/variables.jinja
+        macros_tools.jinja:
+          path: cmd4/action/macros_tools.jinja
+        macros_content.jinja:
+          path: cmd4/shared/macros_content.jinja
+        macros_reasoning.jinja:
+          path: cmd4/shared/macros_reasoning.jinja
+        setup.jinja:
+          path: cmd4/shared/setup.jinja
+        platform_turn.jinja:
+          path: cmd4/shared/platform_turn.jinja
+        messages_loop.jinja:
+          path: cmd4/action/messages_loop.jinja
+        generation_prompt_reasoning.jinja:
+          path: cmd4/shared/generation_prompt_reasoning.jinja
 
   cmd4-hf:
     revision: 1
-    entry:
-      jinja:
-        path: cmd4/cmd4-hf.jinja
-        includes:
-          cmd4-reasoning.jinja:
-            path: cmd4/cmd4-reasoning.jinja
-            includes:
-              reasoning_init.jinja:
-                path: cmd4/shared/reasoning_init.jinja
-              variables.jinja:
-                path: cmd4/shared/variables.jinja
-              macros_tools.jinja:
-                path: cmd4/action/macros_tools.jinja
-              macros_content.jinja:
-                path: cmd4/shared/macros_content.jinja
-              macros_reasoning.jinja:
-                path: cmd4/shared/macros_reasoning.jinja
-              setup.jinja:
-                path: cmd4/shared/setup.jinja
-              platform_turn.jinja:
-                path: cmd4/shared/platform_turn.jinja
-              messages_loop.jinja:
-                path: cmd4/action/messages_loop.jinja
-              generation_prompt_reasoning.jinja:
-                path: cmd4/shared/generation_prompt_reasoning.jinja
+    jinja:
+      path: cmd4/cmd4-hf.jinja
+      includes:
+        cmd4-reasoning.jinja:
+          path: cmd4/cmd4-reasoning.jinja
+          includes:
+            reasoning_init.jinja:
+              path: cmd4/shared/reasoning_init.jinja
+            variables.jinja:
+              path: cmd4/shared/variables.jinja
+            macros_tools.jinja:
+              path: cmd4/action/macros_tools.jinja
+            macros_content.jinja:
+              path: cmd4/shared/macros_content.jinja
+            macros_reasoning.jinja:
+              path: cmd4/shared/macros_reasoning.jinja
+            setup.jinja:
+              path: cmd4/shared/setup.jinja
+            platform_turn.jinja:
+              path: cmd4/shared/platform_turn.jinja
+            messages_loop.jinja:
+              path: cmd4/action/messages_loop.jinja
+            generation_prompt_reasoning.jinja:
+              path: cmd4/shared/generation_prompt_reasoning.jinja
 
   cmd5:
     revision: 1
-    entry:
-      jinja:
-        path: cmd5/cmd5.jinja
-        includes:
-          reasoning_init.jinja:
-            path: cmd4/shared/reasoning_init.jinja
-          variables.jinja:
-            path: cmd4/shared/variables.jinja
-          macros_tools.jinja:
-            path: cmd5/cofl/macros_tools_nested_xml.jinja
-          macros_content.jinja:
-            path: cmd4/shared/macros_content.jinja
-          macros_reasoning.jinja:
-            path: cmd4/shared/macros_reasoning.jinja
-          setup.jinja:
-            path: cmd4/shared/setup.jinja
-          platform_turn.jinja:
-            path: cmd4/shared/platform_turn.jinja
-          messages_loop.jinja:
-            path: cmd5/cofl/messages_loop.jinja
-          generation_prompt_reasoning.jinja:
-            path: cmd4/shared/generation_prompt_reasoning.jinja
+    jinja:
+      path: cmd5/cmd5.jinja
+      includes:
+        reasoning_init.jinja:
+          path: cmd4/shared/reasoning_init.jinja
+        variables.jinja:
+          path: cmd4/shared/variables.jinja
+        macros_tools.jinja:
+          path: cmd5/cofl/macros_tools_nested_xml.jinja
+        macros_content.jinja:
+          path: cmd4/shared/macros_content.jinja
+        macros_reasoning.jinja:
+          path: cmd4/shared/macros_reasoning.jinja
+        setup.jinja:
+          path: cmd4/shared/setup.jinja
+        platform_turn.jinja:
+          path: cmd4/shared/platform_turn.jinja
+        messages_loop.jinja:
+          path: cmd5/cofl/messages_loop.jinja
+        generation_prompt_reasoning.jinja:
+          path: cmd4/shared/generation_prompt_reasoning.jinja
 
   cmd5-no-escape:
     revision: 1
-    entry:
-      jinja:
-        path: cmd5/cmd5-no-escape.jinja
-        includes:
-          reasoning_init.jinja:
-            path: cmd4/shared/reasoning_init.jinja
-          variables.jinja:
-            path: cmd4/shared/variables.jinja
-          macros_tools.jinja:
-            path: cmd5/cofl/macros_tools_no_xml_escape.jinja
-          macros_content.jinja:
-            path: cmd4/shared/macros_content.jinja
-          macros_reasoning.jinja:
-            path: cmd4/shared/macros_reasoning.jinja
-          setup.jinja:
-            path: cmd4/shared/setup.jinja
-          platform_turn.jinja:
-            path: cmd4/shared/platform_turn.jinja
-          messages_loop.jinja:
-            path: cmd5/cofl/messages_loop.jinja
-          generation_prompt_reasoning.jinja:
-            path: cmd4/shared/generation_prompt_reasoning.jinja
+    jinja:
+      path: cmd5/cmd5-no-escape.jinja
+      includes:
+        reasoning_init.jinja:
+          path: cmd4/shared/reasoning_init.jinja
+        variables.jinja:
+          path: cmd4/shared/variables.jinja
+        macros_tools.jinja:
+          path: cmd5/cofl/macros_tools_no_xml_escape.jinja
+        macros_content.jinja:
+          path: cmd4/shared/macros_content.jinja
+        macros_reasoning.jinja:
+          path: cmd4/shared/macros_reasoning.jinja
+        setup.jinja:
+          path: cmd4/shared/setup.jinja
+        platform_turn.jinja:
+          path: cmd4/shared/platform_turn.jinja
+        messages_loop.jinja:
+          path: cmd5/cofl/messages_loop.jinja
+        generation_prompt_reasoning.jinja:
+          path: cmd4/shared/generation_prompt_reasoning.jinja
 
   cmd5-strict:
     revision: 1
-    entry:
-      jinja:
-        path: cmd5/cmd5-strict.jinja
-        includes:
-          reasoning_init.jinja:
-            path: cmd4/shared/reasoning_init.jinja
-          variables.jinja:
-            path: cmd4/shared/variables.jinja
-          macros_tools.jinja:
-            path: cmd5/cofl/macros_tools.jinja
-          macros_content.jinja:
-            path: cmd4/shared/macros_content.jinja
-          macros_reasoning.jinja:
-            path: cmd4/shared/macros_reasoning.jinja
-          setup.jinja:
-            path: cmd4/shared/setup.jinja
-          platform_turn.jinja:
-            path: cmd4/shared/platform_turn.jinja
-          messages_loop.jinja:
-            path: cmd5/cofl/messages_loop.jinja
-          generation_prompt_reasoning.jinja:
-            path: cmd4/shared/generation_prompt_reasoning.jinja
+    jinja:
+      path: cmd5/cmd5-strict.jinja
+      includes:
+        reasoning_init.jinja:
+          path: cmd4/shared/reasoning_init.jinja
+        variables.jinja:
+          path: cmd4/shared/variables.jinja
+        macros_tools.jinja:
+          path: cmd5/cofl/macros_tools.jinja
+        macros_content.jinja:
+          path: cmd4/shared/macros_content.jinja
+        macros_reasoning.jinja:
+          path: cmd4/shared/macros_reasoning.jinja
+        setup.jinja:
+          path: cmd4/shared/setup.jinja
+        platform_turn.jinja:
+          path: cmd4/shared/platform_turn.jinja
+        messages_loop.jinja:
+          path: cmd5/cofl/messages_loop.jinja
+        generation_prompt_reasoning.jinja:
+          path: cmd4/shared/generation_prompt_reasoning.jinja

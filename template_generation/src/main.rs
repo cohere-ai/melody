@@ -25,11 +25,6 @@ struct Registry {
 #[derive(Debug, Deserialize)]
 struct TemplateConfig {
     revision: u32,
-    entry: EntryConfig,
-}
-
-#[derive(Debug, Deserialize)]
-struct EntryConfig {
     #[serde(default)]
     jinja: Option<JinjaTemplateConfig>,
     #[serde(default)]
@@ -136,21 +131,19 @@ fn compile(registry: &Registry, args: &Args) -> Result<Vec<Compiled>> {
             bail!("template name '{name}' must not contain '@'");
         }
         let jinja = template
-            .entry
             .jinja
             .as_ref()
             .map(|c| c.get_template_string(&args.jinja_templates_dir))
             .transpose()
             .with_context(|| format!("jinja {name}"))?;
         let liquid = template
-            .entry
             .liquid
             .as_ref()
             .map(|c| c.get_template_string(&args.liquid_templates_dir))
             .transpose()
             .with_context(|| format!("liquid {name}"))?;
         if jinja.is_none() && liquid.is_none() {
-            bail!("{name}: entry must include jinja and/or liquid");
+            bail!("{name}: must include jinja and/or liquid");
         }
         compiled.push(Compiled {
             name: name.clone(),
