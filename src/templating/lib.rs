@@ -16,7 +16,10 @@ fn jinja_for_id(template_id: &str, family: &str) -> Result<&'static str, MelodyE
         MelodyError::TemplateValidation(format!("unknown template id: {template_id}"))
     })?;
     // Resolve to the canonical name so pins like cmd4@1 still check cleanly.
-    let name = template_id.split_once('@').map(|(n, _)| n).unwrap_or(template_id);
+    let name = template_id
+        .split_once('@')
+        .map(|(n, _)| n)
+        .unwrap_or(template_id);
     let ok = match family {
         "cmd3" => name.starts_with("cmd3-"),
         "cmd4" => name == "cmd4" || name.starts_with("cmd4-"),

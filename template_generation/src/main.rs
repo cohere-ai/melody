@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -279,7 +279,8 @@ fn write_archive(compiled: &[Compiled]) -> Result<()> {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(&path, body).with_context(|| format!("Failed to write {}", path.display()))?;
+            fs::write(&path, body)
+                .with_context(|| format!("Failed to write {}", path.display()))?;
             // Real file (not a symlink) so GitHub raw / curl serve the template body.
             let latest = dir.join(format!("latest.{ext}"));
             let _ = fs::remove_file(&latest);
@@ -340,7 +341,10 @@ fn write_embeds(compiled: &[Compiled]) -> Result<()> {
         Ok(items)
     };
 
-    let emit_lookup = |out: &mut String, fn_name: &str, engine: &str, items: &[(bool, String, String, String)]| {
+    let emit_lookup = |out: &mut String,
+                       fn_name: &str,
+                       engine: &str,
+                       items: &[(bool, String, String, String)]| {
         out.push_str(&format!(
             "\n/// Look up an embedded {engine} template by id (`{{name}}` or `{{name}}@{{revision}}`).\n\
              pub fn {fn_name}(id: &str) -> Option<&'static str> {{\n    match id {{\n"
