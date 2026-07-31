@@ -108,7 +108,7 @@ struct Compiled {
 }
 
 impl Compiled {
-    /// `(archive-relative path, body, extension for latest symlink)`.
+    /// `(archive-relative path, body, extension for latest copy)`.
     fn artifacts(&self) -> Vec<(String, &str, &str)> {
         let mut out = Vec::new();
         if let Some(body) = &self.jinja {
@@ -269,26 +269,6 @@ fn parse_archive_filename(name: &str, fname: &str) -> Option<(u32, String)> {
     Some((rev, ext.to_string()))
 }
 
-fn write_latest_symlink(dir: &Path, link_name: &str, target: &str) -> Result<()> {
-    fs::create_dir_all(dir)?;
-    let link = dir.join(link_name);
-    if link
-        .symlink_metadata()
-        .map(|m| m.file_type().is_symlink())
-        .unwrap_or(false)
-        && fs::read_link(&link).ok().as_deref() == Some(Path::new(target))
-    {
-        return Ok(());
-    }
-    let _ = fs::remove_file(&link);
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(target, &link)
-        .with_context(|| format!("symlink {} -> {target}", link.display()))?;
-    #[cfg(not(unix))]
-    bail!("latest symlinks require unix ({})", link.display());
-    Ok(())
-}
-
 fn write_archive(compiled: &[Compiled]) -> Result<()> {
     let root = PathBuf::from("gen/templates/archive");
     fs::create_dir_all(&root)?;
@@ -300,11 +280,11 @@ fn write_archive(compiled: &[Compiled]) -> Result<()> {
                 fs::create_dir_all(parent)?;
             }
             fs::write(&path, body).with_context(|| format!("Failed to write {}", path.display()))?;
-            write_latest_symlink(
-                &dir,
-                &format!("latest.{ext}"),
-                &format!("{}@{}.{}", t.name, t.revision, ext),
-            )?;
+            // Real file (not a symlink) so GitHub raw / curl serve the template body.
+            let latest = dir.join(format!("latest.{ext}"));
+            let _ = fs::remove_file(&latest);
+            fs::write(&latest, body)
+                .with_context(|| format!("Failed to write {}", latest.display()))?;
         }
         // Drop latest.* for engines the current revision no longer ships.
         if t.jinja.is_none() {
