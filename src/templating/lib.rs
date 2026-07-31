@@ -121,7 +121,7 @@ pub struct RenderCmd4Options<'a> {
     /// Liquid template string to use for rendering.
     pub template: &'a str,
     /// Jinja template string. An empty string is treated as "caller did not
-    /// provide a template" and the renderer falls back to `cmd4@1` when called via [`render_cmd4`].
+    /// provide a template" and the renderer falls back to `cmd4@2` when called via [`render_cmd4`].
     pub template_jinja: &'a str,
     /// Whether to use jinja template
     pub use_jinja: bool,
@@ -391,7 +391,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
         add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
         let mut active_template = if opts.template_jinja.is_empty() {
-            jinja_for_id("cmd4@1", "cmd4")?
+            jinja_for_id("cmd4@2", "cmd4")?
         } else {
             opts.template_jinja
         };
@@ -463,7 +463,7 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
         active_opts.template_id = None;
     } else if active_opts.template_jinja.is_empty() {
         // Pin the cmd5 default before delegating to `render_cmd4`, whose own
-        // empty-string fallback would otherwise pick cmd4@1.
+        // empty-string fallback would otherwise pick cmd4@2.
         active_opts.template_jinja = jinja_for_id("cmd5", "cmd5")?;
     }
 

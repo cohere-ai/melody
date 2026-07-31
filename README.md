@@ -119,8 +119,9 @@ curl -fsSL \
 
 `make generate-dev` rebuilds the current revision, leaves older archive files
 alone, and refreshes embeds/locks. Changing a locked file’s content fails;
-bump `revision` to publish a new current, or delete a frozen file from git to
-retire it from Melody.
+bump `revision` to publish a new current. Delete a frozen file from git only
+when nothing still references it (e.g. Melody’s liquid default still uses
+`cmd4@1` because there is no cmd4 liquid for `@2`).
 
 ## Releasing
 
