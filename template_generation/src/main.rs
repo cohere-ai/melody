@@ -4,18 +4,15 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Unified template registry
     #[arg(long, default_value = "template_generation/template_registry.yaml")]
     registry: String,
-    /// Jinja templates source directory
     #[arg(long, default_value = "template_generation/templates/jinja")]
     jinja_templates_dir: String,
-    /// Liquid templates source directory
     #[arg(long, default_value = "template_generation/templates/liquid")]
     liquid_templates_dir: String,
 }
@@ -54,33 +51,31 @@ enum LiquidTemplateConfig {
 impl LiquidTemplateConfig {
     fn get_template_string(&self, base_dir: &str) -> Result<String> {
         match self {
-            LiquidTemplateConfig::RawTemplate(s) => Ok(s.clone()),
-            LiquidTemplateConfig::Config { path, variables } => {
-                let path_str = path
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("Template path is required but not provided"))?;
-                let full_path = format!("{base_dir}/{path_str}");
+            Self::RawTemplate(s) => Ok(s.clone()),
+            Self::Config { path, variables } => {
+                let full_path = format!(
+                    "{base_dir}/{}",
+                    path.as_ref().context("Template path is required but not provided")?
+                );
                 let content = fs::read_to_string(&full_path)
                     .with_context(|| format!("Failed to read file: {full_path}"))?;
-
-                if !variables.is_empty() {
-                    let mut variable_strings = Vec::new();
-                    let mut keys: Vec<_> = variables.keys().collect();
-                    keys.sort();
-
-                    for key in keys {
-                        let var_content = variables[key].get_template_string(base_dir)?;
-                        let var_content_trimmed = var_content.trim_end_matches('\n');
-                        variable_strings.push(format!(
-                            "{{% capture {key} %}}{var_content_trimmed}{{% endcapture %}}"
-                        ));
-                    }
-
-                    let variables_string = variable_strings.join("");
-                    Ok(format!("{variables_string}{content}"))
-                } else {
-                    Ok(content)
+                if variables.is_empty() {
+                    return Ok(content);
                 }
+                let mut keys: Vec<_> = variables.keys().collect();
+                keys.sort();
+                let captures = keys
+                    .into_iter()
+                    .map(|key| {
+                        let body = variables[key]
+                            .get_template_string(base_dir)?
+                            .trim_end_matches('\n')
+                            .to_string();
+                        Ok(format!("{{% capture {key} %}}{body}{{% endcapture %}}"))
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .join("");
+                Ok(format!("{captures}{content}"))
             }
         }
     }
@@ -101,37 +96,28 @@ enum JinjaTemplateConfig {
 impl JinjaTemplateConfig {
     fn get_template_string(&self, base_dir: &str) -> Result<String> {
         match self {
-            JinjaTemplateConfig::RawTemplate(s) => Ok(s.clone()),
-            JinjaTemplateConfig::Config { path, includes } => {
-                let path_str = path
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("Template path is required but not provided"))?;
-                let full_path = format!("{base_dir}/{path_str}");
+            Self::RawTemplate(s) => Ok(s.clone()),
+            Self::Config { path, includes } => {
+                let full_path = format!(
+                    "{base_dir}/{}",
+                    path.as_ref().context("Template path is required but not provided")?
+                );
                 let mut content = fs::read_to_string(&full_path)
                     .with_context(|| format!("Failed to read file: {full_path}"))?;
-
-                if !includes.is_empty() {
-                    for (key, include_config) in includes {
-                        let include_content = include_config
-                            .get_template_string(base_dir)?
-                            .trim_end_matches('\n')
-                            .to_string();
-                        let include_statement = format!(r#"\{{%\s*include\s*"{key}"\s*%\}}"#);
-                        let re = regex::Regex::new(&include_statement).with_context(|| {
-                            format!("Failed to create regex for include: {key}")
-                        })?;
+                for (key, include_config) in includes {
+                    let include_content = include_config
+                        .get_template_string(base_dir)?
+                        .trim_end_matches('\n')
+                        .to_string();
+                    for pattern in [
+                        format!(r#"\{{%\s*include\s*"{key}"\s*%\}}"#),
+                        format!(r#"\s*\{{%-\s*include\s*"{key}"\s*%\}}\s*"#),
+                    ] {
+                        let re = regex::Regex::new(&pattern)
+                            .with_context(|| format!("Failed to create regex for include: {key}"))?;
                         content = re
                             .replace_all(&content, regex::NoExpand(include_content.as_str()))
-                            .to_string();
-
-                        let include_statement_trim =
-                            format!(r#"\s*\{{%-\s*include\s*"{key}"\s*%\}}\s*"#);
-                        let re = regex::Regex::new(&include_statement_trim).with_context(|| {
-                            format!("Failed to create regex for include: {key}")
-                        })?;
-                        content = re
-                            .replace_all(&content, regex::NoExpand(include_content.as_str()))
-                            .to_string();
+                            .into_owned();
                     }
                 }
                 Ok(content)
@@ -140,343 +126,248 @@ impl JinjaTemplateConfig {
     }
 }
 
-#[derive(Debug, Clone)]
-struct CompiledTemplate {
+/// One compiled template revision (jinja and/or liquid bodies).
+struct Compiled {
     name: String,
     revision: u32,
     jinja: Option<String>,
     liquid: Option<String>,
 }
 
-impl CompiledTemplate {
-    fn canonical_id(&self) -> String {
+impl Compiled {
+    fn id(&self) -> String {
         format!("{}@{}", self.name, self.revision)
     }
 
-    fn archive_jinja_rel(&self) -> String {
-        format!("{0}/{0}@{1}.jinja", self.name, self.revision)
-    }
-
-    fn archive_liquid_rel(&self) -> String {
-        format!("{0}/{0}@{1}.tmpl", self.name, self.revision)
-    }
-
-    fn embed_jinja_rel(&self) -> String {
-        format!("templates/archive/{}", self.archive_jinja_rel())
-    }
-
-    fn embed_liquid_rel(&self) -> String {
-        format!("templates/archive/{}", self.archive_liquid_rel())
-    }
-
     fn static_name(&self, engine: &str) -> String {
-        let name = self.name.to_uppercase().replace(['-', '/'], "_");
-        format!("TPL_{name}_{}_{engine}", self.revision)
+        format!(
+            "TPL_{}_{engine}",
+            format!("{}_{}", self.name, self.revision)
+                .to_uppercase()
+                .replace(['-', '/'], "_")
+        )
+    }
+
+    /// `(archive-relative path, body, file extension for latest symlink)`.
+    fn artifacts(&self) -> Vec<(String, &str, &str)> {
+        let mut out = Vec::new();
+        if let Some(body) = &self.jinja {
+            out.push((
+                format!("{0}/{0}@{1}.jinja", self.name, self.revision),
+                body.as_str(),
+                "jinja",
+            ));
+        }
+        if let Some(body) = &self.liquid {
+            out.push((
+                format!("{0}/{0}@{1}.tmpl", self.name, self.revision),
+                body.as_str(),
+                "tmpl",
+            ));
+        }
+        out
     }
 }
 
-fn compile_registry(registry: &Registry, args: &Args) -> Result<Vec<CompiledTemplate>> {
+fn compile(registry: &Registry, args: &Args) -> Result<Vec<Compiled>> {
     let mut compiled = Vec::new();
-
     for (name, template) in &registry.templates {
         if name.contains('@') {
             bail!("template name '{name}' must not contain '@'");
         }
-
-        let jinja = if let Some(cfg) = template.entry.jinja.as_ref() {
-            Some(
-                cfg.get_template_string(&args.jinja_templates_dir)
-                    .with_context(|| format!("jinja {name}"))?,
-            )
-        } else {
-            None
-        };
-
-        let liquid = if let Some(cfg) = template.entry.liquid.as_ref() {
-            Some(
-                cfg.get_template_string(&args.liquid_templates_dir)
-                    .with_context(|| format!("liquid {name}"))?,
-            )
-        } else {
-            None
-        };
-
+        let jinja = template
+            .entry
+            .jinja
+            .as_ref()
+            .map(|c| c.get_template_string(&args.jinja_templates_dir))
+            .transpose()
+            .with_context(|| format!("jinja {name}"))?;
+        let liquid = template
+            .entry
+            .liquid
+            .as_ref()
+            .map(|c| c.get_template_string(&args.liquid_templates_dir))
+            .transpose()
+            .with_context(|| format!("liquid {name}"))?;
         if jinja.is_none() && liquid.is_none() {
             bail!("{name}: entry must include jinja and/or liquid");
         }
-
-        compiled.push(CompiledTemplate {
+        compiled.push(Compiled {
             name: name.clone(),
             revision: template.revision,
             jinja,
             liquid,
         });
     }
-
     compiled.sort_by(|a, b| (&a.name, a.revision).cmp(&(&b.name, b.revision)));
     Ok(compiled)
 }
 
-fn write_outputs(compiled: &[CompiledTemplate]) -> Result<()> {
-    // Append-only archive: prior revisions stay on disk when revision is bumped.
-    // Melody embeds pinned `@N` files via include_str!; `latest` symlinks float.
-    fs::create_dir_all("gen/templates/archive")?;
+fn sha256(content: &str) -> String {
+    format!("sha256:{:x}", Sha256::digest(content.as_bytes()))
+}
 
-    for v in compiled {
-        if let Some(jinja) = &v.jinja {
-            let archive = format!("gen/templates/archive/{}", v.archive_jinja_rel());
-            write_archive_file(&archive, jinja)?;
-            write_latest_symlink(
-                &format!("gen/templates/archive/{}", v.name),
-                "latest.jinja",
-                &format!("{}@{}.jinja", v.name, v.revision),
-            )?;
-        }
+fn enforce_locks(compiled: &[Compiled]) -> Result<()> {
+    const LOCK_PATH: &str = "gen/template_revision_locks.json";
+    let mut locks: BTreeMap<String, String> = Path::new(LOCK_PATH)
+        .exists()
+        .then(|| fs::read_to_string(LOCK_PATH).ok())
+        .flatten()
+        .map(|raw| serde_json::from_str(&raw))
+        .transpose()
+        .with_context(|| format!("Failed to parse {LOCK_PATH}"))?
+        .unwrap_or_default();
 
-        if let Some(liquid) = &v.liquid {
-            let archive = format!("gen/templates/archive/{}", v.archive_liquid_rel());
-            write_archive_file(&archive, liquid)?;
-            write_latest_symlink(
-                &format!("gen/templates/archive/{}", v.name),
-                "latest.tmpl",
-                &format!("{}@{}.tmpl", v.name, v.revision),
-            )?;
+    let mut conflicts = Vec::new();
+    let mut dirty = false;
+    for (key, body, _) in compiled.iter().flat_map(Compiled::artifacts) {
+        let hash = sha256(body);
+        match locks.get(&key) {
+            Some(existing) if existing != &hash => conflicts.push(format!(
+                "{key}: content changed (locked {existing}, got {hash}). Bump `revision`."
+            )),
+            Some(_) => {}
+            None => {
+                locks.insert(key, hash);
+                dirty = true;
+            }
         }
     }
-
+    if !conflicts.is_empty() {
+        for c in &conflicts {
+            eprintln!("  - {c}");
+        }
+        bail!("template content changed without bumping revision");
+    }
+    if dirty {
+        fs::create_dir_all("gen")?;
+        fs::write(LOCK_PATH, format!("{}\n", serde_json::to_string_pretty(&locks)?))?;
+        println!("Updated {LOCK_PATH}");
+    }
     Ok(())
 }
 
-/// Write an immutable archive revision file. Existing bytes must match (locks
-/// already enforce this); identical content is a no-op so git stays quiet.
-fn write_archive_file(path: &str, content: &str) -> Result<()> {
-    if Path::new(path).exists() {
-        let existing = fs::read_to_string(path)
-            .with_context(|| format!("Failed to read existing {path}"))?;
+fn write_archive_file(path: &Path, content: &str) -> Result<()> {
+    if path.exists() {
+        let existing = fs::read_to_string(path)?;
         if existing == content {
             return Ok(());
         }
         bail!(
-            "{path} already exists with different content; bump `revision` in template_registry.yaml"
+            "{} already exists with different content; bump `revision`",
+            path.display()
         );
     }
-    if let Some(parent) = Path::new(path).parent() {
+    if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(path, content).with_context(|| format!("Failed to write {path}"))?;
+    fs::write(path, content)?;
     Ok(())
 }
 
-/// Create or update a relative symlink named `link_name` in `dir`.
-fn write_latest_symlink(dir: &str, link_name: &str, relative_target: &str) -> Result<()> {
-    fs::create_dir_all(dir).with_context(|| format!("Failed to create {dir}"))?;
-    let link = Path::new(dir).join(link_name);
-
-    if link.symlink_metadata().is_ok() {
-        if link
-            .symlink_metadata()
-            .map(|m| m.file_type().is_symlink())
-            .unwrap_or(false)
-        {
-            let current = fs::read_link(&link)
-                .with_context(|| format!("Failed to read symlink {}", link.display()))?;
-            if current == Path::new(relative_target) {
-                return Ok(());
-            }
-        }
-        fs::remove_file(&link)
-            .with_context(|| format!("Failed to remove {}", link.display()))?;
+fn write_latest_symlink(dir: &Path, link_name: &str, target: &str) -> Result<()> {
+    fs::create_dir_all(dir)?;
+    let link = dir.join(link_name);
+    if link
+        .symlink_metadata()
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+        && fs::read_link(&link).ok().as_deref() == Some(Path::new(target))
+    {
+        return Ok(());
     }
-
+    let _ = fs::remove_file(&link);
     #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(relative_target, &link).with_context(|| {
-            format!(
-                "Failed to symlink {} -> {relative_target}",
-                link.display()
-            )
-        })?;
-    }
+    std::os::unix::fs::symlink(target, &link)
+        .with_context(|| format!("symlink {} -> {target}", link.display()))?;
     #[cfg(not(unix))]
-    {
-        bail!(
-            "template archive latest symlinks require unix (failed for {})",
-            link.display()
-        );
-    }
-
+    bail!("latest symlinks require unix ({})", link.display());
     Ok(())
 }
 
-fn content_sha256(content: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    format!("sha256:{}", hex::encode(hasher.finalize()))
+fn write_archive(compiled: &[Compiled]) -> Result<()> {
+    let root = PathBuf::from("gen/templates/archive");
+    fs::create_dir_all(&root)?;
+    for t in compiled {
+        for (rel, body, ext) in t.artifacts() {
+            write_archive_file(&root.join(&rel), body)?;
+            write_latest_symlink(
+                &root.join(&t.name),
+                &format!("latest.{ext}"),
+                &format!("{}@{}.{}", t.name, t.revision, ext),
+            )?;
+        }
+    }
+    Ok(())
 }
 
-/// Enforce immutability of `{name}@{revision}` contents.
-///
-/// `gen/template_revision_locks.json` maps each archive relative path to
-/// a content hash. If the same path is regenerated with different bytes, generation
-/// fails and the revision must be bumped in `template_registry.yaml`.
-/// Old revision files under `gen/templates/archive/` are left in place (append-only).
-fn enforce_revision_locks(compiled: &[CompiledTemplate]) -> Result<()> {
-    const LOCK_PATH: &str = "gen/template_revision_locks.json";
+fn write_embeds(compiled: &[Compiled]) -> Result<()> {
+    let mut out = String::from(
+        "// @generated by template_generation. Do not edit by hand.\n\
+         // Build config: template_generation/template_registry.yaml\n\n\
+         #![allow(dead_code)]\n#![allow(clippy::all)]\n\n",
+    );
 
-    let mut locks: BTreeMap<String, String> = if Path::new(LOCK_PATH).exists() {
-        let raw = fs::read_to_string(LOCK_PATH)
-            .with_context(|| format!("Failed to read {LOCK_PATH}"))?;
-        serde_json::from_str(&raw)
-            .with_context(|| format!("Failed to parse {LOCK_PATH}"))?
-    } else {
-        BTreeMap::new()
+    for t in compiled {
+        if t.jinja.is_some() {
+            let path = format!("templates/archive/{0}/{0}@{1}.jinja", t.name, t.revision);
+            out.push_str(&format!(
+                "pub static {}: &str = include_str!({path:?});\n",
+                t.static_name("JINJA")
+            ));
+        }
+        if t.liquid.is_some() {
+            let path = format!("templates/archive/{0}/{0}@{1}.tmpl", t.name, t.revision);
+            out.push_str(&format!(
+                "pub static {}: &str = include_str!({path:?});\n",
+                t.static_name("LIQUID")
+            ));
+        }
+    }
+
+    let emit_lookup = |out: &mut String, fn_name: &str, engine: &str, items: &[&Compiled]| {
+        out.push_str(&format!(
+            "\n/// Look up an embedded {engine} template by id (`{{name}}` or `{{name}}@{{revision}}`).\n\
+             pub fn {fn_name}(id: &str) -> Option<&'static str> {{\n    match id {{\n"
+        ));
+        for t in items {
+            out.push_str(&format!(
+                "        {:?} | {:?} => Some({}),\n",
+                t.name,
+                t.id(),
+                t.static_name(&engine.to_uppercase())
+            ));
+        }
+        out.push_str("        _ => None,\n    }\n}\n");
     };
 
-    let mut conflicts = Vec::new();
-    let mut additions = BTreeMap::new();
+    let jinja: Vec<_> = compiled.iter().filter(|t| t.jinja.is_some()).collect();
+    let liquid: Vec<_> = compiled.iter().filter(|t| t.liquid.is_some()).collect();
+    emit_lookup(&mut out, "lookup_jinja", "jinja", &jinja);
+    emit_lookup(&mut out, "lookup_liquid", "liquid", &liquid);
 
-    for v in compiled {
-        if let Some(jinja) = &v.jinja {
-            let key = v.archive_jinja_rel();
-            let hash = content_sha256(jinja);
-            match locks.get(&key) {
-                Some(existing) if existing != &hash => {
-                    conflicts.push(format!(
-                        "{key}: content changed for existing revision (locked {existing}, got {hash}). Bump `revision` in template_registry.yaml."
-                    ));
-                }
-                Some(_) => {}
-                None => {
-                    additions.insert(key, hash);
-                }
-            }
-        }
-        if let Some(liquid) = &v.liquid {
-            let key = v.archive_liquid_rel();
-            let hash = content_sha256(liquid);
-            match locks.get(&key) {
-                Some(existing) if existing != &hash => {
-                    conflicts.push(format!(
-                        "{key}: content changed for existing revision (locked {existing}, got {hash}). Bump `revision` in template_registry.yaml."
-                    ));
-                }
-                Some(_) => {}
-                None => {
-                    additions.insert(key, hash);
-                }
-            }
-        }
-    }
-
-    if !conflicts.is_empty() {
-        eprintln!("Revision lock conflicts ({}):", conflicts.len());
-        for c in &conflicts {
-            eprintln!("  - {c}");
-        }
-        bail!(
-            "template content changed without bumping revision; see conflicts above"
-        );
-    }
-
-    if !additions.is_empty() {
-        locks.extend(additions);
-        if let Some(parent) = Path::new(LOCK_PATH).parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let pretty = serde_json::to_string_pretty(&locks)?;
-        fs::write(LOCK_PATH, format!("{pretty}\n"))
-            .with_context(|| format!("Failed to write {LOCK_PATH}"))?;
-        println!("Updated {LOCK_PATH}");
-    }
-
-    Ok(())
-}
-
-fn rust_string_literal(s: &str) -> String {
-    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
-fn write_embedded_templates(compiled: &[CompiledTemplate]) -> Result<()> {
-    let mut out = String::new();
-    out.push_str("// @generated by template_generation. Do not edit by hand.\n");
-    out.push_str("// Build config: template_generation/template_registry.yaml\n\n");
-    out.push_str("#![allow(dead_code)]\n");
-    out.push_str("#![allow(clippy::all)]\n\n");
-
-    for v in compiled {
-        if v.jinja.is_some() {
-            let name = v.static_name("JINJA");
-            let path = v.embed_jinja_rel();
-            out.push_str(&format!(
-                "pub static {name}: &str = include_str!({path:?});\n"
-            ));
-        }
-        if v.liquid.is_some() {
-            let name = v.static_name("LIQUID");
-            let path = v.embed_liquid_rel();
-            out.push_str(&format!(
-                "pub static {name}: &str = include_str!({path:?});\n"
-            ));
-        }
-    }
-    out.push('\n');
-
-    // Thin id → body lookup for `template_id` (name and name@revision).
-    out.push_str("/// Look up an embedded jinja template by id (`{name}` or `{name}@{revision}`).\n");
-    out.push_str("pub fn lookup_jinja(id: &str) -> Option<&'static str> {\n");
-    out.push_str("    match id {\n");
-    for v in compiled.iter().filter(|v| v.jinja.is_some()) {
-        let static_name = v.static_name("JINJA");
-        out.push_str(&format!(
-            "        {name} | {pinned} => Some({static_name}),\n",
-            name = rust_string_literal(&v.name),
-            pinned = rust_string_literal(&v.canonical_id()),
-        ));
-    }
-    out.push_str("        _ => None,\n");
-    out.push_str("    }\n");
-    out.push_str("}\n\n");
-
-    out.push_str("/// Look up an embedded liquid template by id (`{name}` or `{name}@{revision}`).\n");
-    out.push_str("pub fn lookup_liquid(id: &str) -> Option<&'static str> {\n");
-    out.push_str("    match id {\n");
-    for v in compiled.iter().filter(|v| v.liquid.is_some()) {
-        let static_name = v.static_name("LIQUID");
-        out.push_str(&format!(
-            "        {name} | {pinned} => Some({static_name}),\n",
-            name = rust_string_literal(&v.name),
-            pinned = rust_string_literal(&v.canonical_id()),
-        ));
-    }
-    out.push_str("        _ => None,\n");
-    out.push_str("    }\n");
-    out.push_str("}\n");
-
-    fs::write("gen/embedded_templates.rs", out)
-        .with_context(|| "Failed to write gen/embedded_templates.rs")?;
+    fs::write("gen/embedded_templates.rs", out)?;
     Ok(())
 }
 
 fn main() {
-    let args = Args::parse();
-
-    if let Err(e) = run(&args) {
+    if let Err(e) = run(Args::parse()) {
         eprintln!("Error: {e:?}");
         std::process::exit(1);
     }
 }
 
-fn run(args: &Args) -> Result<()> {
-    let input = fs::read_to_string(&args.registry)
-        .with_context(|| format!("Failed to read registry: {}", args.registry))?;
-    let registry: Registry = serde_yaml::from_str(&input)
-        .with_context(|| format!("Failed to parse registry YAML: {}", args.registry))?;
+fn run(args: Args) -> Result<()> {
+    let registry: Registry = serde_yaml::from_str(
+        &fs::read_to_string(&args.registry)
+            .with_context(|| format!("Failed to read {}", args.registry))?,
+    )
+    .with_context(|| format!("Failed to parse {}", args.registry))?;
 
-    let compiled = compile_registry(&registry, args)?;
-    enforce_revision_locks(&compiled)?;
-    write_outputs(&compiled)?;
-    write_embedded_templates(&compiled)?;
-
+    let compiled = compile(&registry, &args)?;
+    enforce_locks(&compiled)?;
+    write_archive(&compiled)?;
+    write_embeds(&compiled)?;
     println!(
         "Generated {} templates from {}",
         compiled.len(),
