@@ -2,6 +2,7 @@ package gobindings
 
 import (
 	"errors"
+	"fmt"
 	"unsafe"
 )
 
@@ -65,37 +66,41 @@ func ParseVisionGeneration(text string) (*VisionGeneration, error) {
 		return nil, errors.New("melody_parse_vision_generation returned neither result nor error")
 	}
 
-	return convertCVisionGeneration(res.result), nil
+	return convertCVisionGeneration(res.result)
 }
 
-func convertCVisionGeneration(cGen *C.CVisionGeneration) *VisionGeneration {
+func convertCVisionGeneration(cGen *C.CVisionGeneration) (*VisionGeneration, error) {
 	out := &VisionGeneration{}
 	if cGen.segments == nil || cGen.segments_len == 0 {
-		return out
+		return out, nil
 	}
 	cSegs := unsafe.Slice(cGen.segments, int(cGen.segments_len))
 	out.Segments = make([]VisionSegment, len(cSegs))
 	for i, cs := range cSegs {
-		out.Segments[i] = convertCVisionSegment(cs)
+		seg, err := convertCVisionSegment(cs)
+		if err != nil {
+			return nil, err
+		}
+		out.Segments[i] = seg
 	}
-	return out
+	return out, nil
 }
 
-func convertCVisionSegment(cs C.CVisionSegment) VisionSegment {
+func convertCVisionSegment(cs C.CVisionSegment) (VisionSegment, error) {
 	switch cs.type_ {
 	case C.CVisionSegmentType_Text:
 		return VisionSegment{
 			Type: VisionSegmentTypeText,
 			Text: C.GoString(cs.text),
-		}
+		}, nil
 	case C.CVisionSegmentType_Element:
 		seg := VisionSegment{Type: VisionSegmentTypeElement}
 		if cs.element != nil {
 			seg.Element = convertCVisionElement(cs.element)
 		}
-		return seg
+		return seg, nil
 	default:
-		return VisionSegment{Type: VisionSegmentTypeText, Text: C.GoString(cs.text)}
+		return VisionSegment{}, fmt.Errorf("unknown vision segment type: %d", int(cs.type_))
 	}
 }
 
