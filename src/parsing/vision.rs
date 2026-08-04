@@ -94,63 +94,45 @@ pub struct VisionBBox {
 /// or [`VisionParseError::InvalidBBox`] if a `bbox` field is malformed.
 pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionParseError> {
     let mut segments = Vec::new();
-    let mut pos = 0;
+    let mut text_buf = String::new();
+    // When inside an element: byte offset of the open tag line, and body so far.
+    let mut open: Option<(usize, String)> = None;
+    let mut offset = 0;
 
-    while let Some((tag_line_start, tag_line_end)) =
-        find_standalone_line(text, pos, VISUAL_ELEMENT_START)
-    {
-        if tag_line_start > pos {
-            segments.push(VisionSegment::Text {
-                text: text[pos..tag_line_start].to_string(),
-            });
+    for line in text.split_inclusive('\n') {
+        let line_start = offset;
+        offset += line.len();
+        let is_tag = |tag: &str| line.trim_end_matches(['\r', '\n']).trim() == tag;
+
+        if let Some((_, body)) = open.as_mut() {
+            if is_tag(VISUAL_ELEMENT_END) {
+                let (_, body) = open.take().unwrap();
+                segments.push(VisionSegment::Element {
+                    element: parse_element_body(&body)?,
+                });
+            } else {
+                body.push_str(line);
+            }
+        } else if is_tag(VISUAL_ELEMENT_START) {
+            if !text_buf.is_empty() {
+                segments.push(VisionSegment::Text {
+                    text: std::mem::take(&mut text_buf),
+                });
+            }
+            open = Some((line_start, String::new()));
+        } else {
+            text_buf.push_str(line);
         }
-
-        let body_start = tag_line_end;
-        let Some((end_line_start, end_line_end)) =
-            find_standalone_line(text, body_start, VISUAL_ELEMENT_END)
-        else {
-            return Err(VisionParseError::UnclosedElement(tag_line_start));
-        };
-        let body = &text[body_start..end_line_start];
-        let element = parse_element_body(body)?;
-        segments.push(VisionSegment::Element { element });
-        pos = end_line_end;
     }
 
-    if pos < text.len() {
-        segments.push(VisionSegment::Text {
-            text: text[pos..].to_string(),
-        });
+    if let Some((start, _)) = open {
+        return Err(VisionParseError::UnclosedElement(start));
+    }
+    if !text_buf.is_empty() {
+        segments.push(VisionSegment::Text { text: text_buf });
     }
 
     Ok(VisionGeneration { segments })
-}
-
-/// Find the next line (from `from`) whose trimmed content equals `tag`.
-///
-/// Returns `(line_start, line_end)` where `line_end` is exclusive and includes the
-/// trailing newline when present.
-fn find_standalone_line(text: &str, from: usize, tag: &str) -> Option<(usize, usize)> {
-    let mut line_start = from;
-    while line_start < text.len() {
-        let rest = &text[line_start..];
-        let nl = rest.find('\n');
-        let (line_without_nl, line_end) = match nl {
-            Some(i) => (&rest[..i], line_start + i + 1),
-            None => (rest, text.len()),
-        };
-        let line_content = line_without_nl
-            .strip_suffix('\r')
-            .unwrap_or(line_without_nl);
-        if line_content.trim() == tag {
-            return Some((line_start, line_end));
-        }
-        if line_end == line_start {
-            break;
-        }
-        line_start = line_end;
-    }
-    None
 }
 
 fn parse_element_body(body: &str) -> Result<VisionElement, VisionParseError> {
