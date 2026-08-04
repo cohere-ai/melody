@@ -103,15 +103,17 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
         let line_start = offset;
         offset += line.len();
 
+        if line_is_tag(line, VISUAL_ELEMENT_END)
+            && let Some((_, body)) = open.take()
+        {
+            segments.push(VisionSegment::Element {
+                element: parse_element_body(&body)?,
+            });
+            continue;
+        }
+
         if let Some((_, body)) = open.as_mut() {
-            if line_is_tag(line, VISUAL_ELEMENT_END) {
-                let (_, body) = open.take().unwrap();
-                segments.push(VisionSegment::Element {
-                    element: parse_element_body(&body)?,
-                });
-            } else {
-                body.push_str(line);
-            }
+            body.push_str(line);
         } else if line_is_tag(line, VISUAL_ELEMENT_START) {
             if !text_buf.is_empty() {
                 segments.push(VisionSegment::Text {
