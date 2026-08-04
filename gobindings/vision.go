@@ -15,17 +15,17 @@ type VisionGeneration struct {
 	Segments []VisionSegment
 }
 
-// VisionSegmentKind identifies a segment as text or a structured element.
-type VisionSegmentKind int
+// VisionSegmentType identifies a segment as text or a structured element.
+type VisionSegmentType int
 
 const (
-	VisionSegmentKindText VisionSegmentKind = iota
-	VisionSegmentKindElement
+	VisionSegmentTypeText VisionSegmentType = iota
+	VisionSegmentTypeElement
 )
 
 // VisionSegment is either prose or a structured vision element.
 type VisionSegment struct {
-	Kind    VisionSegmentKind
+	Type    VisionSegmentType
 	Text    string
 	Element *VisionElement
 }
@@ -83,20 +83,20 @@ func convertCVisionGeneration(cGen *C.CVisionGeneration) *VisionGeneration {
 }
 
 func convertCVisionSegment(cs C.CVisionSegment) VisionSegment {
-	switch cs.kind {
-	case C.CVisionSegmentKind_Text:
+	switch cs.type_ {
+	case C.CVisionSegmentType_Text:
 		return VisionSegment{
-			Kind: VisionSegmentKindText,
+			Type: VisionSegmentTypeText,
 			Text: C.GoString(cs.text),
 		}
-	case C.CVisionSegmentKind_Element:
-		seg := VisionSegment{Kind: VisionSegmentKindElement}
+	case C.CVisionSegmentType_Element:
+		seg := VisionSegment{Type: VisionSegmentTypeElement}
 		if cs.element != nil {
 			seg.Element = convertCVisionElement(cs.element)
 		}
 		return seg
 	default:
-		return VisionSegment{Kind: VisionSegmentKindText, Text: C.GoString(cs.text)}
+		return VisionSegment{Type: VisionSegmentTypeText, Text: C.GoString(cs.text)}
 	}
 }
 

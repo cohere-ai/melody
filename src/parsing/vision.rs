@@ -32,7 +32,7 @@ pub struct VisionGeneration {
 
 /// One piece of a vision generation: markdown prose or a structured element.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum VisionSegment {
     /// Markdown / plain text outside visual-element tags.
     Text {
@@ -49,7 +49,7 @@ pub enum VisionSegment {
 /// Structured content of a `[visual_element]` block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct VisionElement {
-    /// Element kind from the `type:` field (e.g. `table`, `flowchart`).
+    /// Element type from the `type:` field (e.g. `table`, `flowchart`).
     #[serde(rename = "type")]
     pub element_type: String,
     /// Axis-aligned bounding box when `bbox:` is present and valid.

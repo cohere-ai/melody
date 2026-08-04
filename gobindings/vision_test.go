@@ -42,7 +42,7 @@ func TestParseVisionGeneration(t *testing.T) {
 	if len(gen.Segments) != 4 {
 		t.Fatalf("got %d segments, want 4: %+v", len(gen.Segments), gen.Segments)
 	}
-	if gen.Segments[0].Kind != VisionSegmentKindElement || gen.Segments[0].Element == nil {
+	if gen.Segments[0].Type != VisionSegmentTypeElement || gen.Segments[0].Element == nil {
 		t.Fatalf("segment 0: %+v", gen.Segments[0])
 	}
 	if gen.Segments[0].Element.Type != "flowchart" {
@@ -51,7 +51,7 @@ func TestParseVisionGeneration(t *testing.T) {
 	if gen.Segments[0].Element.BBox == nil || gen.Segments[0].Element.BBox.TopLeftX != 183 {
 		t.Fatalf("bbox=%+v", gen.Segments[0].Element.BBox)
 	}
-	if gen.Segments[1].Kind != VisionSegmentKindText || !strings.Contains(gen.Segments[1].Text, "Figure 2") {
+	if gen.Segments[1].Type != VisionSegmentTypeText || !strings.Contains(gen.Segments[1].Text, "Figure 2") {
 		t.Fatalf("segment 1: %+v", gen.Segments[1])
 	}
 	if gen.Segments[2].Element == nil || gen.Segments[2].Element.Type != "table" {
@@ -77,7 +77,7 @@ func TestParseVisionGenerationProseOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(gen.Segments) != 1 || gen.Segments[0].Kind != VisionSegmentKindText {
+	if len(gen.Segments) != 1 || gen.Segments[0].Type != VisionSegmentTypeText {
 		t.Fatalf("%+v", gen)
 	}
 }

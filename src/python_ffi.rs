@@ -492,7 +492,7 @@ fn render_cmd5(config: PyDictValue) -> PyResult<String> {
 /// Parse a complete parse-model generation with interleaved `[visual_element]` blocks.
 ///
 /// Unary only — pass the full generation text. Returns a dict with ordered
-/// `segments` (`kind: "text" | "element"`).
+/// `segments` (`type: "text" | "element"`).
 ///
 /// # Errors
 ///

@@ -236,10 +236,10 @@ pub struct CAggregatedResultResponse {
     pub error: *mut c_char,
 }
 
-/// Kind discriminant for [`CVisionSegment`].
+/// Type discriminant for [`CVisionSegment`].
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum CVisionSegmentKind {
+pub enum CVisionSegmentType {
     /// Markdown / plain text segment.
     Text = 0,
     /// Structured `[visual_element]` segment.
@@ -290,11 +290,11 @@ pub struct CVisionElement {
 /// One segment of a vision generation.
 #[repr(C)]
 pub struct CVisionSegment {
-    /// Segment kind.
-    pub kind: CVisionSegmentKind,
-    /// Text content when `kind == Text` (null otherwise).
+    /// Segment type (`text` or `element`).
+    pub type_: CVisionSegmentType,
+    /// Text content when `type_ == Text` (null otherwise).
     pub text: *mut c_char,
-    /// Element content when `kind == Element` (null otherwise).
+    /// Element content when `type_ == Element` (null otherwise).
     pub element: *mut CVisionElement,
 }
 
@@ -1864,12 +1864,12 @@ unsafe fn convert_vision_generation_to_c(parsed: VisionGeneration) -> *mut CVisi
 unsafe fn convert_vision_segment_to_c(segment: VisionSegment) -> CVisionSegment {
     match segment {
         VisionSegment::Text { text } => CVisionSegment {
-            kind: CVisionSegmentKind::Text,
+            type_: CVisionSegmentType::Text,
             text: c_string_or_empty(text),
             element: std::ptr::null_mut(),
         },
         VisionSegment::Element { element } => CVisionSegment {
-            kind: CVisionSegmentKind::Element,
+            type_: CVisionSegmentType::Element,
             text: std::ptr::null_mut(),
             element: Box::into_raw(Box::new(unsafe { convert_vision_element_to_c(element) })),
         },

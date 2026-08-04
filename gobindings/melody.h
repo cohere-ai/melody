@@ -174,9 +174,9 @@ extern void melody_render_result_free(CRenderResult* res);
 // ============================================================================
 
 typedef enum {
-    CVisionSegmentKind_Text = 0,
-    CVisionSegmentKind_Element = 1,
-} CVisionSegmentKind;
+    CVisionSegmentType_Text = 0,
+    CVisionSegmentType_Element = 1,
+} CVisionSegmentType;
 
 typedef struct {
     int32_t top_left_x;
@@ -201,9 +201,9 @@ typedef struct {
 } CVisionElement;
 
 typedef struct {
-    CVisionSegmentKind kind;
-    char* text;              // set when kind == Text
-    CVisionElement* element; // set when kind == Element
+    CVisionSegmentType type_;
+    char* text;              // set when type_ == Text
+    CVisionElement* element; // set when type_ == Element
 } CVisionSegment;
 
 typedef struct {
