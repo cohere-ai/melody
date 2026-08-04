@@ -64,9 +64,6 @@ pub struct VisionElement {
     /// Optional HTML markup (common on tables).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
-    /// Any additional `key: value` fields not mapped above.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub extra: HashMap<String, String>,
 }
 
 /// Pixel bounding box: `top_left_x, top_left_y, bottom_right_x, bottom_right_y`.
@@ -137,15 +134,7 @@ fn parse_element_body(body: &str) -> Result<VisionElement, VisionParseError> {
         element.bbox = Some(parse_bbox(bbox_raw)?);
     }
 
-    for (key, value) in fields {
-        match key.as_str() {
-            "type" | "bbox" | "description" | "title" | "html" => {}
-            _ => {
-                element.extra.insert(key, value.trim().to_string());
-            }
-        }
-    }
-
+    // Unknown keys are ignored for now.
     Ok(element)
 }
 
@@ -384,7 +373,7 @@ bbox: 0,0,10,10
     }
 
     #[test]
-    fn unknown_fields_go_to_extra() {
+    fn unknown_fields_are_ignored() {
         let text = "\
 [visual_element]
 type: other
@@ -394,7 +383,6 @@ confidence: 0.9
         match &parsed.segments[0] {
             VisionSegment::Element { element } => {
                 assert_eq!(element.element_type, "other");
-                assert_eq!(element.extra.get("confidence").map(String::as_str), Some("0.9"));
             }
             other => panic!("expected element, got {other:?}"),
         }

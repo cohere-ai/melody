@@ -259,14 +259,6 @@ pub struct CVisionBBox {
     pub bottom_right_y: i32,
 }
 
-/// One unknown `key: value` field from a vision element body.
-#[repr(C)]
-pub struct CVisionExtraField {
-    /// Field name.
-    pub key: *mut c_char,
-    /// Field value.
-    pub value: *mut c_char,
-}
 
 /// Structured content of a `[visual_element]` block.
 #[repr(C)]
@@ -281,10 +273,6 @@ pub struct CVisionElement {
     pub title: *mut c_char,
     /// HTML markup (null if absent).
     pub html: *mut c_char,
-    /// Additional fields.
-    pub extra: *mut CVisionExtraField,
-    /// Number of extra fields.
-    pub extra_len: usize,
 }
 
 /// One segment of a vision generation.
@@ -1886,29 +1874,12 @@ unsafe fn convert_vision_element_to_c(element: VisionElement) -> CVisionElement 
         }))
     });
 
-    let extra_len = element.extra.len();
-    let extra = if extra_len > 0 {
-        let fields: Vec<CVisionExtraField> = element
-            .extra
-            .into_iter()
-            .map(|(key, value)| CVisionExtraField {
-                key: c_string_or_empty(key),
-                value: c_string_or_empty(value),
-            })
-            .collect();
-        Box::into_raw(fields.into_boxed_slice()).cast::<CVisionExtraField>()
-    } else {
-        std::ptr::null_mut()
-    };
-
     CVisionElement {
         element_type: c_string_or_empty(element.element_type),
         bbox,
         description: opt_c_string(element.description),
         title: opt_c_string(element.title),
         html: opt_c_string(element.html),
-        extra,
-        extra_len,
     }
 }
 
@@ -1970,18 +1941,6 @@ unsafe fn free_vision_element(ptr: *mut CVisionElement) {
         }
         if !el.html.is_null() {
             let _ = CString::from_raw(el.html);
-        }
-        if !el.extra.is_null() && el.extra_len > 0 {
-            let extras =
-                Box::from_raw(std::ptr::slice_from_raw_parts_mut(el.extra, el.extra_len)).into_vec();
-            for field in extras {
-                if !field.key.is_null() {
-                    let _ = CString::from_raw(field.key);
-                }
-                if !field.value.is_null() {
-                    let _ = CString::from_raw(field.value);
-                }
-            }
         }
     }
 }

@@ -37,7 +37,6 @@ type VisionElement struct {
 	Description *string
 	Title       *string
 	HTML        *string
-	Extra       map[string]string
 }
 
 // VisionBBox is a pixel bounding box from a bbox: field.
@@ -123,13 +122,6 @@ func convertCVisionElement(ce *C.CVisionElement) *VisionElement {
 	if ce.html != nil {
 		s := C.GoString(ce.html)
 		el.HTML = &s
-	}
-	if ce.extra != nil && ce.extra_len > 0 {
-		fields := unsafe.Slice(ce.extra, int(ce.extra_len))
-		el.Extra = make(map[string]string, len(fields))
-		for _, f := range fields {
-			el.Extra[C.GoString(f.key)] = C.GoString(f.value)
-		}
 	}
 	return el
 }

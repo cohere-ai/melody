@@ -185,10 +185,6 @@ typedef struct {
     int32_t bottom_right_y;
 } CVisionBBox;
 
-typedef struct {
-    char* key;
-    char* value;
-} CVisionExtraField;
 
 typedef struct {
     char* element_type;
@@ -196,8 +192,6 @@ typedef struct {
     char* description;       // null if absent
     char* title;             // null if absent
     char* html;              // null if absent
-    CVisionExtraField* extra;
-    size_t extra_len;
 } CVisionElement;
 
 typedef struct {
