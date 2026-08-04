@@ -102,10 +102,9 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
     for line in text.split_inclusive('\n') {
         let line_start = offset;
         offset += line.len();
-        let is_tag = |tag: &str| line.trim_end_matches(['\r', '\n']).trim() == tag;
 
         if let Some((_, body)) = open.as_mut() {
-            if is_tag(VISUAL_ELEMENT_END) {
+            if line_is_tag(line, VISUAL_ELEMENT_END) {
                 let (_, body) = open.take().unwrap();
                 segments.push(VisionSegment::Element {
                     element: parse_element_body(&body)?,
@@ -113,7 +112,7 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
             } else {
                 body.push_str(line);
             }
-        } else if is_tag(VISUAL_ELEMENT_START) {
+        } else if line_is_tag(line, VISUAL_ELEMENT_START) {
             if !text_buf.is_empty() {
                 segments.push(VisionSegment::Text {
                     text: std::mem::take(&mut text_buf),
@@ -133,6 +132,10 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
     }
 
     Ok(VisionGeneration { segments })
+}
+
+fn line_is_tag(line: &str, tag: &str) -> bool {
+    line.trim_end_matches(['\r', '\n']).trim() == tag
 }
 
 fn parse_element_body(body: &str) -> Result<VisionElement, VisionParseError> {
