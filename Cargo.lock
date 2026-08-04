@@ -962,7 +962,7 @@ checksum = "670fdfda89751bc4a84ac13eaa63e205cf0fd22b4c9a5fbfa085b63c1f1d3a30"
 
 [[package]]
 name = "melody-parsing"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "divan",
  "env_logger",
