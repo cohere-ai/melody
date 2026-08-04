@@ -1948,7 +1948,7 @@ unsafe fn free_vision_element(ptr: *mut CVisionElement) {
 /// Frees a `CRenderResult` struct and its strings.
 ///
 /// # Safety
-/// `res` must be a valid pointer returned from a melody render / parse function.
+/// `res` must be a valid pointer returned from a melody render function.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_render_result_free(res: *mut CRenderResult) {
     if res.is_null() {
