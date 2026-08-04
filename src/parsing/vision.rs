@@ -12,6 +12,9 @@ use thiserror::Error;
 const VISUAL_ELEMENT_START: &str = "[visual_element]";
 const VISUAL_ELEMENT_END: &str = "[/visual_element]";
 
+/// Field keys recognized inside a `[visual_element]` body (from model generations).
+const FIELD_KEYS: &[&str] = &["type", "bbox", "description", "title", "html"];
+
 /// Errors from parsing a vision-model generation.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum VisionParseError {
@@ -81,6 +84,10 @@ pub struct VisionBBox {
 
 /// Parse a full vision-/parse-model generation into ordered text / element segments.
 ///
+/// Open/close tags are recognized only when they appear alone on a line (optional
+/// surrounding whitespace). Field lines are recognized only for known keys:
+/// `type`, `bbox`, `description`, `title`, and `html`.
+///
 /// # Errors
 ///
 /// Returns [`VisionParseError::UnclosedElement`] if a start tag has no matching end,
@@ -89,23 +96,25 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
     let mut segments = Vec::new();
     let mut pos = 0;
 
-    while let Some(rel_start) = text[pos..].find(VISUAL_ELEMENT_START) {
-        let abs_start = pos + rel_start;
-        if abs_start > pos {
+    while let Some((tag_line_start, tag_line_end)) =
+        find_standalone_line(text, pos, VISUAL_ELEMENT_START)
+    {
+        if tag_line_start > pos {
             segments.push(VisionSegment::Text {
-                text: text[pos..abs_start].to_string(),
+                text: text[pos..tag_line_start].to_string(),
             });
         }
 
-        let body_start = abs_start + VISUAL_ELEMENT_START.len();
-        let Some(rel_end) = text[body_start..].find(VISUAL_ELEMENT_END) else {
-            return Err(VisionParseError::UnclosedElement(abs_start));
+        let body_start = tag_line_end;
+        let Some((end_line_start, end_line_end)) =
+            find_standalone_line(text, body_start, VISUAL_ELEMENT_END)
+        else {
+            return Err(VisionParseError::UnclosedElement(tag_line_start));
         };
-        let body_end = body_start + rel_end;
-        let body = &text[body_start..body_end];
+        let body = &text[body_start..end_line_start];
         let element = parse_element_body(body)?;
         segments.push(VisionSegment::Element { element });
-        pos = body_end + VISUAL_ELEMENT_END.len();
+        pos = end_line_end;
     }
 
     if pos < text.len() {
@@ -115,6 +124,31 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
     }
 
     Ok(VisionGeneration { segments })
+}
+
+/// Find the next line (from `from`) whose trimmed content equals `tag`.
+///
+/// Returns `(line_start, line_end)` where `line_end` is exclusive and includes the
+/// trailing newline when present.
+fn find_standalone_line(text: &str, from: usize, tag: &str) -> Option<(usize, usize)> {
+    let mut line_start = from;
+    while line_start < text.len() {
+        let rest = &text[line_start..];
+        let nl = rest.find('\n');
+        let (line_without_nl, line_end) = match nl {
+            Some(i) => (&rest[..i], line_start + i + 1),
+            None => (rest, text.len()),
+        };
+        let line_content = line_without_nl.strip_suffix('\r').unwrap_or(line_without_nl);
+        if line_content.trim() == tag {
+            return Some((line_start, line_end));
+        }
+        if line_end == line_start {
+            break;
+        }
+        line_start = line_end;
+    }
+    None
 }
 
 fn parse_element_body(body: &str) -> Result<VisionElement, VisionParseError> {
@@ -134,7 +168,6 @@ fn parse_element_body(body: &str) -> Result<VisionElement, VisionParseError> {
         element.bbox = Some(parse_bbox(bbox_raw)?);
     }
 
-    // Unknown keys are ignored for now.
     Ok(element)
 }
 
@@ -163,25 +196,16 @@ fn parse_fields(body: &str) -> HashMap<String, String> {
     fields
 }
 
-/// A field line is `key: optional_rest` where `key` is `[a-z][a-z0-9_]*`.
+/// A field line is `key: optional_rest` where `key` is one of [`FIELD_KEYS`].
 fn split_field_line(line: &str) -> Option<(String, String)> {
     let trimmed = line.trim_start();
     let colon = trimmed.find(':')?;
     let key = &trimmed[..colon];
-    if key.is_empty() || !is_field_key(key) {
+    if !FIELD_KEYS.contains(&key) {
         return None;
     }
     let rest = trimmed[colon + 1..].trim_start().to_string();
     Some((key.to_string(), rest))
-}
-
-fn is_field_key(s: &str) -> bool {
-    let mut chars = s.chars();
-    match chars.next() {
-        Some(c) if c.is_ascii_lowercase() => {}
-        _ => return false,
-    }
-    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 fn parse_bbox(raw: &str) -> Result<VisionBBox, VisionParseError> {
@@ -373,16 +397,77 @@ bbox: 0,0,10,10
     }
 
     #[test]
-    fn unknown_fields_are_ignored() {
+    fn unknown_field_keys_continue_current_value() {
         let text = "\
 [visual_element]
 type: other
 confidence: 0.9
+description: line with confidence: still prose
 [/visual_element]";
         let parsed = parse_vision_generation(text).unwrap();
         match &parsed.segments[0] {
             VisionSegment::Element { element } => {
-                assert_eq!(element.element_type, "other");
+                assert_eq!(element.element_type, "other\nconfidence: 0.9");
+                assert_eq!(
+                    element.description.as_deref(),
+                    Some("line with confidence: still prose")
+                );
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn inline_tags_are_not_delimiters() {
+        let text = "\
+see [visual_element] inline
+[visual_element]
+type: table
+description: mentions [/visual_element] mid-line
+[/visual_element]
+and [visual_element] again
+";
+        let parsed = parse_vision_generation(text).unwrap();
+        assert_eq!(parsed.segments.len(), 3);
+        match &parsed.segments[0] {
+            VisionSegment::Text { text } => {
+                assert!(text.contains("see [visual_element] inline"));
+            }
+            other => panic!("expected leading text, got {other:?}"),
+        }
+        match &parsed.segments[1] {
+            VisionSegment::Element { element } => {
+                assert_eq!(element.element_type, "table");
+                assert_eq!(
+                    element.description.as_deref(),
+                    Some("mentions [/visual_element] mid-line")
+                );
+            }
+            other => panic!("expected element, got {other:?}"),
+        }
+        match &parsed.segments[2] {
+            VisionSegment::Text { text } => {
+                assert!(text.contains("and [visual_element] again"));
+            }
+            other => panic!("expected trailing text, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn end_tag_inside_description_on_own_line_still_closes() {
+        // Standalone end tag always closes — even if it appears where a field value continues.
+        let text = "\
+[visual_element]
+type: table
+description: before
+[/visual_element]
+after
+";
+        let parsed = parse_vision_generation(text).unwrap();
+        assert_eq!(parsed.segments.len(), 2);
+        match &parsed.segments[0] {
+            VisionSegment::Element { element } => {
+                assert_eq!(element.description.as_deref(), Some("before"));
             }
             other => panic!("expected element, got {other:?}"),
         }
