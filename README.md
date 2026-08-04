@@ -49,6 +49,28 @@ for citation in &result.citations {
 let final_result = filter.flush_partials();
 ```
 
+### Parsing vision generations (unary)
+
+Parse/OCR models emit markdown interleaved with `[visual_element]…[/visual_element]`
+blocks. Use the unary helper (full generation text, not streaming):
+
+```rust
+use cohere_melody::parsing::parse_vision_generation;
+
+let parsed = parse_vision_generation(model_output)?;
+for segment in &parsed.segments {
+    match segment {
+        cohere_melody::parsing::VisionSegment::Text { text } => { /* markdown */ }
+        cohere_melody::parsing::VisionSegment::Element { element } => {
+            // element.type, bbox, description, html, ...
+        }
+    }
+}
+```
+
+Go: `gobindings.ParseVisionGeneration(text)`.
+Python: `cohere_melody.parse_vision_generation(text)`.
+
 ### Templating
 
 ```rust

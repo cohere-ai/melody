@@ -13,6 +13,7 @@
 //! - Search queries
 //! - Reasoning steps (thinking)
 //! - Regular text content
+//! - Vision-element blocks from parse/OCR model generations (unary)
 //!
 //! # Features
 //!
@@ -20,6 +21,7 @@
 //! - **Citation Extraction**: Parse inline citations with source tracking
 //! - **Tool Call Parsing**: Extract tool names, IDs, and parameters from structured outputs
 //! - **Multiple Format Support**: Handles CMD3, CMD4, RAG, and multi-hop formats
+//! - **Vision Generation Parsing**: Unary parse of `[visual_element]` interleaved markdown
 //! - **FFI Support**: C and Python bindings for cross-language usage
 //! - **Configurable Filtering**: Control what content is streamed vs. buffered
 //!
@@ -40,6 +42,17 @@
 //!
 //! // Flush any remaining partial outputs
 //! let final_result = filter.flush_partials();
+//! ```
+//!
+//! ## Vision generations (unary)
+//!
+//! ```rust
+//! use cohere_melody::parsing::parse_vision_generation;
+//!
+//! let parsed = parse_vision_generation(
+//!     "[visual_element]\ntype: table\nbbox: 0,0,10,10\n[/visual_element]\nHello",
+//! ).unwrap();
+//! assert_eq!(parsed.segments.len(), 2);
 //! ```
 //!
 //! # Usage Patterns
@@ -91,6 +104,7 @@
 //! - `FilterMode`: Different parsing modes (`PlainText`, `ToolAction`, `GroundedAnswer`, etc.)
 //! - `FilterOptions`: Configuration for the filter behavior
 //! - `AggregatedResult`: Structured output containing parsed content, reasoning, citations, and tool calls
+//! - `parse_vision_generation`: Unary parser for parse-model vision markup
 //!
 //! # Safety
 //!
@@ -104,7 +118,8 @@ pub mod errors;
 /// Parsing module for token stream processing and filtering.
 ///
 /// Contains the filter implementation, options, and types for processing
-/// cohere model outputs with support for citations, tool calls, and structured content.
+/// cohere model outputs with support for citations, tool calls, structured
+/// content, and unary vision generations.
 pub mod parsing;
 
 /// Templating module for rendering prompts.

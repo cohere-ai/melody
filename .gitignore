@@ -36,6 +36,7 @@ rust/target/
 target/
 **/*.rs.bk
 artifacts
+dist
 
 # OS
 .DS_Store

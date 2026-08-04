@@ -27,4 +27,8 @@ pub enum MelodyError {
     /// Validation error
     #[error("Template validation error: {0}")]
     TemplateValidation(String),
+
+    /// Vision generation parse error
+    #[error("Vision generation parse error: {0}")]
+    VisionParse(#[from] crate::parsing::VisionParseError),
 }

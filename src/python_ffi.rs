@@ -3,7 +3,7 @@
 //! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4`/`render_cmd5` for templating.
 
 use crate::parsing::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
-use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
+use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter, parse_vision_generation};
 use crate::templating::types::{Document, Message};
 use crate::templating::{
     RenderCmd3Options, RenderCmd4Options, RenderCmd5Options, render_cmd3 as rust_render_cmd3,
@@ -12,7 +12,7 @@ use crate::templating::{
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pythonize::depythonize;
+use pythonize::{depythonize, pythonize};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
@@ -489,6 +489,31 @@ fn render_cmd5(config: PyDictValue) -> PyResult<String> {
     rust_render_cmd5(&opts).map_err(|e| PyValueError::new_err(format!("Render error: {e}")))
 }
 
+/// Parse a complete parse-model generation with interleaved `[visual_element]` blocks.
+///
+/// Unary only — pass the full generation text. Returns a dict with ordered
+/// `segments` (`kind: "text" | "element"`).
+///
+/// # Errors
+///
+/// Raises `ValueError` on unclosed tags or invalid `bbox` fields.
+///
+/// # Example
+///
+/// ```python
+/// result = parse_vision_generation(
+///     "[visual_element]\\ntype: table\\nbbox: 0,0,10,10\\n[/visual_element]\\nHi"
+/// )
+/// assert result["segments"][0]["element"]["type"] == "table"
+/// ```
+#[pyfunction]
+#[pyo3(name = "parse_vision_generation")]
+fn parse_vision_generation_py(py: Python<'_>, text: &str) -> PyResult<Py<PyAny>> {
+    let parsed = parse_vision_generation(text).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let obj = pythonize(py, &parsed).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok(obj.into())
+}
+
 #[pymodule]
 fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOptions>()?;
@@ -499,6 +524,7 @@ fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(render_cmd3, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd5, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_vision_generation_py, m)?)?;
     Ok(())
 }
 

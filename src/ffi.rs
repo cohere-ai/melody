@@ -23,7 +23,7 @@
 
 use crate::parsing::FilterAggregatedResult;
 use crate::parsing::types::{FilterCitation, Source};
-use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter};
+use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter, parse_vision_generation};
 use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
@@ -1674,10 +1674,77 @@ pub unsafe extern "C" fn melody_render_cmd5(opts: *const CRenderCmd5Options) -> 
     }))
 }
 
+/// Parse a full vision generation into JSON.
+///
+/// The JSON shape matches [`crate::parsing::VisionGeneration`] (tagged
+/// `segments` with `kind: "text" | "element"`). This is unary-only — feed the
+/// complete model output, not streaming chunks.
+///
+/// # Safety
+/// Caller must free the return value with `melody_render_result_free`.
+/// `text` must be a valid null-terminated UTF-8 C string.
+#[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
+pub unsafe extern "C" fn melody_parse_vision_generation(text: *const c_char) -> *mut CRenderResult {
+    catch_panic_render_result(AssertUnwindSafe(|| {
+        if text.is_null() {
+            let err = CString::new("null text pointer")
+                .unwrap_or_else(|_| CString::new("null text").unwrap())
+                .into_raw();
+            return Box::into_raw(Box::new(CRenderResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }));
+        }
+        let Ok(text) = (unsafe { CStr::from_ptr(text).to_str() }) else {
+            let err = CString::new("text is not valid UTF-8")
+                .unwrap_or_else(|_| CString::new("invalid utf-8").unwrap())
+                .into_raw();
+            return Box::into_raw(Box::new(CRenderResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }));
+        };
+        match parse_vision_generation(text) {
+            Ok(parsed) => match serde_json::to_string(&parsed) {
+                Ok(s) => {
+                    let result = CString::new(s)
+                        .unwrap_or_else(|_| CString::new("result contained null bytes").unwrap())
+                        .into_raw();
+                    Box::into_raw(Box::new(CRenderResult {
+                        result,
+                        error: std::ptr::null_mut(),
+                    }))
+                }
+                Err(e) => {
+                    let error = CString::new(e.to_string())
+                        .unwrap_or_else(|_| {
+                            CString::new("error message contained null bytes").unwrap()
+                        })
+                        .into_raw();
+                    Box::into_raw(Box::new(CRenderResult {
+                        result: std::ptr::null_mut(),
+                        error,
+                    }))
+                }
+            },
+            Err(e) => {
+                let error = CString::new(e.to_string())
+                    .unwrap_or_else(|_| CString::new("error message contained null bytes").unwrap())
+                    .into_raw();
+                Box::into_raw(Box::new(CRenderResult {
+                    result: std::ptr::null_mut(),
+                    error,
+                }))
+            }
+        }
+    }))
+}
+
 /// Frees a `CRenderResult` struct and its strings.
 ///
 /// # Safety
-/// `res` must be a valid pointer returned from a melody render function.
+/// `res` must be a valid pointer returned from a melody render / parse function.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn melody_render_result_free(res: *mut CRenderResult) {
     if res.is_null() {

@@ -167,6 +167,9 @@ typedef struct {
 extern CRenderResult* melody_render_cmd3(const CRenderCmd3Options* opts);
 extern CRenderResult* melody_render_cmd4(const CRenderCmd4Options* opts);
 extern CRenderResult* melody_render_cmd5(const CRenderCmd5Options* opts);
+/// Parse a full vision generation; result JSON is VisionGeneration.
+/// Free with melody_render_result_free.
+extern CRenderResult* melody_parse_vision_generation(const char* text);
 extern void melody_render_result_free(CRenderResult* res);
 
 typedef struct CFilter CFilter;

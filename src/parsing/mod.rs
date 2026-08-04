@@ -10,9 +10,14 @@ mod cofl_nested_filter;
 mod filter;
 mod options;
 mod param_filter;
+pub mod vision;
 
 pub mod types;
 
 pub use filter::*;
 pub use options::*;
 pub use types::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
+pub use vision::{
+    VisionBBox, VisionElement, VisionGeneration, VisionParseError, VisionSegment,
+    parse_vision_generation,
+};
