@@ -25,8 +25,8 @@
 use crate::parsing::FilterAggregatedResult;
 use crate::parsing::types::{FilterCitation, Source};
 use crate::parsing::{
-    Filter, FilterImpl, FilterOptions, VisionElement, VisionGeneration, VisionSegment,
-    new_filter, parse_vision_generation,
+    Filter, FilterImpl, FilterOptions, VisionElement, VisionGeneration, VisionSegment, new_filter,
+    parse_vision_generation,
 };
 use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
@@ -108,7 +108,6 @@ where
         }
     }
 }
-
 
 /// Catches panics and returns a `CVisionGenerationResponse` with an error if one occurs.
 fn catch_panic_vision_generation<F>(f: F) -> *mut CVisionGenerationResponse
@@ -258,7 +257,6 @@ pub struct CVisionBBox {
     /// Bottom edge (inclusive).
     pub bottom_right_y: i32,
 }
-
 
 /// Structured content of a `[visual_element]` block.
 #[repr(C)]

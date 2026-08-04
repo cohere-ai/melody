@@ -139,7 +139,9 @@ fn find_standalone_line(text: &str, from: usize, tag: &str) -> Option<(usize, us
             Some(i) => (&rest[..i], line_start + i + 1),
             None => (rest, text.len()),
         };
-        let line_content = line_without_nl.strip_suffix('\r').unwrap_or(line_without_nl);
+        let line_content = line_without_nl
+            .strip_suffix('\r')
+            .unwrap_or(line_without_nl);
         if line_content.trim() == tag {
             return Some((line_start, line_end));
         }
