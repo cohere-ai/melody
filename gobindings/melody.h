@@ -167,10 +167,57 @@ typedef struct {
 extern CRenderResult* melody_render_cmd3(const CRenderCmd3Options* opts);
 extern CRenderResult* melody_render_cmd4(const CRenderCmd4Options* opts);
 extern CRenderResult* melody_render_cmd5(const CRenderCmd5Options* opts);
-/// Parse a full vision generation; result JSON is VisionGeneration.
-/// Free with melody_render_result_free.
-extern CRenderResult* melody_parse_vision_generation(const char* text);
 extern void melody_render_result_free(CRenderResult* res);
+
+// ============================================================================
+// Vision generation parsing (unary)
+// ============================================================================
+
+typedef enum {
+    CVisionSegmentKind_Text = 0,
+    CVisionSegmentKind_Element = 1,
+} CVisionSegmentKind;
+
+typedef struct {
+    int32_t top_left_x;
+    int32_t top_left_y;
+    int32_t bottom_right_x;
+    int32_t bottom_right_y;
+} CVisionBBox;
+
+typedef struct {
+    char* key;
+    char* value;
+} CVisionExtraField;
+
+typedef struct {
+    char* element_type;
+    CVisionBBox* bbox;       // null if absent
+    char* description;       // null if absent
+    char* title;             // null if absent
+    char* html;              // null if absent
+    CVisionExtraField* extra;
+    size_t extra_len;
+} CVisionElement;
+
+typedef struct {
+    CVisionSegmentKind kind;
+    char* text;              // set when kind == Text
+    CVisionElement* element; // set when kind == Element
+} CVisionSegment;
+
+typedef struct {
+    CVisionSegment* segments;
+    size_t segments_len;
+} CVisionGeneration;
+
+typedef struct {
+    CVisionGeneration* result; // null if error
+    char* error;               // null if success
+} CVisionGenerationResponse;
+
+extern CVisionGenerationResponse* melody_parse_vision_generation(const char* text);
+extern void melody_vision_generation_free(CVisionGenerationResponse* res);
 
 typedef struct CFilter CFilter;
 typedef struct CFilterOptions CFilterOptions;

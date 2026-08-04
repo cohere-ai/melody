@@ -13,6 +13,7 @@
 //!
 //! - Pointers returned by `_new` functions: **Caller owns**, must call `_free`
 //! - `CAggregatedResultResponse` returned by `write_decoded` and `flush_partials`: **Caller owns**, must call `melody_aggregated_result_free`
+//! - `CVisionGenerationResponse` returned by `melody_parse_vision_generation`: **Caller owns**, must call `melody_vision_generation_free`
 //! - Pointers passed as arguments: **Caller retains ownership**, must remain valid for call duration
 //!
 //! # Thread Safety
@@ -23,7 +24,10 @@
 
 use crate::parsing::FilterAggregatedResult;
 use crate::parsing::types::{FilterCitation, Source};
-use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter, parse_vision_generation};
+use crate::parsing::{
+    Filter, FilterImpl, FilterOptions, VisionElement, VisionGeneration, VisionSegment,
+    new_filter, parse_vision_generation,
+};
 use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
     Role, SafetyMode, Tool, ToolCall,
@@ -98,6 +102,35 @@ where
                 })
                 .into_raw();
             Box::into_raw(Box::new(CRenderResult {
+                result: std::ptr::null_mut(),
+                error: err,
+            }))
+        }
+    }
+}
+
+
+/// Catches panics and returns a `CVisionGenerationResponse` with an error if one occurs.
+fn catch_panic_vision_generation<F>(f: F) -> *mut CVisionGenerationResponse
+where
+    F: FnOnce() -> *mut CVisionGenerationResponse + panic::UnwindSafe,
+{
+    match panic::catch_unwind(f) {
+        Ok(result) => result,
+        Err(e) => {
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                format!("Rust panic: {s}")
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                format!("Rust panic: {s}")
+            } else {
+                "Rust panic: unknown error".to_string()
+            };
+            let err = CString::new(msg)
+                .unwrap_or_else(|_| {
+                    CString::new("Rust panic: error message contained null bytes").unwrap()
+                })
+                .into_raw();
+            Box::into_raw(Box::new(CVisionGenerationResponse {
                 result: std::ptr::null_mut(),
                 error: err,
             }))
@@ -200,6 +233,86 @@ pub struct CAggregatedResultResponse {
     /// Pointer to the aggregated result (null if error)
     pub result: *mut CAggregatedResult,
     /// Null-terminated C string containing the error (null if success)
+    pub error: *mut c_char,
+}
+
+/// Kind discriminant for [`CVisionSegment`].
+#[repr(C)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum CVisionSegmentKind {
+    /// Markdown / plain text segment.
+    Text = 0,
+    /// Structured `[visual_element]` segment.
+    Element = 1,
+}
+
+/// Pixel bounding box.
+#[repr(C)]
+pub struct CVisionBBox {
+    /// Left edge (inclusive).
+    pub top_left_x: i32,
+    /// Top edge (inclusive).
+    pub top_left_y: i32,
+    /// Right edge (inclusive).
+    pub bottom_right_x: i32,
+    /// Bottom edge (inclusive).
+    pub bottom_right_y: i32,
+}
+
+/// One unknown `key: value` field from a vision element body.
+#[repr(C)]
+pub struct CVisionExtraField {
+    /// Field name.
+    pub key: *mut c_char,
+    /// Field value.
+    pub value: *mut c_char,
+}
+
+/// Structured content of a `[visual_element]` block.
+#[repr(C)]
+pub struct CVisionElement {
+    /// `type:` field (never null; may be empty).
+    pub element_type: *mut c_char,
+    /// Bounding box (null if absent).
+    pub bbox: *mut CVisionBBox,
+    /// Description (null if absent).
+    pub description: *mut c_char,
+    /// Title (null if absent).
+    pub title: *mut c_char,
+    /// HTML markup (null if absent).
+    pub html: *mut c_char,
+    /// Additional fields.
+    pub extra: *mut CVisionExtraField,
+    /// Number of extra fields.
+    pub extra_len: usize,
+}
+
+/// One segment of a vision generation.
+#[repr(C)]
+pub struct CVisionSegment {
+    /// Segment kind.
+    pub kind: CVisionSegmentKind,
+    /// Text content when `kind == Text` (null otherwise).
+    pub text: *mut c_char,
+    /// Element content when `kind == Element` (null otherwise).
+    pub element: *mut CVisionElement,
+}
+
+/// Parsed vision generation.
+#[repr(C)]
+pub struct CVisionGeneration {
+    /// Ordered segments.
+    pub segments: *mut CVisionSegment,
+    /// Number of segments.
+    pub segments_len: usize,
+}
+
+/// Result-or-error wrapper for [`CVisionGeneration`].
+#[repr(C)]
+pub struct CVisionGenerationResponse {
+    /// Parsed result (null if error).
+    pub result: *mut CVisionGeneration,
+    /// Error message (null if success).
     pub error: *mut c_char,
 }
 
@@ -1674,71 +1787,203 @@ pub unsafe extern "C" fn melody_render_cmd5(opts: *const CRenderCmd5Options) -> 
     }))
 }
 
-/// Parse a full vision generation into JSON.
+/// Parse a full vision generation into structured segments.
 ///
-/// The JSON shape matches [`crate::parsing::VisionGeneration`] (tagged
-/// `segments` with `kind: "text" | "element"`). This is unary-only — feed the
-/// complete model output, not streaming chunks.
+/// Unary only — feed the complete model output, not streaming chunks.
 ///
 /// # Safety
-/// Caller must free the return value with `melody_render_result_free`.
+/// Caller must free the return value with `melody_vision_generation_free`.
 /// `text` must be a valid null-terminated UTF-8 C string.
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
-pub unsafe extern "C" fn melody_parse_vision_generation(text: *const c_char) -> *mut CRenderResult {
-    catch_panic_render_result(AssertUnwindSafe(|| {
+pub unsafe extern "C" fn melody_parse_vision_generation(
+    text: *const c_char,
+) -> *mut CVisionGenerationResponse {
+    catch_panic_vision_generation(AssertUnwindSafe(|| {
         if text.is_null() {
-            let err = CString::new("null text pointer")
-                .unwrap_or_else(|_| CString::new("null text").unwrap())
-                .into_raw();
-            return Box::into_raw(Box::new(CRenderResult {
-                result: std::ptr::null_mut(),
-                error: err,
-            }));
+            return vision_generation_error("null text pointer");
         }
         let Ok(text) = (unsafe { CStr::from_ptr(text).to_str() }) else {
-            let err = CString::new("text is not valid UTF-8")
-                .unwrap_or_else(|_| CString::new("invalid utf-8").unwrap())
-                .into_raw();
-            return Box::into_raw(Box::new(CRenderResult {
-                result: std::ptr::null_mut(),
-                error: err,
-            }));
+            return vision_generation_error("text is not valid UTF-8");
         };
         match parse_vision_generation(text) {
-            Ok(parsed) => match serde_json::to_string(&parsed) {
-                Ok(s) => {
-                    let result = CString::new(s)
-                        .unwrap_or_else(|_| CString::new("result contained null bytes").unwrap())
-                        .into_raw();
-                    Box::into_raw(Box::new(CRenderResult {
-                        result,
-                        error: std::ptr::null_mut(),
-                    }))
-                }
-                Err(e) => {
-                    let error = CString::new(e.to_string())
-                        .unwrap_or_else(|_| {
-                            CString::new("error message contained null bytes").unwrap()
-                        })
-                        .into_raw();
-                    Box::into_raw(Box::new(CRenderResult {
-                        result: std::ptr::null_mut(),
-                        error,
-                    }))
-                }
-            },
-            Err(e) => {
-                let error = CString::new(e.to_string())
-                    .unwrap_or_else(|_| CString::new("error message contained null bytes").unwrap())
-                    .into_raw();
-                Box::into_raw(Box::new(CRenderResult {
-                    result: std::ptr::null_mut(),
-                    error,
+            Ok(parsed) => {
+                let result = unsafe { convert_vision_generation_to_c(parsed) };
+                Box::into_raw(Box::new(CVisionGenerationResponse {
+                    result,
+                    error: std::ptr::null_mut(),
                 }))
             }
+            Err(e) => vision_generation_error(&e.to_string()),
         }
     }))
+}
+
+fn vision_generation_error(msg: &str) -> *mut CVisionGenerationResponse {
+    let error = CString::new(msg)
+        .unwrap_or_else(|_| CString::new("error message contained null bytes").unwrap())
+        .into_raw();
+    Box::into_raw(Box::new(CVisionGenerationResponse {
+        result: std::ptr::null_mut(),
+        error,
+    }))
+}
+
+fn c_string_or_empty(s: String) -> *mut c_char {
+    CString::new(s)
+        .unwrap_or_else(|_| CString::new("").unwrap())
+        .into_raw()
+}
+
+fn opt_c_string(s: Option<String>) -> *mut c_char {
+    s.map_or(std::ptr::null_mut(), c_string_or_empty)
+}
+
+/// Converts a [`VisionGeneration`] to its C representation.
+///
+/// # Safety
+/// The returned pointer must be freed with `melody_vision_generation_free`.
+unsafe fn convert_vision_generation_to_c(parsed: VisionGeneration) -> *mut CVisionGeneration {
+    let segments_len = parsed.segments.len();
+    let segments = if segments_len > 0 {
+        let c_segments: Vec<CVisionSegment> = parsed
+            .segments
+            .into_iter()
+            .map(|seg| unsafe { convert_vision_segment_to_c(seg) })
+            .collect();
+        Box::into_raw(c_segments.into_boxed_slice()).cast::<CVisionSegment>()
+    } else {
+        std::ptr::null_mut()
+    };
+    Box::into_raw(Box::new(CVisionGeneration {
+        segments,
+        segments_len,
+    }))
+}
+
+unsafe fn convert_vision_segment_to_c(segment: VisionSegment) -> CVisionSegment {
+    match segment {
+        VisionSegment::Text { text } => CVisionSegment {
+            kind: CVisionSegmentKind::Text,
+            text: c_string_or_empty(text),
+            element: std::ptr::null_mut(),
+        },
+        VisionSegment::Element { element } => CVisionSegment {
+            kind: CVisionSegmentKind::Element,
+            text: std::ptr::null_mut(),
+            element: Box::into_raw(Box::new(unsafe { convert_vision_element_to_c(element) })),
+        },
+    }
+}
+
+unsafe fn convert_vision_element_to_c(element: VisionElement) -> CVisionElement {
+    let bbox = element.bbox.map_or(std::ptr::null_mut(), |b| {
+        Box::into_raw(Box::new(CVisionBBox {
+            top_left_x: b.top_left_x,
+            top_left_y: b.top_left_y,
+            bottom_right_x: b.bottom_right_x,
+            bottom_right_y: b.bottom_right_y,
+        }))
+    });
+
+    let extra_len = element.extra.len();
+    let extra = if extra_len > 0 {
+        let fields: Vec<CVisionExtraField> = element
+            .extra
+            .into_iter()
+            .map(|(key, value)| CVisionExtraField {
+                key: c_string_or_empty(key),
+                value: c_string_or_empty(value),
+            })
+            .collect();
+        Box::into_raw(fields.into_boxed_slice()).cast::<CVisionExtraField>()
+    } else {
+        std::ptr::null_mut()
+    };
+
+    CVisionElement {
+        element_type: c_string_or_empty(element.element_type),
+        bbox,
+        description: opt_c_string(element.description),
+        title: opt_c_string(element.title),
+        html: opt_c_string(element.html),
+        extra,
+        extra_len,
+    }
+}
+
+/// Frees a `CVisionGenerationResponse` and all nested allocations.
+///
+/// # Safety
+/// `res` must be a valid pointer returned from `melody_parse_vision_generation`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_vision_generation_free(res: *mut CVisionGenerationResponse) {
+    if res.is_null() {
+        return;
+    }
+    unsafe {
+        let res_box = Box::from_raw(res);
+        if !res_box.error.is_null() {
+            let _ = CString::from_raw(res_box.error);
+        }
+        if !res_box.result.is_null() {
+            free_vision_generation(res_box.result);
+        }
+    }
+}
+
+unsafe fn free_vision_generation(ptr: *mut CVisionGeneration) {
+    unsafe {
+        let parsed = Box::from_raw(ptr);
+        if !parsed.segments.is_null() && parsed.segments_len > 0 {
+            let segments = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                parsed.segments,
+                parsed.segments_len,
+            ))
+            .into_vec();
+            for seg in segments {
+                if !seg.text.is_null() {
+                    let _ = CString::from_raw(seg.text);
+                }
+                if !seg.element.is_null() {
+                    free_vision_element(seg.element);
+                }
+            }
+        }
+    }
+}
+
+unsafe fn free_vision_element(ptr: *mut CVisionElement) {
+    unsafe {
+        let el = Box::from_raw(ptr);
+        if !el.element_type.is_null() {
+            let _ = CString::from_raw(el.element_type);
+        }
+        if !el.bbox.is_null() {
+            let _ = Box::from_raw(el.bbox);
+        }
+        if !el.description.is_null() {
+            let _ = CString::from_raw(el.description);
+        }
+        if !el.title.is_null() {
+            let _ = CString::from_raw(el.title);
+        }
+        if !el.html.is_null() {
+            let _ = CString::from_raw(el.html);
+        }
+        if !el.extra.is_null() && el.extra_len > 0 {
+            let extras =
+                Box::from_raw(std::ptr::slice_from_raw_parts_mut(el.extra, el.extra_len)).into_vec();
+            for field in extras {
+                if !field.key.is_null() {
+                    let _ = CString::from_raw(field.key);
+                }
+                if !field.value.is_null() {
+                    let _ = CString::from_raw(field.value);
+                }
+            }
+        }
+    }
 }
 
 /// Frees a `CRenderResult` struct and its strings.
