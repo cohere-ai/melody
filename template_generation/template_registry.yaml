@@ -2,7 +2,6 @@
 #
 # `make generate-dev` reads this file and writes:
 #   - gen/templates/archive/{name}/{name}@{revision}.{jinja,tmpl} for the current revision
-#   - latest.* copies of the current revision (real files, not symlinks)
 #   - gen/embedded_templates.rs (current + any older archive files still on disk)
 #   - gen/template_revision_locks.json
 #

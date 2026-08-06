@@ -104,13 +104,13 @@ config). Melody embeds every archive revision still on disk for a name.
 
 | Form | Example | Meaning |
 |------|---------|---------|
-| Current | `cmd4` or `cmd4@2` | Registry `revision` (also written as `latest.*`) |
+| Current | `cmd4` or `cmd4@2` | Registry `revision` |
 | Older pin | `cmd4@1` | Frozen archive file, still embedded while present |
 
 ```bash
-# current (latest.* is a real file copy of the current revision)
+# current (use the current `{name}@{revision}` path from the registry)
 curl -fsSL \
-  "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd4/latest.jinja"
+  "https://raw.githubusercontent.com/cohere-ai/melody/main/gen/templates/archive/cmd4/cmd4@2.jinja"
 
 # immutable pin
 curl -fsSL \

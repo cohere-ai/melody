@@ -95,20 +95,18 @@ struct Compiled {
 
 impl Compiled {
     /// Archive-relative path + body for each engine this revision ships.
-    fn artifacts(&self) -> Vec<(String, &str, &str)> {
+    fn artifacts(&self) -> Vec<(String, &str)> {
         let mut out = Vec::new();
         if let Some(body) = &self.jinja {
             out.push((
                 format!("{0}/{0}@{1}.jinja", self.name, self.revision),
                 body.as_str(),
-                "jinja",
             ));
         }
         if let Some(body) = &self.liquid {
             out.push((
                 format!("{0}/{0}@{1}.tmpl", self.name, self.revision),
                 body.as_str(),
-                "tmpl",
             ));
         }
         out
@@ -220,7 +218,7 @@ fn enforce_locks(compiled: &[Compiled]) -> Result<()> {
     let mut dirty = false;
     let mut active = HashSet::new();
 
-    for (key, body, _) in compiled.iter().flat_map(Compiled::artifacts) {
+    for (key, body) in compiled.iter().flat_map(Compiled::artifacts) {
         check_lock(
             &mut locks,
             key,
@@ -277,21 +275,10 @@ fn enforce_locks(compiled: &[Compiled]) -> Result<()> {
 fn write_archive(compiled: &[Compiled]) -> Result<()> {
     let root = PathBuf::from(ARCHIVE);
     for t in compiled {
-        let dir = root.join(&t.name);
-        fs::create_dir_all(&dir)?;
-        for (rel, body, ext) in t.artifacts() {
+        fs::create_dir_all(root.join(&t.name))?;
+        for (rel, body) in t.artifacts() {
             let path = root.join(&rel);
             fs::write(&path, body).with_context(|| format!("write {}", path.display()))?;
-            // Real file (not a symlink) so GitHub raw / curl serve the body.
-            let latest = dir.join(format!("latest.{ext}"));
-            let _ = fs::remove_file(&latest);
-            fs::write(&latest, body).with_context(|| format!("write {}", latest.display()))?;
-        }
-        if t.jinja.is_none() {
-            let _ = fs::remove_file(dir.join("latest.jinja"));
-        }
-        if t.liquid.is_none() {
-            let _ = fs::remove_file(dir.join("latest.tmpl"));
         }
     }
     Ok(())
