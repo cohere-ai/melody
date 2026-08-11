@@ -10,7 +10,8 @@
 {%- set convert_first_system_msg = convert_first_system_msg | default(true) -%}
 {%- set skip_thinking = skip_thinking | default(false) -%}
 {{ bos_token }}
-{%- macro xml_text(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;') }}{%- endmacro -%}
+{#- Escape XML text, then restore <|...|> special-token delimiters (e.g. image placeholders) so tokenizers still recognize them. -#}
+{%- macro xml_text(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('&lt;|', '<|')|replace('|&gt;', '|>') }}{%- endmacro -%}
 {%- macro xml_attr(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('"', '&quot;') }}{%- endmacro -%}
 {%- macro render_cofl_value(name, value) -%}
 {%- if value is none -%}

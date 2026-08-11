@@ -48,7 +48,7 @@
             {
               "type": "image",
               "image": {
-                "template_placeholder": "<|IMG_PATCH|>"
+                "template_placeholder": "<|START_IMAGE|>imagedata<|END_IMAGE|>"
               }
             },
             {

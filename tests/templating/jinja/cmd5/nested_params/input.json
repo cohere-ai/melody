@@ -24,6 +24,27 @@
           "parameters": "{\"query\": \"echo \\\"Hello\\\" >> foo.txt && exit 🌈\", \"limit\": 3, \"float example\": 3.14, \"filters\": {\"fresh\": true, \"tags\": [\"music\", \"Sudan 🌈\"]}, \"missing\": null, \"empty_dict\": {}, \"empty_list\": []}"
         }
       ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "0",
+      "content": [
+        {
+          "type": "multipart",
+          "multipart": [
+            {
+              "type": "text",
+              "text": "search result with an image"
+            },
+            {
+              "type": "image",
+              "image": {
+                "template_placeholder": "<|START_IMAGE|>imagedata<|END_IMAGE|>"
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "available_tools": [
