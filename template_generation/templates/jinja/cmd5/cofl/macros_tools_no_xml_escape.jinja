@@ -1,4 +1,5 @@
-{%- macro xml_text(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;') }}{%- endmacro -%}
+{#- Escape XML text, then restore <|...|> special-token delimiters (e.g. image placeholders) so tokenizers still recognize them. -#}
+{%- macro xml_text(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('&lt;|', '<|')|replace('|&gt;', '|>') }}{%- endmacro -%}
 {%- macro xml_attr(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('"', '&quot;') }}{%- endmacro -%}
 {%- macro render_tool_call_params(arguments) -%}
 {%- for param_name, param_value in arguments|items -%}
