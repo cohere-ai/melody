@@ -39,7 +39,9 @@ pub struct VisionGeneration {
 pub enum VisionSegment {
     /// Markdown / plain text outside visual-element tags.
     Text {
-        /// Prose content, including surrounding newlines as emitted by the model.
+        /// Prose content with leading/trailing newlines stripped. Internal newlines
+        /// (e.g. paragraph breaks) are preserved. Boundary spacing belongs to the
+        /// consumer when joining segments into markdown (typically `\n\n`).
         text: String,
     },
     /// A parsed `[visual_element]` block.
@@ -88,6 +90,10 @@ pub struct VisionBBox {
 /// surrounding whitespace). Field lines are recognized only for known keys:
 /// `type`, `bbox`, `description`, `title`, and `html`.
 ///
+/// Text segments have leading and trailing newlines stripped (mirroring document
+/// OCR block content). Blank-line spacing between segments is left to the consumer
+/// when assembling markdown.
+///
 /// # Errors
 ///
 /// Returns [`VisionParseError::UnclosedElement`] if a start tag has no matching end,
@@ -115,11 +121,7 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
         if let Some((_, body)) = open.as_mut() {
             body.push_str(line);
         } else if line_is_tag(line, VISUAL_ELEMENT_START) {
-            if !text_buf.is_empty() {
-                segments.push(VisionSegment::Text {
-                    text: std::mem::take(&mut text_buf),
-                });
-            }
+            push_text_segment(&mut segments, std::mem::take(&mut text_buf));
             open = Some((line_start, String::new()));
         } else {
             text_buf.push_str(line);
@@ -129,11 +131,22 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
     if let Some((start, _)) = open {
         return Err(VisionParseError::UnclosedElement(start));
     }
-    if !text_buf.is_empty() {
-        segments.push(VisionSegment::Text { text: text_buf });
-    }
+    push_text_segment(&mut segments, text_buf);
 
     Ok(VisionGeneration { segments })
+}
+
+/// Push a text segment after stripping leading/trailing newlines.
+///
+/// Empty or newline-only buffers are dropped so spacing around visual elements is
+/// not stored on the segments themselves.
+fn push_text_segment(segments: &mut Vec<VisionSegment>, text: String) {
+    let trimmed = text.trim_matches(['\r', '\n']);
+    if !trimmed.is_empty() {
+        segments.push(VisionSegment::Text {
+            text: trimmed.to_string(),
+        });
+    }
 }
 
 fn line_is_tag(line: &str, tag: &str) -> bool {
@@ -293,8 +306,11 @@ html: <table><thead><tr><td>Parameters</td><td>Decoder</td><td>Encoder</td></tr>
 
         match &parsed.segments[1] {
             VisionSegment::Text { text } => {
-                assert!(text.contains("**Figure 2: Pixtral Vision Encoder.**"));
+                assert!(!text.starts_with('\n'));
+                assert!(!text.ends_with('\n'));
+                assert!(text.starts_with("**Figure 2: Pixtral Vision Encoder.**"));
                 assert!(text.contains("### 2.1 Multimodal Decoder"));
+                assert!(text.ends_with("Table 1: Decoder and encoder parameters."));
             }
             other => panic!("expected prose, got {other:?}"),
         }
@@ -323,10 +339,59 @@ html: <table><thead><tr><td>Parameters</td><td>Decoder</td><td>Encoder</td></tr>
 
         match &parsed.segments[3] {
             VisionSegment::Text { text } => {
-                assert!(text.contains("### 2.2 Vision Encoder"));
+                assert_eq!(text, "### 2.2 Vision Encoder");
             }
             other => panic!("expected trailing prose, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn text_segments_trim_boundary_newlines() {
+        let text = "\
+before
+
+[visual_element]
+type: table
+[/visual_element]
+
+after
+";
+        let parsed = parse_vision_generation(text).unwrap();
+        assert_eq!(
+            parsed.segments,
+            vec![
+                VisionSegment::Text {
+                    text: "before".into(),
+                },
+                VisionSegment::Element {
+                    element: VisionElement {
+                        element_type: "table".into(),
+                        ..Default::default()
+                    },
+                },
+                VisionSegment::Text {
+                    text: "after".into(),
+                },
+            ]
+        );
+
+        // Newline-only gaps between elements are dropped, not stored as empty text.
+        let text = "\
+[visual_element]
+type: a
+[/visual_element]
+
+
+[visual_element]
+type: b
+[/visual_element]
+";
+        let parsed = parse_vision_generation(text).unwrap();
+        assert_eq!(parsed.segments.len(), 2);
+        assert!(matches!(
+            &parsed.segments[..],
+            [VisionSegment::Element { .. }, VisionSegment::Element { .. }]
+        ));
     }
 
     #[test]
@@ -335,7 +400,7 @@ html: <table><thead><tr><td>Parameters</td><td>Decoder</td><td>Encoder</td></tr>
         assert_eq!(
             parsed.segments,
             vec![VisionSegment::Text {
-                text: "just markdown\n\n## heading\n".into(),
+                text: "just markdown\n\n## heading".into(),
             }]
         );
     }
@@ -420,7 +485,7 @@ and [visual_element] again
         assert_eq!(parsed.segments.len(), 3);
         match &parsed.segments[0] {
             VisionSegment::Text { text } => {
-                assert!(text.contains("see [visual_element] inline"));
+                assert_eq!(text, "see [visual_element] inline");
             }
             other => panic!("expected leading text, got {other:?}"),
         }
@@ -436,7 +501,7 @@ and [visual_element] again
         }
         match &parsed.segments[2] {
             VisionSegment::Text { text } => {
-                assert!(text.contains("and [visual_element] again"));
+                assert_eq!(text, "and [visual_element] again");
             }
             other => panic!("expected trailing text, got {other:?}"),
         }
