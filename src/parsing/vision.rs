@@ -121,7 +121,8 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
         if let Some((_, body)) = open.as_mut() {
             body.push_str(line);
         } else if line_is_tag(line, VISUAL_ELEMENT_START) {
-            push_text_segment(&mut segments, std::mem::take(&mut text_buf));
+            push_text_segment(&mut segments, &text_buf);
+            text_buf.clear();
             open = Some((line_start, String::new()));
         } else {
             text_buf.push_str(line);
@@ -131,7 +132,7 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
     if let Some((start, _)) = open {
         return Err(VisionParseError::UnclosedElement(start));
     }
-    push_text_segment(&mut segments, text_buf);
+    push_text_segment(&mut segments, &text_buf);
 
     Ok(VisionGeneration { segments })
 }
@@ -140,7 +141,7 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
 ///
 /// Empty or newline-only buffers are dropped so spacing around visual elements is
 /// not stored on the segments themselves.
-fn push_text_segment(segments: &mut Vec<VisionSegment>, text: String) {
+fn push_text_segment(segments: &mut Vec<VisionSegment>, text: &str) {
     let trimmed = text.trim_matches(['\r', '\n']);
     if !trimmed.is_empty() {
         segments.push(VisionSegment::Text {
