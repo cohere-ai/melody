@@ -1587,7 +1587,7 @@ mod tests {
     #[test]
     fn test_process_full_text_citations_in_response() {
         let mut f = make_cmd3_filter();
-        let text = "<|START_RESPONSE|>The sky is <co: 0>blue</co: 0>.<|END_RESPONSE|>";
+        let text = "<|START_RESPONSE|>The sky is <co>blue</co: 0:[0]>.<|END_RESPONSE|>";
         let result = f.process_full_text(text);
         assert!(result.content.is_some());
         let content = result.content.unwrap();
