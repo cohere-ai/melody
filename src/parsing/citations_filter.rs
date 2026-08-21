@@ -13,7 +13,7 @@ const START_FIRST_CIT: &str = "<co: ";
 const START_LAST_CIT: &str = "</co: ";
 const END_OF_CIT: &str = ">";
 const START_OF_CIT: char = '<';
-const START_FIRST_CIT_CMD3: &str = "<co";
+const START_FIRST_CIT_CMD3: &str = "<co>";
 
 impl FilterImpl {
     fn emit_plain_text_citation_output(&mut self, s: &str) -> (Option<FilterOutput>, usize) {
@@ -100,8 +100,13 @@ impl FilterImpl {
             START_FIRST_CIT
         };
 
-        let (start_first_id, end_first_id, _) =
-            Self::find_an_element(s, start_first_citation_str, END_OF_CIT, self.cmd3_citations);
+        let (start_first_id, end_first_id) = if self.cmd3_citations {
+            Self::find_exact_marker(s, start_first_citation_str)
+        } else {
+            let (start_id, end_id, _) =
+                Self::find_an_element(s, start_first_citation_str, END_OF_CIT, false);
+            (start_id, end_id)
+        };
 
         // No citation was found so send the plain text and remove from buffer
         if start_first_id == usize::MAX {
@@ -120,12 +125,8 @@ impl FilterImpl {
         // Only partial citation found so we need to wait for the complete citation.
         if start_last_id == usize::MAX || end_last_id == usize::MAX {
             if !self.stream_non_grounded_answer && end_last_id == usize::MAX {
-                let (txt, remove) = self.get_partial_or_malformed_citation_text(
-                    start_first_id,
-                    end_first_id,
-                    start_last_id,
-                    s,
-                );
+                let (txt, remove) =
+                    self.get_partial_citation_text(start_first_id, end_first_id, start_last_id, s);
                 if !txt.is_empty() {
                     return (
                         Some(FilterOutput {
@@ -230,27 +231,14 @@ impl FilterImpl {
         )
     }
 
-    fn get_partial_or_malformed_citation_text(
-        &mut self,
-        start_first_id: usize,
-        end_first_id: usize,
-        start_last_id: usize,
-        s: &str,
-    ) -> (String, usize) {
-        if !self.cmd3_citations || START_FIRST_CIT_CMD3.len() + start_first_id == end_first_id {
-            return self.get_partial_citation_text(start_first_id, end_first_id, start_last_id, s);
+    fn find_exact_marker(s: &str, marker: &str) -> (usize, usize) {
+        let marker = marker.to_string();
+
+        match find_partial(s, std::iter::once(&marker)) {
+            PartialMatchResult::NoMatch => (usize::MAX, usize::MAX),
+            PartialMatchResult::Partial { idx } => (idx, usize::MAX),
+            PartialMatchResult::Full { idx, .. } => (idx, idx + marker.len() - 1),
         }
-
-        let txt = if start_last_id != usize::MAX && start_last_id > 0 {
-            &s[..start_last_id]
-        } else {
-            s
-        };
-
-        self.cur_text_index += txt.chars().count();
-        self.cur_text_byte_index += txt.len();
-
-        (txt.to_string(), txt.len())
     }
 
     fn find_an_element(
@@ -378,7 +366,8 @@ fn convert_string_to_int_list(s: &str) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parsing::filter::FilterImpl;
+    use crate::parsing::filter::{Filter, FilterImpl};
+    use crate::parsing::options::{FilterOptions, new_filter};
 
     #[test]
     fn test_handle_citations_standard_case() {
@@ -602,6 +591,66 @@ mod tests {
 
         assert!(output.is_none());
         assert_eq!(remove, 0);
+    }
+
+    #[test]
+    fn test_find_exact_marker() {
+        let marker = "<co>";
+        let cases = [
+            ("plain text", (usize::MAX, usize::MAX)),
+            ("<", (0, usize::MAX)),
+            ("<c", (0, usize::MAX)),
+            ("<co", (0, usize::MAX)),
+            ("<co>", (0, 3)),
+            ("before <co>", (7, 10)),
+            ("<cof", (usize::MAX, usize::MAX)),
+            ("<cofl:tool_calls>", (usize::MAX, usize::MAX)),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(
+                FilterImpl::find_exact_marker(input, marker),
+                expected,
+                "input: {input:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_citations_treats_cofl_as_plain_text() {
+        let mut filter = FilterImpl::new();
+        filter.cmd3_citations = true;
+        filter.stream_non_grounded_answer = true;
+
+        let input = "<cofl:tool_calls>";
+        let (output, remove) = filter.parse_citations(input, FilterMode::GroundedAnswer);
+
+        let output = output.expect("COFL should not be buffered");
+        assert_eq!(output.text, input);
+        assert!(output.citations.is_empty());
+        assert_eq!(remove, input.len());
+    }
+
+    #[test]
+    fn test_cmd5_no_tools_streams_cofl_with_citations_enabled() {
+        let options = FilterOptions::new()
+            .cmd5()
+            .no_tools()
+            .stream_non_grounded_answer();
+        let mut filter = new_filter(options);
+
+        filter.write_decoded("<|END_THINKING|>");
+
+        let cofl = concat!(
+            "<cofl:tool_calls>",
+            r#"<cofl:tool_call id="0" name="search"></cofl:tool_call>"#,
+            "</cofl:tool_calls>",
+        );
+        let output = filter.write_decoded(cofl);
+
+        assert_eq!(output.content.as_deref(), Some(cofl));
+        assert!(output.reasoning.is_none());
+        assert!(output.tool_calls.is_empty());
     }
 
     #[test]
