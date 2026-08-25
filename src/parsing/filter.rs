@@ -11,6 +11,7 @@ use crate::parsing::types::{
     AccumulatedToolCall, FilterAggregatedResult, FilterMode, FilterOutput, FilterSearchQueryDelta,
     SearchQueryDelta,
 };
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 fn push_text(target: &mut Option<String>, text: &mut String) {
@@ -405,15 +406,15 @@ impl FilterImpl {
             return SpecialTokenScanResult::NoMatch;
         }
 
-        let decoded = String::from_utf8_lossy(&self.buf).into_owned();
-        match find_partial(&decoded, self.special_token_map.keys()) {
+        let decoded = String::from_utf8_lossy(&self.buf);
+        match find_partial(decoded.as_ref(), self.special_token_map.keys()) {
             PartialMatchResult::NoMatch => SpecialTokenScanResult::NoMatch,
             PartialMatchResult::Partial { .. } => SpecialTokenScanResult::Partial,
             PartialMatchResult::Full { idx, sequence } => {
                 SpecialTokenScanResult::Found(SpecialTokenMatch {
                     idx,
                     sequence,
-                    decoded,
+                    decoded: decoded.into_owned(),
                 })
             }
         }
@@ -602,22 +603,24 @@ impl FilterImpl {
         Vec::new()
     }
 
-    pub(crate) fn utf8_valid_or_limit(bstr: &[u8]) -> bool {
+    pub(crate) fn decode_utf8_or_limit(bstr: &[u8]) -> Option<Cow<'_, str>> {
         let limit = 4; // utf-8 is up to 4 bytes
-        let valid = std::str::from_utf8(bstr).is_ok();
-        if bstr.len() >= limit && !valid {
-            log::warn!("emitting invalid utf8: {bstr:?}");
+        match std::str::from_utf8(bstr) {
+            Ok(s) => Some(Cow::Borrowed(s)),
+            Err(_) if bstr.len() < limit => None,
+            Err(_) => {
+                log::warn!("emitting invalid utf8: {bstr:?}");
+                Some(String::from_utf8_lossy(bstr))
+            }
         }
-        valid || bstr.len() >= limit
     }
 
     pub(crate) fn process_search_query(&mut self, bstr: &[u8]) -> (Vec<FilterOutput>, usize) {
-        if !Self::utf8_valid_or_limit(bstr) {
+        let Some(s) = Self::decode_utf8_or_limit(bstr) else {
             return (Vec::new(), 0);
-        }
+        };
 
-        let s = String::from_utf8_lossy(bstr);
-        let (send, rem_right) = self.trim_space(&s);
+        let (send, rem_right) = self.trim_space(s.as_ref());
         let mut out = Vec::new();
 
         if !send.is_empty() {
@@ -635,12 +638,11 @@ impl FilterImpl {
     }
 
     pub(crate) fn process_text(&mut self, bstr: &[u8]) -> (Vec<FilterOutput>, usize) {
-        if !Self::utf8_valid_or_limit(bstr) {
+        let Some(s) = Self::decode_utf8_or_limit(bstr) else {
             return (Vec::new(), 0);
-        }
+        };
 
-        let s = String::from_utf8_lossy(bstr);
-        let (send, rem_right) = self.trim_space(&s);
+        let (send, rem_right) = self.trim_space(s.as_ref());
         let mut out = Vec::new();
 
         if !send.is_empty() {
@@ -742,6 +744,30 @@ impl FilterImpl {
 
 impl Filter for FilterImpl {
     fn write_decoded(&mut self, decoded_token: &str) -> FilterAggregatedResult {
+        // Plain text is the most common path. When no buffering, trimming, or
+        // special-token handling is needed, construct the public result directly
+        // instead of allocating an intermediate byte buffer and output vector.
+        if !self.done
+            && self.mode == FilterMode::PlainText
+            && self.chunk_size == 1
+            && self.buf.is_empty()
+            && !self.left_trimmed
+            && !self.right_trimmed
+            && !decoded_token
+                .as_bytes()
+                .iter()
+                .any(|byte| self.special_token_start_bytes[usize::from(*byte)])
+        {
+            return if decoded_token.is_empty() {
+                FilterAggregatedResult::default()
+            } else {
+                FilterAggregatedResult {
+                    content: Some(decoded_token.to_owned()),
+                    ..Default::default()
+                }
+            };
+        }
+
         let outputs = self.write_text(decoded_token.as_bytes());
         aggregate(outputs)
     }
@@ -777,21 +803,20 @@ pub(crate) fn find_partial<'a>(
     let mut min_partial_idx: Option<usize> = None;
 
     for stop in stops {
-        if let Some(idx) = s.find(stop) {
+        if let Some(idx) = find_subslice(s.as_bytes(), stop.as_bytes()) {
             if best_full.as_ref().is_none_or(|(cur_idx, _)| idx < *cur_idx) {
                 best_full = Some((idx, stop.clone()));
             }
             continue;
         }
         // Otherwise look for a tail-prefix partial match.
-        'inner: for i in 0..stop.len() {
-            if !stop.is_char_boundary(stop.len() - i) {
-                continue 'inner;
-            }
-            let suffix = &stop[..stop.len() - i];
-
-            if s.ends_with(suffix) {
-                let idx = s.len() - suffix.len();
+        let max_overlap = s.len().min(stop.len().saturating_sub(1));
+        for overlap in (1..=max_overlap).rev() {
+            let idx = s.len() - overlap;
+            if s.is_char_boundary(idx)
+                && stop.is_char_boundary(overlap)
+                && s.as_bytes()[idx..] == stop.as_bytes()[..overlap]
+            {
                 if min_partial_idx.is_none_or(|current_min_idx| current_min_idx > idx) {
                     min_partial_idx = Some(idx);
                 }
@@ -807,6 +832,19 @@ pub(crate) fn find_partial<'a>(
     } else {
         PartialMatchResult::NoMatch
     }
+}
+
+fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    if needle.len() > haystack.len() {
+        return None;
+    }
+
+    let last_start = haystack.len() - needle.len();
+    (0..=last_start)
+        .find(|&idx| haystack[idx] == needle[0] && haystack[idx..idx + needle.len()] == *needle)
 }
 
 #[cfg(test)]
