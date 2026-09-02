@@ -104,7 +104,6 @@ def get_template_info(template_path: str) -> tuple[str, str]:
             "templates/jinja/cmd3-v2.jinja",
             "jinja_tests/cmd3_reasoning_hf/chat_merged_template",
         ),
-        ("templates/jinja/cmd4-v1.jinja", "jinja_tests/cmd4_v1/chat_template"),
     ],
 )
 @pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])

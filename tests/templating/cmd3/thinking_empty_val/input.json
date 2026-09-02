@@ -1,0 +1,36 @@
+{
+  "skip_preamble": true,
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "What is 2 + 2?"
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": ""
+        },
+        {
+          "type": "text",
+          "text": "Didn't actually think"
+        }
+      ]
+    },
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Think again"
+        }
+      ]
+    }
+  ]
+}

@@ -59,8 +59,8 @@ cmd3-v3:
     reasoning_preamble:
       path: cmd3/vars/reasoning_preamble.tmpl
 
-cmd4-v1:
-  path: cmd4/cmd4-v1.tmpl
+cmd4:
+  path: cmd4/cmd4.tmpl
   variables:
     grounding_preamble:
       path: cmd4/vars/grounding_preamble.tmpl

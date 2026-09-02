@@ -100,7 +100,7 @@ pub struct RenderCmd4Options<'a> {
     pub template: &'a str,
     /// Jinja template string. An empty string is treated as "caller did not
     /// provide a template" and the renderer falls back to the family default
-    /// for the function being called (`CMD4V1_JINJA_TEMPLATE` for cmd4,
+    /// for the function being called (`CMD4_JINJA_TEMPLATE` for cmd4,
     /// `CMD5_JINJA_TEMPLATE` for cmd5).
     pub template_jinja: &'a str,
     /// Whether to use jinja template
@@ -134,9 +134,8 @@ pub struct RenderCmd4Options<'a> {
     pub raw_tool_call_names: bool,
 }
 
-static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.tmpl");
-static CMD4V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v1.jinja");
-static CMD4V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v2.jinja");
+static CMD4_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4.tmpl");
+static CMD4_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4.jinja");
 static CMD4HF_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-hf.jinja");
 static CMD5_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd5.jinja");
 static CMD5_NO_ESCAPE_JINJA_TEMPLATE: &str =
@@ -148,7 +147,7 @@ impl Default for RenderCmd4Options<'_> {
         Self {
             messages: Vec::new(),
             template_id: None,
-            template: CMD4V1_TEMPLATE,
+            template: CMD4_TEMPLATE,
             template_jinja: "",
             use_jinja: false,
             dev_instruction: None,
@@ -199,16 +198,14 @@ impl CMD3JinjaTemplates {
 }
 
 enum CMD4JinjaTemplates {
-    CMD4V1,
-    CMD4V2,
+    CMD4,
     CMD4HF,
 }
 
 impl CMD4JinjaTemplates {
     fn get_template(&self) -> &str {
         match *self {
-            CMD4JinjaTemplates::CMD4V1 => CMD4V1_JINJA_TEMPLATE,
-            CMD4JinjaTemplates::CMD4V2 => CMD4V2_JINJA_TEMPLATE,
+            CMD4JinjaTemplates::CMD4 => CMD4_JINJA_TEMPLATE,
             CMD4JinjaTemplates::CMD4HF => CMD4HF_JINJA_TEMPLATE,
         }
     }
@@ -219,9 +216,8 @@ impl FromStr for CMD4JinjaTemplates {
 
     fn from_str(o: &str) -> Result<Self, Self::Err> {
         match o {
-            "cmd4-v1" => Ok(Self::CMD4V1),
-            "cmd4-v2" => Ok(Self::CMD4V2),
-            "cmd4_hf" | "cmd4-hf" => Ok(Self::CMD4HF),
+            "cmd4" => Ok(Self::CMD4),
+            "cmd4-hf" => Ok(Self::CMD4HF),
             _ => Err(MelodyError::TemplateValidation(format!(
                 "unknown template id: {o}"
             ))),
@@ -474,7 +470,7 @@ pub fn render_cmd4(opts: &RenderCmd4Options) -> Result<String, MelodyError> {
         add_jinja_substitutions_cmd4(&mut substitutions, opts);
 
         let mut active_template = if opts.template_jinja.is_empty() {
-            CMD4V1_JINJA_TEMPLATE
+            CMD4_JINJA_TEMPLATE
         } else {
             opts.template_jinja
         };
@@ -525,7 +521,7 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
     // leftover liquid `template` field is likewise ignored when `template_id` or
     // non-empty `template_jinja` selects a jinja path.
     if !opts.use_jinja
-        && opts.template != CMD4V1_TEMPLATE
+        && opts.template != CMD4_TEMPLATE
         && opts.template_id.is_none()
         && opts.template_jinja.is_empty()
     {
@@ -677,12 +673,11 @@ mod tests {
     }
 
     #[test]
-    fn test_render_cmd4_v2_jinja_from_dir() {
-        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd4_v2") {
-            println!("Running cmd4 v2 jinja test case: {}", test_name);
+    fn test_render_cmd4_jinja_from_dir() {
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd4") {
+            println!("Running cmd4 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
-            opts.template_jinja = CMD4V2_JINJA_TEMPLATE;
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
@@ -724,9 +719,9 @@ mod tests {
     }
 
     #[test]
-    fn test_render_cmd4_jinja_from_liquid_dir() {
-        for (test_name, input_json, expected, _) in read_test_cases("cmd4") {
-            println!("Running cmd4 jinja liquid test case: {}", test_name);
+    fn test_render_cmd4_jinja_from_options_dir() {
+        for (test_name, input_json, expected, _) in read_test_cases("cmd4_jinja") {
+            println!("Running cmd4 jinja options test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
             opts.use_jinja = true;
             let rendered = render_cmd4(&opts).unwrap();
@@ -735,16 +730,32 @@ mod tests {
     }
 
     #[test]
-    fn test_render_cmd4_v2_jinja_from_liquid_dir() {
-        for (test_name, input_json, expected, _) in read_test_cases("cmd4_v2") {
-            println!("Running cmd4 v2 jinja liquid test case: {}", test_name);
-            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
-            opts.use_jinja = true;
-            if test_name != "template_provided" {
-                opts.template_jinja = CMD4V2_JINJA_TEMPLATE;
-            }
-            let rendered = render_cmd4(&opts).unwrap();
-            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+    fn test_render_cmd4_template_id() {
+        let opts = RenderCmd4Options {
+            use_jinja: true,
+            template_id: Some("cmd4".to_string()),
+            ..RenderCmd4Options::default()
+        };
+        let rendered = render_cmd4(&opts).unwrap();
+        assert!(
+            rendered.contains("CHATBOT"),
+            "template_id=cmd4 should render current cmd4 jinja"
+        );
+    }
+
+    #[test]
+    fn test_render_cmd4_versioned_template_id_rejected() {
+        for id in ["cmd4-v1", "cmd4-v2"] {
+            let opts = RenderCmd4Options {
+                use_jinja: true,
+                template_id: Some(id.to_string()),
+                ..RenderCmd4Options::default()
+            };
+            let err = render_cmd4(&opts).unwrap_err();
+            assert!(
+                err.to_string().contains(&format!("unknown template id: {id}")),
+                "unexpected error: {err}"
+            );
         }
     }
 
