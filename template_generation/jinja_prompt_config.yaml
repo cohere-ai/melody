@@ -1,25 +1,25 @@
 # paths are relative to src/template_generation/templates/jinja
 
-cmd3-v1:
-  path: cmd3/chat_merged_template_v1.jinja
+cmd3-default:
+  path: cmd3/cmd3.jinja
   includes:
     chat_merged_template.jinja:
       path: cmd3/chat_merged_template.jinja
 
-cmd3-v2:
-  path: cmd3/chat_merged_template_v2.jinja
+cmd3-reasoning:
+  path: cmd3/cmd3-reasoning.jinja
   includes:
     chat_merged_template.jinja:
       path: cmd3/chat_merged_template.jinja
 
-cmd3-v3:
-  path: cmd3/chat_merged_template_default_thinking.jinja
+cmd3-default-thinking:
+  path: cmd3/cmd3-default-thinking.jinja
   includes:
     chat_merged_template.jinja:
       path: cmd3/chat_merged_template.jinja
 
-cmd3-v1-hf:
-  path: cmd3/chat_merged_template_v1_huggingface.jinja
+cmd3-hf:
+  path: cmd3/cmd3-hf.jinja
   includes:
     chat_merged_template.jinja:
       path: cmd3/chat_merged_template.jinja

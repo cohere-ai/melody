@@ -24,7 +24,7 @@ pub struct RenderCmd3Options<'a> {
     pub template: &'a str,
     /// Jinja template string. An empty string is treated as "caller did not
     /// provide a template" and the renderer falls back to the family default
-    /// (e.g. `CMD3V1_JINJA_TEMPLATE` for cmd3).
+    /// (e.g. `CMD3_JINJA_TEMPLATE` for cmd3).
     pub template_jinja: &'a str,
     /// Whether to use jinja template
     pub use_jinja: bool,
@@ -53,22 +53,25 @@ pub struct RenderCmd3Options<'a> {
     /// Special tokens to escape in the output.
     pub escaped_special_tokens: BTreeMap<String, String>,
 }
-// for now always set the template to cmd3v1.
-static CMD3V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd3-v1.tmpl");
+// for now always set the template to cmd3.
+static CMD3_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd3-default.tmpl");
 #[allow(dead_code)] // this is used in a test below
-static CMD3V3_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd3-v3.tmpl");
-static CMD3V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v1.jinja");
-static CMD3V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v2.jinja");
-static CMD3V3_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v3.jinja");
+static CMD3_DEFAULT_THINKING_TEMPLATE: &str =
+    include_str!("../../gen/templates/liquid/cmd3-default-thinking.tmpl");
+static CMD3_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-default.jinja");
+static CMD3_REASONING_JINJA_TEMPLATE: &str =
+    include_str!("../../gen/templates/jinja/cmd3-reasoning.jinja");
+static CMD3_DEFAULT_THINKING_JINJA_TEMPLATE: &str =
+    include_str!("../../gen/templates/jinja/cmd3-default-thinking.jinja");
 #[allow(dead_code)] // this is used in a test below
-static CMD3V1_JINJA_HF_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-v1-hf.jinja");
+static CMD3_HF_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd3-hf.jinja");
 
 impl Default for RenderCmd3Options<'_> {
     fn default() -> Self {
         Self {
             messages: Vec::new(),
             template_id: None,
-            template: CMD3V1_TEMPLATE,
+            template: CMD3_TEMPLATE,
             template_jinja: "",
             use_jinja: false,
             dev_instruction: None,
@@ -167,9 +170,9 @@ impl Default for RenderCmd4Options<'_> {
 }
 
 enum CMD3JinjaTemplates {
-    CMD3V1,
-    CMD3V2,
-    CMD3V3,
+    CMD3,
+    CMD3Reasoning,
+    CMD3DefaultThinking,
 }
 
 impl FromStr for CMD3JinjaTemplates {
@@ -177,9 +180,9 @@ impl FromStr for CMD3JinjaTemplates {
 
     fn from_str(o: &str) -> Result<Self, Self::Err> {
         match o {
-            "cmd3-v1" => Ok(Self::CMD3V1),
-            "cmd3-v2" => Ok(Self::CMD3V2),
-            "cmd3-v3" => Ok(Self::CMD3V3),
+            "cmd3-default" => Ok(Self::CMD3),
+            "cmd3-reasoning" => Ok(Self::CMD3Reasoning),
+            "cmd3-default-thinking" => Ok(Self::CMD3DefaultThinking),
             _ => Err(MelodyError::TemplateValidation(format!(
                 "unknown template id: {o}"
             ))),
@@ -190,9 +193,9 @@ impl FromStr for CMD3JinjaTemplates {
 impl CMD3JinjaTemplates {
     fn get_template(&self) -> &str {
         match *self {
-            CMD3JinjaTemplates::CMD3V1 => CMD3V1_JINJA_TEMPLATE,
-            CMD3JinjaTemplates::CMD3V2 => CMD3V2_JINJA_TEMPLATE,
-            CMD3JinjaTemplates::CMD3V3 => CMD3V3_JINJA_TEMPLATE,
+            CMD3JinjaTemplates::CMD3 => CMD3_JINJA_TEMPLATE,
+            CMD3JinjaTemplates::CMD3Reasoning => CMD3_REASONING_JINJA_TEMPLATE,
+            CMD3JinjaTemplates::CMD3DefaultThinking => CMD3_DEFAULT_THINKING_JINJA_TEMPLATE,
         }
     }
 }
@@ -372,7 +375,7 @@ pub fn render_cmd3(opts: &RenderCmd3Options) -> Result<String, MelodyError> {
         add_jinja_substitutions_cmd3(&mut substitutions, opts);
 
         let mut active_template = if opts.template_jinja.is_empty() {
-            CMD3V1_JINJA_TEMPLATE
+            CMD3_JINJA_TEMPLATE
         } else {
             opts.template_jinja
         };
@@ -624,7 +627,7 @@ mod tests {
             println!("Running cmd3v3 test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             if test_name != "template_provided" {
-                opts.template = CMD3V3_TEMPLATE;
+                opts.template = CMD3_DEFAULT_THINKING_TEMPLATE;
             }
             if opts.reasoning_type.is_none() || opts.reasoning_type == Some(ReasoningType::Unknown)
             {
@@ -642,7 +645,7 @@ mod tests {
             println!("Running cmd3 v1 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
-            opts.template_jinja = CMD3V1_JINJA_HF_TEMPLATE;
+            opts.template_jinja = CMD3_HF_JINJA_TEMPLATE;
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
@@ -654,7 +657,7 @@ mod tests {
             println!("Running cmd3 v2 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
-            opts.template_jinja = CMD3V2_JINJA_TEMPLATE;
+            opts.template_jinja = CMD3_REASONING_JINJA_TEMPLATE;
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
@@ -666,7 +669,7 @@ mod tests {
             println!("Running cmd3 v3 jinja test case: {}", test_name);
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
-            opts.template_jinja = CMD3V3_JINJA_TEMPLATE;
+            opts.template_jinja = CMD3_DEFAULT_THINKING_JINJA_TEMPLATE;
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
@@ -701,7 +704,7 @@ mod tests {
             let mut opts = deserialize::<_, RenderCmd3Options>(&input_json).unwrap();
             opts.use_jinja = true;
             if test_name != "template_provided" {
-                opts.template_jinja = CMD3V3_JINJA_TEMPLATE;
+                opts.template_jinja = CMD3_DEFAULT_THINKING_JINJA_TEMPLATE;
             }
             let rendered = render_cmd3(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);

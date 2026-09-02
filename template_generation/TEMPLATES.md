@@ -11,10 +11,10 @@ different products that coexist with the default.
 
 | `template_id` | Kind | Generated file |
 | --- | --- | --- |
-| `cmd3-v1` | variant (default Command 3; Command R / A / Vision / Translate) | `gen/templates/jinja/cmd3-v1.jinja` |
-| `cmd3-v2` | variant (reasoning default-on; North Large, some C4 translate) | `gen/templates/jinja/cmd3-v2.jinja` |
-| `cmd3-v3` | variant (v2 + default thinking filler; Command A Reasoning) | `gen/templates/jinja/cmd3-v3.jinja` |
-| `cmd3-v1-hf` | variant (HuggingFace wrapper of cmd3-v1) | `gen/templates/jinja/cmd3-v1-hf.jinja` |
+| `cmd3-default` | variant (default Command 3; Command R / A / Vision / Translate) | `gen/templates/jinja/cmd3-default.jinja` |
+| `cmd3-reasoning` | variant (reasoning default-on; North Large, some C4 translate) | `gen/templates/jinja/cmd3-reasoning.jinja` |
+| `cmd3-default-thinking` | variant (reasoning + default thinking filler; Command A Reasoning) | `gen/templates/jinja/cmd3-default-thinking.jinja` |
+| `cmd3-hf` | variant (HuggingFace wrapper of cmd3) | `gen/templates/jinja/cmd3-hf.jinja` |
 | `cmd4` | current cmd4 (v2) | `gen/templates/jinja/cmd4.jinja` |
 | `cmd4-hf` | variant (HuggingFace wrapper of current cmd4) | `gen/templates/jinja/cmd4-hf.jinja` |
 | `cmd5` | current cmd5 | `gen/templates/jinja/cmd5.jinja` |
@@ -44,11 +44,11 @@ Paths on a tag are whatever those files were named at that commit. For cmd4:
 | v1 | `cmd4-v1` | `gen/templates/jinja/cmd4-v1.jinja` |
 | v2 | `cmd4-v2` | `gen/templates/jinja/cmd4-v2.jinja` (same content as current `cmd4.jinja`) |
 
-## Freeze on merge
+## Version bump on merge
 
 Merges to `main` that change a generated artifact under `gen/templates/` tag
 the previous `main` SHA as `<template_id>-vN` (`N` is one past the highest
-existing tag for that id). New files are not frozen until they are replaced.
+existing tag for that id). New files are not tagged until they are replaced.
 Each id has its own series, including wrappers (`cmd4-hf`).
 
-This is [`.github/workflows/freeze-templates.yml`](../.github/workflows/freeze-templates.yml).
+This is [`.github/workflows/version-bump.yml`](../.github/workflows/version-bump.yml).
