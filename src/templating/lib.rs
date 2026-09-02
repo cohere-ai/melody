@@ -756,7 +756,8 @@ mod tests {
             };
             let err = render_cmd4(&opts).unwrap_err();
             assert!(
-                err.to_string().contains(&format!("unknown template id: {id}")),
+                err.to_string()
+                    .contains(&format!("unknown template id: {id}")),
                 "unexpected error: {err}"
             );
         }
