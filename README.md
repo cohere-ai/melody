@@ -114,6 +114,13 @@ let options = templating::RenderCmd4Options {
 let prompt = templating::render_cmd4(&options).unwrap();
 ```
 
+### Template versions
+
+`main` keeps the current revision of each family plus variants (`cmd4-hf`,
+`cmd5-strict`, …). Old revisions are git tags, created automatically when a
+generated template is replaced on `main`. See
+[`template_generation/TEMPLATES.md`](template_generation/TEMPLATES.md).
+
 ## Releasing
 
 Bump the version in `Cargo.toml` and push to `main`. The CI will automatically create a GitHub release, build wheels for all platforms, and publish to PyPI.

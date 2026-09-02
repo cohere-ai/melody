@@ -1,7 +1,8 @@
 # paths are relative to src/template_generation/templates/liquid
-cmd3-v1:
-  path: cmd3/cmd3-v1.tmpl
-  variables:
+
+cmd3-default:
+  path: cmd3/cmd3.tmpl
+  variables: &cmd3_vars
     rag_augmented_generation_tool:
       path: cmd3/vars/rag_augmented_generation_tool.tmpl
     contextual_safety_preamble:
@@ -19,48 +20,16 @@ cmd3-v1:
     reasoning_preamble:
       path: cmd3/vars/reasoning_preamble.tmpl
 
-cmd3-v2:
-  path: cmd3/cmd3-v2.tmpl
-  variables:
-    rag_augmented_generation_tool:
-      path: cmd3/vars/rag_augmented_generation_tool.tmpl
-    contextual_safety_preamble:
-      path: cmd3/vars/contextual_safety_preamble.tmpl
-    strict_safety_preamble:
-      path: cmd3/vars/strict_safety_preamble.tmpl
-    rag_preamble_citation_mode_fast:
-      path: cmd3/vars/rag_preamble_citation_mode_fast.tmpl
-    rag_preamble_citation_mode_none:
-      path: cmd3/vars/rag_preamble_citation_mode_none.tmpl
-    rag_preamble_skip_thinking_citation_mode_fast:
-      path: cmd3/vars/rag_preamble_skip_thinking_citation_mode_fast.tmpl
-    rag_preamble_skip_thinking_citation_mode_none:
-      path: cmd3/vars/rag_preamble_skip_thinking_citation_mode_none.tmpl
-    reasoning_preamble:
-      path: cmd3/vars/reasoning_preamble.tmpl
+cmd3-reasoning:
+  path: cmd3/cmd3-reasoning.tmpl
+  variables: *cmd3_vars
 
-cmd3-v3:
-  path: cmd3/cmd3-v3.tmpl
-  variables:
-    rag_augmented_generation_tool:
-      path: cmd3/vars/rag_augmented_generation_tool.tmpl
-    contextual_safety_preamble:
-      path: cmd3/vars/contextual_safety_preamble.tmpl
-    strict_safety_preamble:
-      path: cmd3/vars/strict_safety_preamble.tmpl
-    rag_preamble_citation_mode_fast:
-      path: cmd3/vars/rag_preamble_citation_mode_fast.tmpl
-    rag_preamble_citation_mode_none:
-      path: cmd3/vars/rag_preamble_citation_mode_none.tmpl
-    rag_preamble_skip_thinking_citation_mode_fast:
-      path: cmd3/vars/rag_preamble_skip_thinking_citation_mode_fast.tmpl
-    rag_preamble_skip_thinking_citation_mode_none:
-      path: cmd3/vars/rag_preamble_skip_thinking_citation_mode_none.tmpl
-    reasoning_preamble:
-      path: cmd3/vars/reasoning_preamble.tmpl
+cmd3-default-thinking:
+  path: cmd3/cmd3-default-thinking.tmpl
+  variables: *cmd3_vars
 
-cmd4-v1:
-  path: cmd4/cmd4-v1.tmpl
+cmd4:
+  path: cmd4/cmd4.tmpl
   variables:
     grounding_preamble:
       path: cmd4/vars/grounding_preamble.tmpl
