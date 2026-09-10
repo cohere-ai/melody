@@ -2310,6 +2310,7 @@ mod tests {
         // when the whole output is parsed at once.
         let mut f = make_cmd4_no_tools_filter();
         let r = f.write_decoded("think<|END_THINKING|><|START_TEXT|>a\n<|END_TEXT|>");
+        assert_eq!(r.reasoning.as_deref(), Some("think"));
         assert_eq!(r.content.as_deref(), Some("a"));
         let mut f = make_cmd4_no_tools_filter();
         let r = f.process_full_text("think<|END_THINKING|><|START_TEXT|>a\n<|END_TEXT|>");
