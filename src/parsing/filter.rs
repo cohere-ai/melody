@@ -424,7 +424,7 @@ impl FilterImpl {
         self.cur_text_byte_index += text.len();
         vec![FilterOutput {
             text,
-            is_reasoning: self.mode == FilterMode::ToolReason,
+            is_reasoning: self.is_reasoning(),
             ..Default::default()
         }]
     }
@@ -728,6 +728,12 @@ impl FilterImpl {
             all_outputs.extend(o);
         }
         aggregate(all_outputs)
+    }
+
+    /// Whether the filter is currently inside a reasoning block.
+    #[must_use]
+    pub fn is_reasoning(&self) -> bool {
+        self.mode == FilterMode::ToolReason
     }
 
     /// Classify decoded chunks by whether they emit content.
@@ -2431,5 +2437,24 @@ mod tests {
             streamed_result.tool_calls[0].arguments, expected_args,
             "streamed args must match full-text (no trailing null on json leaf)"
         );
+    }
+
+    #[test]
+    fn test_is_reasoning_tracks_thinking_mode() {
+        let mut f = make_cmd4_no_tools_filter();
+        assert!(f.is_reasoning(), "cmd4 starts in thinking mode");
+        f.write_decoded("think");
+        assert!(f.is_reasoning());
+        f.write_decoded("<|END_THINKING|>");
+        assert!(!f.is_reasoning());
+        f.write_decoded("<|START_TEXT|>answer");
+        assert!(!f.is_reasoning());
+
+        let mut f = make_cmd3_filter();
+        assert!(!f.is_reasoning(), "cmd3 starts in answer mode");
+        f.write_decoded("<|START_THINKING|>think");
+        assert!(f.is_reasoning());
+        f.write_decoded("<|END_THINKING|><|START_ACTION|>");
+        assert!(!f.is_reasoning());
     }
 }
