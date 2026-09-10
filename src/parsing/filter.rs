@@ -2317,6 +2317,49 @@ mod tests {
         assert_eq!(r.content.as_deref(), Some("a"));
     }
 
+    /// An unclosed citation whose body was already streamed early (tool
+    /// filter, `stream_non_grounded_answer` off) must not be emitted a second
+    /// time when the leftover `<co>…` buffer is flushed.
+    #[test]
+    fn test_unclosed_citation_leftover_is_not_duplicated_on_flush() {
+        // Streamed early, then flushed before `<|END_TEXT|>`.
+        let mut f = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        f.write_decoded("<|START_TEXT|>");
+        assert_eq!(
+            f.write_decoded("sky is <co>blue").content.as_deref(),
+            Some("sky is blue")
+        );
+        assert_eq!(f.write_decoded("<|END_TEXT|>").content, None);
+
+        // Streamed early, then flushed at end of stream.
+        let mut f = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        f.write_decoded("<|START_TEXT|>");
+        assert_eq!(
+            f.write_decoded("sky is <co>blue").content.as_deref(),
+            Some("sky is blue")
+        );
+        assert_eq!(f.flush_partials().content, None);
+
+        // Same, parsed in one go.
+        let mut f = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        let r = f.process_full_text("<|START_TEXT|>sky is <co>blue");
+        assert_eq!(r.content.as_deref(), Some("sky is blue"));
+
+        // Never streamed (fully buffered): emitted once, raw.
+        let mut f = new_filter(
+            FilterOptions::default()
+                .cmd4()
+                .no_tools()
+                .stream_non_grounded_answer(),
+        );
+        f.write_decoded("<|START_THINKING|>");
+        assert_eq!(f.write_decoded("sky is <co>blue").reasoning, None);
+        assert_eq!(
+            f.write_decoded("<|END_THINKING|>").reasoning.as_deref(),
+            Some("sky is <co>blue")
+        );
+    }
+
     /// A chunk whose tail looks like the start of a citation (`<`, `<c`,
     /// `<co`) is held back while more input may arrive, but once a special
     /// token follows it in the same buffer it can never complete. It must be
