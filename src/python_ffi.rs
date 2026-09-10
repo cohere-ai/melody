@@ -369,6 +369,11 @@ impl PyFilter {
         self.inner.flush_partials()
     }
 
+    /// Whether the filter is currently inside a reasoning block.
+    fn is_reasoning(&self) -> bool {
+        self.inner.is_reasoning()
+    }
+
     /// Process a complete output token-by-token and return a single result
     /// with fully accumulated tool calls.
     #[allow(clippy::needless_pass_by_value)]
