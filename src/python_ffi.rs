@@ -145,7 +145,8 @@ impl PyFilterOptions {
         }
     }
 
-    /// Disable tool call parsing by removing the action tokens.
+    /// Reasoning-only filter: tool markup is plain text, and bytes still held
+    /// back when the reasoning end token arrives are flushed verbatim.
     fn no_tools(&self) -> Self {
         PyFilterOptions {
             inner: self.inner.clone().no_tools(),

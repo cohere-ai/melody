@@ -39,6 +39,9 @@ pub struct FilterOptions {
     pub(crate) stream_processed_params: bool,
     pub(crate) has_tool_call_id: bool,
     pub(crate) cmd3_citations: bool,
+    /// Token after which any bytes still held back at the end of a
+    /// `write_decoded` call are flushed verbatim.
+    pub(crate) flush_after_token: Option<String>,
 }
 
 impl Default for FilterOptions {
@@ -56,6 +59,7 @@ impl Default for FilterOptions {
             stream_processed_params: false,
             has_tool_call_id: false,
             cmd3_citations: false,
+            flush_after_token: None,
         }
     }
 }
@@ -449,8 +453,9 @@ impl FilterOptions {
 
     /// Disable tool call parsing by removing the action tokens.
     ///
-    /// Removes `<|START_ACTION|>` and `<|END_ACTION|>` from the special token map
-    /// so the filter treats tool call markup as plain text.
+    /// Removes `<|START_ACTION|>` and `<|END_ACTION|>` from the special token
+    /// map so tool markup passes through as plain text for the tool filter to
+    /// parse. Everything else is still parsed as usual.
     ///
     /// # Examples
     ///
@@ -465,6 +470,9 @@ impl FilterOptions {
     pub fn no_tools(mut self) -> Self {
         self.special_token_map.remove("<|START_ACTION|>");
         self.special_token_map.remove("<|END_ACTION|>");
+        if self.special_token_map.contains_key("<|END_THINKING|>") {
+            self.flush_after_token = Some("<|END_THINKING|>".to_string());
+        }
         self
     }
 

@@ -213,6 +213,9 @@ pub struct FilterImpl {
     pub(crate) buf: Vec<u8>,
     pub(crate) mode: FilterMode,
     pub(crate) done: bool,
+    /// After this token is consumed, the bytes still buffered at the end
+    /// are emitted verbatim instead of being held.
+    pub(crate) flush_after_token: Option<String>,
 }
 
 struct SpecialTokenMatch {
@@ -270,6 +273,7 @@ impl FilterImpl {
             buf: Vec::new(),
             mode: FilterMode::PlainText,
             done: false,
+            flush_after_token: None,
         }
     }
 
@@ -284,6 +288,7 @@ impl FilterImpl {
         self.cmd3_citations = options.cmd3_citations;
         self.default_mode = options.default_mode;
         self.mode = options.default_mode;
+        self.flush_after_token = options.flush_after_token;
 
         // Merge special token maps
         for (token, mode) in &options.special_token_map {
@@ -328,13 +333,21 @@ impl FilterImpl {
 
         // loop until no special token is detected to avoid leaking
         // unconsumed tokens.
+        let mut flush_tail = false;
         loop {
             match self.detect_special_token() {
+                // A partial match normally waits for more input, but not when
+                // the tail must be flushed at the end of this call.
+                SpecialTokenScanResult::Partial if flush_tail => break,
                 SpecialTokenScanResult::Partial => return out,
                 SpecialTokenScanResult::NoMatch => break,
                 SpecialTokenScanResult::Found(token_match) => {
                     match self.apply_special_token_match(&token_match, &mut out) {
-                        SpecialTokenOutcome::Consumed => {}
+                        SpecialTokenOutcome::Consumed => {
+                            if self.flush_after_token.as_deref() == Some(&token_match.sequence) {
+                                flush_tail = true;
+                            }
+                        }
                         SpecialTokenOutcome::Stop => return out,
                         // Rejected matches (e.g. `Answer:` while already in
                         // GroundedAnswer) leave buf and mode untouched, so
@@ -350,7 +363,7 @@ impl FilterImpl {
         if !self.buf.is_empty() {
             self.num_tokens_in_chunk += 1;
 
-            if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size {
+            if self.chunk_size > 1 && self.num_tokens_in_chunk < self.chunk_size && !flush_tail {
                 return out;
             }
 
@@ -364,7 +377,27 @@ impl FilterImpl {
             self.num_tokens_in_chunk = 0;
         }
 
+        if flush_tail && !self.buf.is_empty() {
+            out.extend(self.flush_buffer_verbatim());
+        }
+
         out
+    }
+
+    /// Emit whatever is buffered as plain text, without trimming or waiting
+    /// for a possible marker / citation to complete.
+    fn flush_buffer_verbatim(&mut self) -> Vec<FilterOutput> {
+        let buf = std::mem::take(&mut self.buf);
+        self.num_tokens_in_chunk = 0;
+        self.cur_citation_byte_index = None;
+        let text = String::from_utf8_lossy(&buf).into_owned();
+        self.cur_text_index += text.chars().count();
+        self.cur_text_byte_index += text.len();
+        vec![FilterOutput {
+            text,
+            is_reasoning: self.mode == FilterMode::ToolReason,
+            ..Default::default()
+        }]
     }
 
     fn detect_special_token(&self) -> SpecialTokenScanResult {
@@ -414,9 +447,13 @@ impl FilterImpl {
         }
 
         // `idx` is a byte offset produced by string search on `decoded`.
+        // The bytes before the token can never be extended, so flush them as
+        // final (`after_last_token = true`): a trailing partial citation
+        // opener such as `<`, `<c` or `<co` is emitted as literal text
+        // instead of being drained silently while waiting for more input.
         let pre_special_token = &token_match.decoded[..token_match.idx];
         if !pre_special_token.is_empty() {
-            let (o, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), false);
+            let (o, _) = self.handle_token(self.mode, pre_special_token.as_bytes(), true);
             out.extend(o);
         }
 
@@ -1433,6 +1470,22 @@ mod tests {
     }
 
     #[test]
+    fn test_process_full_text_matches_process_full_cmd4_no_tools() {
+        let text = "<|START_THINKING|>Plan: step 1.\
+                     <|END_THINKING|>\
+                     <|START_TEXT|>a <b> c\n  d\
+                     <|END_TEXT|>";
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+
+        let result_full_text = make_cmd4_no_tools_filter().process_full_text(text);
+        let result_full = make_cmd4_no_tools_filter().process_full(&chunks);
+
+        assert_eq!(result_full_text.reasoning, result_full.reasoning);
+        assert_eq!(result_full_text.content, result_full.content);
+        assert_eq!(result_full.content.as_deref(), Some("a <b> c\n  d"));
+    }
+
+    #[test]
     fn test_process_full_text_matches_process_full_plain_text() {
         let text = "Just plain text without any markers.";
 
@@ -1557,6 +1610,117 @@ mod tests {
         assert_eq!(result.reasoning, Some("Reasoning.".into()));
         assert_eq!(result.content, Some("Answer.".into()));
         assert!(result.tool_calls.is_empty());
+    }
+
+    /// vLLM hands the stream to its tool filter right after the call that
+    /// contains `<|END_THINKING|>`, so a `no_tools` filter must not hold
+    /// anything back at the end of that call: trailing whitespace and a
+    /// partial `<` marker / citation prefix are flushed verbatim. Later
+    /// calls (standalone use) keep parsing markers as usual.
+    #[test]
+    fn test_no_tools_flushes_held_back_tail_at_reasoning_end() {
+        let mut f = make_cmd4_no_tools_filter();
+        f.write_decoded("<|START_THINKING|>");
+        f.write_decoded("think");
+        let r = f.write_decoded("<|END_THINKING|><|START_TEXT|>import sys\n");
+        assert_eq!(r.reasoning, None);
+        assert_eq!(r.content.as_deref(), Some("import sys\n"));
+        let r = f.write_decoded("from array<|END_TEXT|>");
+        assert_eq!(r.content.as_deref(), Some("from array"));
+
+        // A partial marker / citation prefix is not held back either.
+        let mut f = make_cmd4_no_tools_filter();
+        let r = f.write_decoded("think <<|END_THINKING|><|START_TEXT|>#include <");
+        assert_eq!(r.reasoning.as_deref(), Some("think <"));
+        assert_eq!(r.content.as_deref(), Some("#include <"));
+
+        // Nor by `chunk_size` batching.
+        let mut f = new_filter(
+            FilterOptions::default()
+                .cmd4()
+                .no_tools()
+                .with_chunk_size(8),
+        );
+        let r = f.write_decoded("think<|END_THINKING|><|START_TEXT|>import sys\n");
+        assert_eq!(r.content.as_deref(), Some("import sys\n"));
+
+        // Nothing changes when the block closes within the same call, or
+        // when the whole output is parsed at once.
+        let mut f = make_cmd4_no_tools_filter();
+        let r = f.write_decoded("think<|END_THINKING|><|START_TEXT|>a\n<|END_TEXT|>");
+        assert_eq!(r.reasoning.as_deref(), Some("think"));
+        assert_eq!(r.content.as_deref(), Some("a"));
+        let mut f = make_cmd4_no_tools_filter();
+        let r = f.process_full_text("think<|END_THINKING|><|START_TEXT|>a\n<|END_TEXT|>");
+        assert_eq!(r.reasoning.as_deref(), Some("think"));
+        assert_eq!(r.content.as_deref(), Some("a"));
+    }
+
+    /// An unclosed citation whose body was already streamed early (tool
+    /// filter) must not be emitted a second time when the leftover `<co>…`
+    /// buffer is flushed.
+    #[test]
+    fn test_unclosed_citation_leftover_is_not_duplicated_on_flush() {
+        // Streamed early, then flushed before `<|END_TEXT|>`.
+        let mut f = make_cmd4_filter();
+        f.write_decoded("<|START_TEXT|>");
+        assert_eq!(
+            f.write_decoded("sky is <co>blue").content.as_deref(),
+            Some("sky is blue")
+        );
+        assert_eq!(f.write_decoded("<|END_TEXT|>").content, None);
+
+        // Streamed early, then flushed at end of stream.
+        let mut f = make_cmd4_filter();
+        f.write_decoded("<|START_TEXT|>");
+        assert_eq!(
+            f.write_decoded("sky is <co>blue").content.as_deref(),
+            Some("sky is blue")
+        );
+        assert_eq!(f.flush_partials().content, None);
+
+        // Same, parsed in one go.
+        let mut f = make_cmd4_filter();
+        let r = f.process_full_text("<|START_TEXT|>sky is <co>blue");
+        assert_eq!(r.content.as_deref(), Some("sky is blue"));
+
+        // Never streamed (fully buffered): emitted once, raw.
+        let mut f = new_filter(
+            FilterOptions::default()
+                .cmd4()
+                .no_tools()
+                .stream_non_grounded_answer(),
+        );
+        f.write_decoded("<|START_THINKING|>");
+        assert_eq!(f.write_decoded("sky is <co>blue").reasoning, None);
+        assert_eq!(
+            f.write_decoded("<|END_THINKING|>").reasoning.as_deref(),
+            Some("sky is <co>blue")
+        );
+    }
+
+    /// A chunk whose tail looks like the start of a citation (`<`, `<c`,
+    /// `<co`) is held back while more input may arrive, but once a special
+    /// token follows it in the same buffer it can never complete. It must be
+    /// emitted as literal text, not drained silently with the token.
+    #[test]
+    fn test_write_decoded_partial_citation_prefix_before_special_token_is_kept() {
+        let mut f = make_cmd4_no_tools_filter();
+        f.write_decoded("<|START_THINKING|>");
+        assert_eq!(f.write_decoded("I think a <").reasoning, None);
+        let r = f.write_decoded("<|END_THINKING|>");
+        assert_eq!(r.reasoning.as_deref(), Some("I think a <"));
+
+        let mut f = make_cmd4_filter();
+        f.write_decoded("<|START_TEXT|>");
+        assert_eq!(f.write_decoded("std::vector<c").content, None);
+        let r = f.write_decoded("<|END_TEXT|>");
+        assert_eq!(r.content.as_deref(), Some("std::vector<c"));
+
+        // Same, arriving in one speculative-decoding delta.
+        let mut f = make_cmd4_filter();
+        let r = f.write_decoded("<|START_TEXT|>x <<|END_TEXT|>");
+        assert_eq!(r.content.as_deref(), Some("x <"));
     }
 
     #[test]
