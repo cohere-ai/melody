@@ -72,6 +72,40 @@ func TestParseVisionGenerationUnclosed(t *testing.T) {
 	}
 }
 
+func TestParseTruncatedVisionGenerationRecoversPartialElement(t *testing.T) {
+	gen, err := ParseTruncatedVisionGeneration("before\n\n[visual_element]\ntype: table\n" +
+		"description: partial description\nhtml: <table><tr><td>a</td></tr>\nbbox: 1,2,3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gen.Segments) != 2 {
+		t.Fatalf("got %d segments, want 2: %+v", len(gen.Segments), gen.Segments)
+	}
+	el := gen.Segments[1].Element
+	if el == nil || el.Type != "table" || !el.Truncated {
+		t.Fatalf("segment 1: %+v", gen.Segments[1])
+	}
+	if el.BBox != nil {
+		t.Fatalf("expected malformed trailing bbox to be dropped, got %+v", el.BBox)
+	}
+	if el.Description == nil || *el.Description != "partial description" {
+		t.Fatalf("description=%v", el.Description)
+	}
+	if el.HTML == nil || *el.HTML != "<table><tr><td>a</td></tr>" {
+		t.Fatalf("html=%v", el.HTML)
+	}
+}
+
+func TestParseTruncatedVisionGenerationStillErrorsOnClosedElementBadBBox(t *testing.T) {
+	_, err := ParseTruncatedVisionGeneration("[visual_element]\nbbox: 1,2,3\n[/visual_element]")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "invalid bbox") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestParseVisionGenerationProseOnly(t *testing.T) {
 	gen, err := ParseVisionGeneration("hello\n\nworld\n")
 	if err != nil {

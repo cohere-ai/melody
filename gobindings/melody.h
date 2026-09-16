@@ -192,6 +192,7 @@ typedef struct {
     char* description;       // null if absent
     char* title;             // null if absent
     char* html;              // null if absent
+    bool truncated;          // true if recovered from a truncated generation
 } CVisionElement;
 
 typedef struct {
@@ -211,6 +212,7 @@ typedef struct {
 } CVisionGenerationResponse;
 
 extern CVisionGenerationResponse* melody_parse_vision_generation(const char* text);
+extern CVisionGenerationResponse* melody_parse_truncated_vision_generation(const char* text);
 extern void melody_vision_generation_free(CVisionGenerationResponse* res);
 
 typedef struct CFilter CFilter;
