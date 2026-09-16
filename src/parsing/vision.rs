@@ -134,9 +134,7 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
 ///
 /// Returns [`VisionParseError::InvalidBBox`] if a `bbox` field on a closed element
 /// is malformed.
-pub fn parse_truncated_vision_generation(
-    text: &str,
-) -> Result<VisionGeneration, VisionParseError> {
+pub fn parse_truncated_vision_generation(text: &str) -> Result<VisionGeneration, VisionParseError> {
     parse_vision_generation_inner(text, true)
 }
 
