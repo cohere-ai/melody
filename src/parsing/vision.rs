@@ -5,6 +5,7 @@
 //! parse endpoints consume the full generation before mapping to an API response.
 
 use std::collections::HashMap;
+use std::ops::Not;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -73,14 +74,8 @@ pub struct VisionElement {
     /// mid-block (see [`parse_truncated_vision_generation`]). A truncated element's
     /// fields reflect only what was emitted before the cutoff; e.g. a `bbox` with
     /// too few numbers is dropped rather than treated as an error.
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default, skip_serializing_if = "<&bool>::not")]
     pub truncated: bool,
-}
-
-// serde's `skip_serializing_if` always calls with `&bool`, so this can't take `bool` by value.
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_false(b: &bool) -> bool {
-    !*b
 }
 
 /// Pixel bounding box: `top_left_x, top_left_y, bottom_right_x, bottom_right_y`.
