@@ -27,6 +27,8 @@ jobs:
         run: |
           PATHS=(
             ':src/templating/templates/**'
+            ':template_generation/**'
+            ':gen/templates/**'
             ':tests/templating/jinja/python/**'
             ':*.jinja'
             ':*.py'

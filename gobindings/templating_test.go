@@ -102,7 +102,7 @@ func TestTemplating_RenderCMD3_DirCases_Jinja(t *testing.T) {
 
 func TestTemplating_RenderCMD4_DirCases_Jinja(t *testing.T) {
 	t.Parallel()
-	cases := readTemplatingTestCases(t, "cmd4")
+	cases := readTemplatingTestCases(t, "cmd4_jinja")
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

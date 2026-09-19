@@ -1,0 +1,195 @@
+name: version bump
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gen/templates/**"
+      - ".github/workflows/version-bump.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const before = context.payload.before;
+            const after = context.sha;
+            const artifact = /^(gen\/templates\/jinja\/[^/]+\.jinja|gen\/templates\/liquid\/[^/]+\.tmpl)$/;
+            const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const sameSha = (a, b) => a.toLowerCase() === b.toLowerCase();
+
+            if (!before || /^0+$/.test(before)) {
+              core.info('no previous commit; skip');
+              return;
+            }
+
+            async function templateBlobs(commitSha) {
+              const { data: commit } = await github.rest.git.getCommit({
+                owner,
+                repo,
+                commit_sha: commitSha,
+              });
+              let treeSha = commit.tree.sha;
+              for (const segment of ['gen', 'templates']) {
+                const { data: tree } = await github.rest.git.getTree({
+                  owner,
+                  repo,
+                  tree_sha: treeSha,
+                });
+                const entry = tree.tree.find(
+                  (item) => item.path === segment && item.type === 'tree',
+                );
+                if (!entry) {
+                  return new Map();
+                }
+                treeSha = entry.sha;
+              }
+              const { data: tree } = await github.rest.git.getTree({
+                owner,
+                repo,
+                tree_sha: treeSha,
+                recursive: 'true',
+              });
+              if (tree.truncated) {
+                throw new Error(`git tree for gen/templates at ${commitSha} is truncated`);
+              }
+              const blobs = new Map();
+              for (const item of tree.tree) {
+                if (item.type !== 'blob' || !item.path) {
+                  continue;
+                }
+                const path = `gen/templates/${item.path}`;
+                if (!artifact.test(path)) {
+                  continue;
+                }
+                blobs.set(path, item.sha);
+              }
+              return blobs;
+            }
+
+            const ids = new Set();
+            try {
+              const [oldBlobs, newBlobs] = await Promise.all([
+                templateBlobs(before),
+                templateBlobs(after),
+              ]);
+              for (const [path, sha] of oldBlobs) {
+                const next = newBlobs.get(path);
+                if (next && next !== sha) {
+                  ids.add(path.split('/').pop().replace(/\.(jinja|tmpl)$/, ''));
+                }
+              }
+            } catch (err) {
+              if (err.status === 404) {
+                core.info(`cannot read trees ${before}...${after}; skip`);
+                return;
+              }
+              throw err;
+            }
+
+            if (ids.size === 0) {
+              core.info('no template replacements to version');
+              return;
+            }
+
+            const tagNameRe = (id) => new RegExp(`^refs/tags/${escapeRe(id)}-v([0-9]+)$`);
+
+            const allTagRefs = await github.paginate(github.rest.git.listMatchingRefs, {
+              owner,
+              repo,
+              ref: 'tags',
+            });
+
+            function tagsFor(id) {
+              const re = tagNameRe(id);
+              return allTagRefs.filter((r) => re.test(r.ref));
+            }
+
+            async function peeledCommit(ref) {
+              if (ref.object.type === 'commit') {
+                return ref.object.sha;
+              }
+              const { data: tag } = await github.rest.git.getTag({
+                owner,
+                repo,
+                tag_sha: ref.object.sha,
+              });
+              return tag.object.sha;
+            }
+
+            function nextVersion(id) {
+              let max = 0;
+              const re = tagNameRe(id);
+              for (const ref of tagsFor(id)) {
+                const n = Number(ref.ref.match(re)[1]);
+                if (n > max) {
+                  max = n;
+                }
+              }
+              return max + 1;
+            }
+
+            for (const id of [...ids].sort()) {
+              const existing = tagsFor(id);
+              let already = false;
+              for (const ref of existing) {
+                if (sameSha(await peeledCommit(ref), before)) {
+                  core.info(`skip ${id}: ${before.slice(0, 7)} already tagged as ${ref.ref.replace('refs/tags/', '')}`);
+                  already = true;
+                  break;
+                }
+              }
+              if (already) {
+                continue;
+              }
+
+              const version = nextVersion(id);
+              const tag = `${id}-v${version}`;
+              try {
+                const { data: tagObj } = await github.rest.git.createTag({
+                  owner,
+                  repo,
+                  tag,
+                  message: `${id} template v${version}`,
+                  object: before,
+                  type: 'commit',
+                  tagger: {
+                    name: 'github-actions[bot]',
+                    email: '41898282+github-actions[bot]@users.noreply.github.com',
+                    date: new Date().toISOString(),
+                  },
+                });
+                await github.rest.git.createRef({
+                  owner,
+                  repo,
+                  ref: `refs/tags/${tag}`,
+                  sha: tagObj.sha,
+                });
+                core.info(`created ${tag} at ${before.slice(0, 7)}`);
+                allTagRefs.push({
+                  ref: `refs/tags/${tag}`,
+                  object: { type: 'commit', sha: before },
+                });
+              } catch (err) {
+                if (err.status === 422) {
+                  const conflict = existing.find((r) => r.ref === `refs/tags/${tag}`);
+                  if (conflict && sameSha(await peeledCommit(conflict), before)) {
+                    core.info(`skip ${id}: ${tag} already exists at ${before.slice(0, 7)}`);
+                    continue;
+                  }
+                  throw new Error(`${tag} already exists but does not point at ${before.slice(0, 7)}`);
+                }
+                throw err;
+              }
+            }

@@ -23,7 +23,7 @@ def render_template_jinja2(template_dir: str, template_name: str, **kwargs: Any)
         trim_blocks=True,
         extensions=["jinja2.ext.loopcontrols"],
     )
-    if "cmd3-v1" in template_name:
+    if template_name in {"cmd3-default.jinja", "cmd3-hf.jinja"}:
         kwargs["add_generation_prompt"] = True
     # Overriding tojson with ensure_ascii=False so that tojson doesn't write unicode
     # characters as \uxxxx
@@ -59,7 +59,7 @@ def render_template_minijinja(
         lstrip_blocks=True,
         trim_blocks=True,
     )
-    if "cmd3-v1" in template_name:
+    if template_name in {"cmd3-default.jinja", "cmd3-hf.jinja"}:
         kwargs["add_generation_prompt"] = True
 
     return env.render_template(template_name, **kwargs)
@@ -97,14 +97,13 @@ def get_template_info(template_path: str) -> tuple[str, str]:
     "template_path, test_dir",
     [
         (
-            "templates/jinja/cmd3-v1.jinja",
+            "templates/jinja/cmd3-default.jinja",
             "jinja_tests/cmd3_v1_hf/chat_merged_template_v1",
         ),
         (
-            "templates/jinja/cmd3-v2.jinja",
+            "templates/jinja/cmd3-reasoning.jinja",
             "jinja_tests/cmd3_reasoning_hf/chat_merged_template",
         ),
-        ("templates/jinja/cmd4-v1.jinja", "jinja_tests/cmd4_v1/chat_template"),
     ],
 )
 @pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])

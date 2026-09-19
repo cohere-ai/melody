@@ -38,7 +38,7 @@ def get_cmd3_v2_tests() -> list[tuple[str, str, str]]:
     test_dir = "liquid_tests/rag/cmd3-v2"
     all_test_files = get_all_files(test_dir)
 
-    merged_template = "templates/jinja/cmd3-v2.jinja"
+    merged_template = "templates/jinja/cmd3-reasoning.jinja"
     template_to_test_files[merged_template] = all_test_files
 
     return get_test_tuples(template_to_test_files, test_dir)
@@ -46,7 +46,7 @@ def get_cmd3_v2_tests() -> list[tuple[str, str, str]]:
 
 def get_cmd3_v1_tests() -> list[tuple[str, str, str]]:
     # get all .json files from the test_dir
-    merged_template = "templates/jinja/cmd3-v1.jinja"
+    merged_template = "templates/jinja/cmd3-default.jinja"
 
     chat_test_dir = "liquid_tests/chat/cmd3-v1"
     rag_test_dir = "liquid_tests/rag/cmd3-v1"
@@ -58,26 +58,18 @@ def get_cmd3_v1_tests() -> list[tuple[str, str, str]]:
 
 def get_cmd3_v3_tests() -> list[tuple[str, str, str]]:
     # get all .json files from the test_dir
-    merged_template = "templates/jinja/cmd3-v3.jinja"
+    merged_template = "templates/jinja/cmd3-default-thinking.jinja"
 
     test_dir = "liquid_tests/rag/cmd3-v3"
 
     return get_tests(merged_template, test_dir)
 
 
-def get_cmd4_v1_tests() -> list[tuple[str, str, str]]:
-    # get all .json files from the test_dir
-    chat_template = "templates/jinja/cmd4-v1.jinja"
-    rag_test_dir = "liquid_tests/rag/cmd4-v1"
-    return get_tests(chat_template, rag_test_dir)
-
-
 def get_template_test_files() -> list[tuple[str, str, str]]:
     cmd3_v2_tests = get_cmd3_v2_tests()
     cmd3_v1_tests = get_cmd3_v1_tests()
     cmd3_v3_tests = get_cmd3_v3_tests()
-    cmd4_v1_tests = get_cmd4_v1_tests()
-    return [*cmd3_v2_tests, *cmd3_v1_tests, *cmd3_v3_tests, *cmd4_v1_tests]
+    return [*cmd3_v2_tests, *cmd3_v1_tests, *cmd3_v3_tests]
 
 
 template_test_files = get_template_test_files()
