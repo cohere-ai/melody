@@ -1,6 +1,7 @@
 use std::hint::black_box;
 
 use cohere_melody::parsing::{Filter, FilterOptions, new_filter};
+use divan::counter::BytesCount;
 
 const PLAIN_ASCII_CHUNKS: &[&str] = &["plain text chunk "];
 const PLAIN_UNICODE_CHUNKS: &[&str] = &["回答🌈", "終わりです", "ありがとう"];
@@ -40,34 +41,70 @@ fn run_repeated_stream(options: FilterOptions, chunks: &[&str], repeats: usize) 
     black_box(filter.flush_partials());
 }
 
+fn stream_bytes(chunks: &[&str], repeats: usize) -> BytesCount {
+    BytesCount::new(chunks.iter().map(|chunk| chunk.len()).sum::<usize>() * repeats)
+}
+
+fn bench_filter_construction(bencher: divan::Bencher, options: FilterOptions) {
+    bencher.bench_local(|| black_box(new_filter(black_box(options.clone()))));
+}
+
+#[divan::bench]
+fn new_filter_default(bencher: divan::Bencher) {
+    bench_filter_construction(bencher, FilterOptions::new());
+}
+
+#[divan::bench]
+fn new_filter_cmd3(bencher: divan::Bencher) {
+    bench_filter_construction(bencher, FilterOptions::new().cmd3());
+}
+
+#[divan::bench]
+fn new_filter_cmd4(bencher: divan::Bencher) {
+    bench_filter_construction(bencher, FilterOptions::new().cmd4());
+}
+
+#[divan::bench]
+fn new_filter_cmd5(bencher: divan::Bencher) {
+    bench_filter_construction(bencher, FilterOptions::new().cmd5());
+}
+
 #[divan::bench(args = [1_024, 16_384, 65_536])]
 fn write_decoded_plain_ascii(bencher: divan::Bencher, repeats: usize) {
-    bencher.bench_local(|| {
-        run_repeated_stream(FilterOptions::new(), PLAIN_ASCII_CHUNKS, repeats);
-    });
+    bencher
+        .counter(stream_bytes(PLAIN_ASCII_CHUNKS, repeats))
+        .bench_local(|| {
+            run_repeated_stream(FilterOptions::new(), PLAIN_ASCII_CHUNKS, repeats);
+        });
 }
 
 #[divan::bench(args = [1_024, 16_384, 65_536])]
 fn write_decoded_plain_unicode(bencher: divan::Bencher, repeats: usize) {
-    bencher.bench_local(|| {
-        run_repeated_stream(FilterOptions::new(), PLAIN_UNICODE_CHUNKS, repeats);
-    });
+    bencher
+        .counter(stream_bytes(PLAIN_UNICODE_CHUNKS, repeats))
+        .bench_local(|| {
+            run_repeated_stream(FilterOptions::new(), PLAIN_UNICODE_CHUNKS, repeats);
+        });
 }
 
-#[divan::bench(args = [256, 4_096, 8_192])]
+#[divan::bench(args = [1, 8, 256, 4_096, 8_192])]
 fn write_decoded_cmd4_reasoning_stream(bencher: divan::Bencher, repeats: usize) {
-    bencher.bench_local(|| {
-        run_repeated_stream(
-            FilterOptions::new().cmd4().no_tools(),
-            CMD4_REASONING_CHUNKS,
-            repeats,
-        );
-    });
+    bencher
+        .counter(stream_bytes(CMD4_REASONING_CHUNKS, repeats))
+        .bench_local(|| {
+            run_repeated_stream(
+                FilterOptions::new().cmd4().no_tools(),
+                CMD4_REASONING_CHUNKS,
+                repeats,
+            );
+        });
 }
 
-#[divan::bench(args = [128, 1_024, 7_280])]
+#[divan::bench(args = [1, 8, 128, 1_024, 7_280])]
 fn write_decoded_cmd4_tool_stream(bencher: divan::Bencher, repeats: usize) {
-    bencher.bench_local(|| {
-        run_repeated_stream(FilterOptions::new().cmd4(), CMD4_TOOL_CHUNKS, repeats);
-    });
+    bencher
+        .counter(stream_bytes(CMD4_TOOL_CHUNKS, repeats))
+        .bench_local(|| {
+            run_repeated_stream(FilterOptions::new().cmd4(), CMD4_TOOL_CHUNKS, repeats);
+        });
 }
