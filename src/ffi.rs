@@ -26,7 +26,7 @@ use crate::parsing::FilterAggregatedResult;
 use crate::parsing::types::{FilterCitation, Source};
 use crate::parsing::{
     Filter, FilterImpl, FilterOptions, VisionElement, VisionGeneration, VisionSegment, new_filter,
-    parse_vision_generation,
+    parse_truncated_vision_generation, parse_vision_generation,
 };
 use crate::templating::{
     CitationQuality, Content, ContentType, Document, Grounding, Image, Message, ReasoningType,
@@ -271,6 +271,9 @@ pub struct CVisionElement {
     pub title: *mut c_char,
     /// HTML markup (null if absent).
     pub html: *mut c_char,
+    /// `true` when recovered from a truncated generation (see
+    /// `melody_parse_truncated_vision_generation`).
+    pub truncated: bool,
 }
 
 /// One segment of a vision generation.
@@ -1805,6 +1808,39 @@ pub unsafe extern "C" fn melody_parse_vision_generation(
     }))
 }
 
+/// Like `melody_parse_vision_generation`, but tolerates a generation cut off
+/// mid-`[visual_element]` block, recovering the trailing partial element instead of
+/// erroring. Only call this when the caller already knows generation stopped due to
+/// a token limit — a bad `bbox` on a *closed* element still errors.
+///
+/// # Safety
+/// Caller must free the return value with `melody_vision_generation_free`.
+/// `text` must be a valid null-terminated UTF-8 C string.
+#[unsafe(no_mangle)]
+#[allow(clippy::missing_panics_doc)]
+pub unsafe extern "C" fn melody_parse_truncated_vision_generation(
+    text: *const c_char,
+) -> *mut CVisionGenerationResponse {
+    catch_panic_vision_generation(AssertUnwindSafe(|| {
+        if text.is_null() {
+            return vision_generation_error("null text pointer");
+        }
+        let Ok(text) = (unsafe { CStr::from_ptr(text).to_str() }) else {
+            return vision_generation_error("text is not valid UTF-8");
+        };
+        match parse_truncated_vision_generation(text) {
+            Ok(parsed) => {
+                let result = unsafe { convert_vision_generation_to_c(parsed) };
+                Box::into_raw(Box::new(CVisionGenerationResponse {
+                    result,
+                    error: std::ptr::null_mut(),
+                }))
+            }
+            Err(e) => vision_generation_error(&e.to_string()),
+        }
+    }))
+}
+
 fn vision_generation_error(msg: &str) -> *mut CVisionGenerationResponse {
     let error = CString::new(msg)
         .unwrap_or_else(|_| CString::new("error message contained null bytes").unwrap())
@@ -1878,6 +1914,7 @@ unsafe fn convert_vision_element_to_c(element: VisionElement) -> CVisionElement 
         description: opt_c_string(element.description),
         title: opt_c_string(element.title),
         html: opt_c_string(element.html),
+        truncated: element.truncated,
     }
 }
 
