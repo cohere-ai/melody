@@ -156,3 +156,6 @@ cmd5-strict:
       path: cmd5/cofl/messages_loop.jinja
     generation_prompt_reasoning.jinja:
       path: cmd4/shared/generation_prompt_reasoning.jinja
+
+parse-v5:
+  path: parse/parse-v5.jinja

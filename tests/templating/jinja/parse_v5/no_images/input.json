@@ -1,0 +1,13 @@
+{
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "No image here"
+        }
+      ]
+    }
+  ]
+}

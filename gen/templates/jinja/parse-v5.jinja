@@ -1,0 +1,25 @@
+<BOS_TOKEN>
+{%- for message in messages %}
+    {%- set image_seen = namespace(value=false) %}
+    {%- if message.content is not string %}
+        {%- for item in message.content %}
+            {%- if item.type | lower == "image" %}
+                {%- set image_seen.value = true %}
+            {%- endif %}
+        {%- endfor %}
+    {%- endif %}
+    {%- if image_seen.value %}
+        {%- set role = message.role | lower %}
+        {%- if role == "user" %}
+            {%- set role_token = "<|USER_TOKEN|>" %}
+        {%- elif role == "chatbot" or role == "assistant" %}
+            {%- set role_token = "<|CHATBOT_TOKEN|>" %}
+        {%- elif role == "system" %}
+            {%- set role_token = "<|SYSTEM_TOKEN|>" %}
+        {%- else %}
+            {%- set role_token = role %}
+        {%- endif %}
+<|START_OF_TURN_TOKEN|>{{ role_token }}<|VISION_START|><|IMAGE_PAD|><|VISION_END|>Extract content from page.<|END_OF_TURN_TOKEN|>
+    {%- endif %}
+{%- endfor %}
+<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>
