@@ -392,6 +392,22 @@ pub unsafe extern "C" fn melody_filter_options_cmd5(options: *mut CFilterOptions
     }
 }
 
+/// Starts parsing in answer (content) mode instead of the preset's default.
+/// Must be called after `melody_filter_options_cmd4` / `_cmd5`, which reset the
+/// default mode.
+///
+/// # Safety
+/// `options` must be a valid pointer returned from `melody_filter_options_new`
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn melody_filter_options_start_in_answer(options: *mut CFilterOptions) {
+    if !options.is_null() {
+        unsafe {
+            let opts = &mut *(options.cast::<FilterOptions>());
+            *opts = std::mem::take(opts).start_in_answer();
+        }
+    }
+}
+
 /// Configures options for RAG format
 ///
 /// # Safety
