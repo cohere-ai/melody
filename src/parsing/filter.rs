@@ -2257,6 +2257,84 @@ mod tests {
         );
     }
 
+    /// With thinking disabled the prompt already closes the thinking block, so a
+    /// model that skips `<|START_TEXT|>` emits bare answer text. A plain `cmd4()`
+    /// filter classifies that as reasoning; `start_in_answer()` must not.
+    #[test]
+    fn test_cmd4_start_in_answer_bare_text_is_content() {
+        let mut default = make_cmd4_filter();
+        let r = default.process_full_text("{\"a\": 1}");
+        assert_eq!(r.reasoning.as_deref(), Some("{\"a\": 1}"));
+        assert!(r.content.is_none());
+
+        let mut f = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        let r = f.process_full_text("{\"a\": 1}");
+        assert_eq!(r.content.as_deref(), Some("{\"a\": 1}"));
+        assert!(r.reasoning.is_none());
+
+        // streamed chunk by chunk
+        let mut f = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        let mut content = String::new();
+        for chunk in ["{\"a\":", " 1}"] {
+            content.push_str(f.write_decoded(chunk).content.as_deref().unwrap_or(""));
+        }
+        content.push_str(f.flush_partials().content.as_deref().unwrap_or(""));
+        assert_eq!(content, "{\"a\": 1}");
+    }
+
+    /// `start_in_answer()` must not change how explicit answer delimiters parse.
+    #[test]
+    fn test_cmd4_start_in_answer_explicit_delimiters_unchanged() {
+        for text in [
+            "<|START_TEXT|>{\"a\": 1}<|END_TEXT|>",
+            "<|START_RESPONSE|>{\"a\": 1}<|END_RESPONSE|>",
+        ] {
+            let mut f = new_filter(FilterOptions::default().cmd4().start_in_answer());
+            let r = f.process_full_text(text);
+            assert_eq!(r.content.as_deref(), Some("{\"a\": 1}"), "{text}");
+            assert!(r.reasoning.is_none(), "{text}");
+        }
+    }
+
+    #[test]
+    fn test_cmd4_start_in_answer_bare_text_then_tool_call() {
+        let text = concat!(
+            "ok <|START_ACTION|>",
+            r#"[{"tool_call_id": "0", "tool_name": "foo", "parameters": {}}]"#,
+            "<|END_ACTION|>",
+        );
+        let mut f = new_filter(FilterOptions::default().cmd4().start_in_answer());
+        let r = f.process_full_text(text);
+        assert_eq!(r.content.as_deref(), Some("ok"));
+        assert!(r.reasoning.is_none());
+        assert_eq!(r.tool_calls.len(), 1);
+    }
+
+    #[test]
+    fn test_cmd5_start_in_answer_bare_text_and_delimiters() {
+        let mut default = make_cmd5_filter();
+        let r = default.process_full_text("{\"a\": 1}");
+        assert_eq!(r.reasoning.as_deref(), Some("{\"a\": 1}"));
+
+        for text in [
+            "{\"a\": 1}",
+            "<|START_TEXT|>{\"a\": 1}<|END_TEXT|>",
+            "<|START_RESPONSE|>{\"a\": 1}<|END_RESPONSE|>",
+        ] {
+            let mut f = new_filter(FilterOptions::default().cmd5().start_in_answer());
+            let r = f.process_full_text(text);
+            assert_eq!(r.content.as_deref(), Some("{\"a\": 1}"), "{text}");
+            assert!(r.reasoning.is_none(), "{text}");
+        }
+
+        let text = r#"ok<cofl:tool_calls><cofl:tool_call id="0" name="GetReminders"></cofl:tool_call></cofl:tool_calls>"#;
+        let mut f = new_filter(FilterOptions::default().cmd5().start_in_answer());
+        let r = f.process_full_text(text);
+        assert_eq!(r.content.as_deref(), Some("ok"));
+        assert!(r.reasoning.is_none());
+        assert_eq!(r.tool_calls.len(), 1);
+    }
+
     #[test]
     fn test_reasoning_to_tool_non_streaming_handoff() {
         let tool_block = concat!(

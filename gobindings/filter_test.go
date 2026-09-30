@@ -169,3 +169,78 @@ func TestFilter_Command3(t *testing.T) {
 		})
 	}
 }
+
+func TestFilter_Command4StartInAnswer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		chunks        []string
+		options       []melody.FilterOption
+		wantContent   string
+		wantReasoning string
+	}{
+		{
+			name:          "bare text defaults to reasoning",
+			chunks:        []string{`{"a":`, ` 1}`},
+			options:       []melody.FilterOption{melody.HandleMultiHopCmd4()},
+			wantReasoning: `{"a": 1}`,
+		},
+		{
+			name:        "bare text is content with StartInAnswer",
+			chunks:      []string{`{"a":`, ` 1}`},
+			options:     []melody.FilterOption{melody.HandleMultiHopCmd4(), melody.StartInAnswer()},
+			wantContent: `{"a": 1}`,
+		},
+		{
+			name:        "option order does not matter",
+			chunks:      []string{`{"a":`, ` 1}`},
+			options:     []melody.FilterOption{melody.StartInAnswer(), melody.HandleMultiHopCmd4()},
+			wantContent: `{"a": 1}`,
+		},
+		{
+			name:        "START_TEXT still parses",
+			chunks:      []string{"<|START_TEXT|>", `{"a": 1}`, "<|END_TEXT|>"},
+			options:     []melody.FilterOption{melody.HandleMultiHopCmd4(), melody.StartInAnswer()},
+			wantContent: `{"a": 1}`,
+		},
+		{
+			name:        "START_RESPONSE still parses",
+			chunks:      []string{"<|START_RESPONSE|>", `{"a": 1}`, "<|END_RESPONSE|>"},
+			options:     []melody.FilterOption{melody.HandleMultiHopCmd4(), melody.StartInAnswer()},
+			wantContent: `{"a": 1}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := melody.NewFilter(tt.options...)
+			require.NotNil(t, f)
+
+			var content, reasoning string
+			collect := func(r *melody.AggregatedResult) {
+				if r == nil {
+					return
+				}
+				if r.Content != nil {
+					content += *r.Content
+				}
+				if r.Reasoning != nil {
+					reasoning += *r.Reasoning
+				}
+			}
+			for _, chunk := range tt.chunks {
+				r, err := f.WriteDecoded(chunk)
+				require.NoError(t, err)
+				collect(r)
+			}
+			r, err := f.FlushPartials()
+			require.NoError(t, err)
+			collect(r)
+
+			require.Equal(t, tt.wantContent, content, "content mismatch")
+			require.Equal(t, tt.wantReasoning, reasoning, "reasoning mismatch")
+		})
+	}
+}
