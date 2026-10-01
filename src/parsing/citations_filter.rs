@@ -50,12 +50,11 @@ impl FilterImpl {
         after_last_token: bool,
         mode: FilterMode,
     ) -> (Vec<FilterOutput>, usize) {
-        if !Self::utf8_valid_or_limit(bstr) {
+        let Some(decoded) = Self::decode_utf8_or_limit(bstr) else {
             return (Vec::new(), 0);
-        }
+        };
 
-        let lossy = String::from_utf8_lossy(bstr);
-        let (send, rem_right) = self.trim_space(&lossy);
+        let (send, rem_right) = self.trim_space(decoded.as_ref());
         let remove = bstr.len() - send.len() - rem_right;
 
         let (mut res_out, remove_cit) = self.parse_citations(send, mode);
