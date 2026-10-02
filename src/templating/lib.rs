@@ -138,6 +138,7 @@ static CMD4V1_TEMPLATE: &str = include_str!("../../gen/templates/liquid/cmd4-v1.
 static CMD4V1_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v1.jinja");
 static CMD4V2_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-v2.jinja");
 static CMD4HF_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd4-hf.jinja");
+static PARSE_V5_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/parse-v5.jinja");
 static CMD5_JINJA_TEMPLATE: &str = include_str!("../../gen/templates/jinja/cmd5.jinja");
 static CMD5_NO_ESCAPE_JINJA_TEMPLATE: &str =
     include_str!("../../gen/templates/jinja/cmd5-no-escape.jinja");
@@ -202,6 +203,7 @@ enum CMD4JinjaTemplates {
     CMD4V1,
     CMD4V2,
     CMD4HF,
+    ParseV5,
 }
 
 impl CMD4JinjaTemplates {
@@ -210,6 +212,7 @@ impl CMD4JinjaTemplates {
             CMD4JinjaTemplates::CMD4V1 => CMD4V1_JINJA_TEMPLATE,
             CMD4JinjaTemplates::CMD4V2 => CMD4V2_JINJA_TEMPLATE,
             CMD4JinjaTemplates::CMD4HF => CMD4HF_JINJA_TEMPLATE,
+            CMD4JinjaTemplates::ParseV5 => PARSE_V5_JINJA_TEMPLATE,
         }
     }
 }
@@ -222,6 +225,7 @@ impl FromStr for CMD4JinjaTemplates {
             "cmd4-v1" => Ok(Self::CMD4V1),
             "cmd4-v2" => Ok(Self::CMD4V2),
             "cmd4_hf" | "cmd4-hf" => Ok(Self::CMD4HF),
+            "parse-v5" => Ok(Self::ParseV5),
             _ => Err(MelodyError::TemplateValidation(format!(
                 "unknown template id: {o}"
             ))),
@@ -772,6 +776,24 @@ mod tests {
             let rendered = render_cmd4(&opts).unwrap();
             assert_eq!(expected, rendered, "Failed test: {}", test_name);
         }
+    }
+
+    #[test]
+    fn test_render_parse_v5_jinja_from_dir() {
+        let mut ran_any = false;
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/parse_v5") {
+            println!("Running parse v5 jinja test case: {}", test_name);
+            let mut opts = deserialize::<_, RenderCmd4Options>(&input_json).unwrap();
+            opts.use_jinja = true;
+            opts.template_id = Some("parse-v5".to_string());
+            let rendered = render_cmd4(&opts).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+            ran_any = true;
+        }
+        assert!(
+            ran_any,
+            "no parse v5 jinja test fixtures were found in tests/templating/jinja/parse_v5"
+        );
     }
 
     fn render_cmd5_from_input(input_json: &Value) -> String {

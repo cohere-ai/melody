@@ -1,0 +1,13 @@
+{
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "image",
+          "image": {"template_placeholder": "<|IMG_PATCH|>"}
+        }
+      ]
+    }
+  ]
+}
