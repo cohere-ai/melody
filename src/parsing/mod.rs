@@ -19,5 +19,5 @@ pub use options::*;
 pub use types::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
 pub use vision::{
     VisionBBox, VisionElement, VisionGeneration, VisionParseError, VisionSegment,
-    parse_vision_generation,
+    parse_truncated_vision_generation, parse_vision_generation,
 };

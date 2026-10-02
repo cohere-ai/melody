@@ -8,6 +8,7 @@ type filterConfig struct {
 	multiHopCmd3            bool
 	multiHopCmd4            bool
 	multiHopCmd5            bool
+	startInAnswer           bool
 	rag                     bool
 	searchQuery             bool
 	multiHop                bool
@@ -36,6 +37,10 @@ func (cfg *filterConfig) apply(opts *FilterOptions) {
 	}
 	if cfg.multiHopCmd5 {
 		opts.Cmd5()
+	}
+	// must come after the format presets, which reset the default mode
+	if cfg.startInAnswer {
+		opts.StartInAnswer()
 	}
 	if cfg.rag {
 		opts.HandleRAG()
@@ -109,6 +114,17 @@ func HandleMultiHopCmd4() FilterOption {
 func HandleMultiHopCmd5() FilterOption {
 	return func(cfg *filterConfig) {
 		cfg.multiHopCmd5 = true
+	}
+}
+
+// StartInAnswer starts parsing in answer (content) mode instead of the format's
+// default. CMD4/CMD5 default to thinking mode because their generation prompts
+// end in <|START_THINKING|>; use this when thinking is disabled and the prompt
+// already closes the thinking block, so output that omits <|START_TEXT|> is
+// still classified as content.
+func StartInAnswer() FilterOption {
+	return func(cfg *filterConfig) {
+		cfg.startInAnswer = true
 	}
 }
 

@@ -458,3 +458,11 @@ class TestWithMessageHistory:
         """Argument-deserialisation failures still raise ValueError."""
         with pytest.raises(ValueError):
             PyFilterOptions().cmd3().with_message_history(messages="not a list")
+
+
+class TestIsReasoning:
+    def test_is_reasoning_flips_on_end_thinking(self):
+        f = PyFilter(PyFilterOptions().cmd4().no_tools())
+        assert f.is_reasoning() is True
+        f.write_decoded("think<|END_THINKING|>")
+        assert f.is_reasoning() is False

@@ -170,7 +170,8 @@ impl PyFilterOptions {
         }
     }
 
-    /// Disable tool call parsing by removing the action tokens.
+    /// Reasoning-only filter: tool markup is plain text, and bytes still held
+    /// back when the reasoning end token arrives are flushed verbatim.
     fn no_tools(&self) -> Self {
         PyFilterOptions {
             inner: self.inner.clone().no_tools(),
@@ -366,6 +367,11 @@ impl PyFilter {
     /// Flush any buffered partial outputs.
     fn flush_partials(&mut self) -> FilterAggregatedResult {
         self.inner.flush_partials()
+    }
+
+    /// Whether the filter is currently inside a reasoning block.
+    fn is_reasoning(&self) -> bool {
+        self.inner.is_reasoning()
     }
 
     /// Process a complete output token-by-token and return a single result

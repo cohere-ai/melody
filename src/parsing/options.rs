@@ -53,6 +53,9 @@ pub struct FilterOptions {
     /// Enabled by [`FilterOptions::cmd5`]; disable with
     /// [`FilterOptions::cofl_nested_xml`]`(false)` for flat formats.
     pub(crate) cofl_nested_xml: bool,
+    /// Token after which any bytes still held back at the end of a
+    /// `write_decoded` call are flushed verbatim.
+    pub(crate) flush_after_token: Option<String>,
     /// Optional lookup table for resolving citation indices back to their
     /// original document identifiers. Indexed as
     /// `document_ids[tool_call_index][tool_result_index]`. Empty when
@@ -78,6 +81,7 @@ impl Default for FilterOptions {
             cofl_tool_action: false,
             cofl_decode_xml_text: true,
             cofl_nested_xml: false,
+            flush_after_token: None,
             document_ids: Vec::new(),
         }
     }
@@ -584,7 +588,8 @@ impl FilterOptions {
     ///
     /// Removes `<|START_ACTION|>` / `<|END_ACTION|>` (cmd3/cmd4) and
     /// `<cofl:tool_calls>` / `</cofl:tool_calls>` (cmd5) from the special
-    /// token map so the filter treats tool call markup as plain text.
+    /// token map so tool markup passes through as plain text for the tool
+    /// filter to parse. Everything else is still parsed as usual.
     ///
     /// # Examples
     ///
@@ -601,6 +606,9 @@ impl FilterOptions {
         self.special_token_map.remove("<|END_ACTION|>");
         self.special_token_map.remove("<cofl:tool_calls>");
         self.special_token_map.remove("</cofl:tool_calls>");
+        if self.special_token_map.contains_key("<|END_THINKING|>") {
+            self.flush_after_token = Some("<|END_THINKING|>".to_string());
+        }
         self
     }
 

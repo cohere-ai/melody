@@ -67,8 +67,17 @@ impl FilterImpl {
             if send.is_empty() || !after_last_token {
                 return (Vec::new(), remove + remove_cit);
             }
+            // flush unsent partial citation.
+            let unsent = match self.cur_citation_byte_index.take() {
+                Some(idx) if idx < send.len() && send.is_char_boundary(idx) => &send[idx..],
+                Some(_) => "",
+                None => send,
+            };
+            if unsent.is_empty() {
+                return (Vec::new(), remove + remove_cit);
+            }
             res_out = Some(FilterOutput {
-                text: send.to_string(),
+                text: unsent.to_string(),
                 ..Default::default()
             });
         }

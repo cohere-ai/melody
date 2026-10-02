@@ -62,6 +62,15 @@ func (opts *FilterOptions) Cmd5() *FilterOptions {
 	return opts
 }
 
+// StartInAnswer starts parsing in answer (content) mode instead of the
+// preset's default. Must be called after Cmd4/Cmd5, which reset the default mode.
+func (opts *FilterOptions) StartInAnswer() *FilterOptions {
+	if opts.ptr != nil {
+		C.melody_filter_options_start_in_answer(opts.ptr)
+	}
+	return opts
+}
+
 // HandleRAG configures options for RAG format
 func (opts *FilterOptions) HandleRAG() *FilterOptions {
 	if opts.ptr != nil {

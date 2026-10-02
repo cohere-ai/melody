@@ -38,6 +38,9 @@ type VisionElement struct {
 	Description *string
 	Title       *string
 	HTML        *string
+	// Truncated is true when this element was recovered from a generation cut off
+	// mid-block by ParseTruncatedVisionGeneration.
+	Truncated bool
 }
 
 // VisionBBox is a pixel bounding box from a bbox: field.
@@ -50,10 +53,32 @@ type VisionBBox struct {
 
 // ParseVisionGeneration parses a complete parse-model generation (unary, not streaming).
 func ParseVisionGeneration(text string) (*VisionGeneration, error) {
+	return parseVisionGeneration(text, false)
+}
+
+// ParseTruncatedVisionGeneration is like ParseVisionGeneration, but tolerates a
+// generation that was cut off mid-[visual_element] block: the trailing partial
+// element is recovered (with Truncated = true) instead of returning an error, and a
+// malformed bbox on that trailing element is dropped rather than erroring.
+//
+// Only call this when the caller already knows generation stopped due to a token
+// limit (e.g. finish_reason == "length") — a malformed bbox on a closed element
+// still returns an error, since that reflects a malformed generation rather than
+// truncation.
+func ParseTruncatedVisionGeneration(text string) (*VisionGeneration, error) {
+	return parseVisionGeneration(text, true)
+}
+
+func parseVisionGeneration(text string, truncated bool) (*VisionGeneration, error) {
 	cText := C.CString(text)
 	defer C.free(unsafe.Pointer(cText))
 
-	res := C.melody_parse_vision_generation(cText)
+	var res *C.CVisionGenerationResponse
+	if truncated {
+		res = C.melody_parse_truncated_vision_generation(cText)
+	} else {
+		res = C.melody_parse_vision_generation(cText)
+	}
 	if res == nil {
 		return nil, errors.New("melody_parse_vision_generation returned null result struct")
 	}
@@ -128,5 +153,6 @@ func convertCVisionElement(ce *C.CVisionElement) *VisionElement {
 		s := C.GoString(ce.html)
 		el.HTML = &s
 	}
+	el.Truncated = bool(ce.truncated)
 	return el
 }

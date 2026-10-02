@@ -5,6 +5,7 @@
 //! parse endpoints consume the full generation before mapping to an API response.
 
 use std::collections::HashMap;
+use std::ops::Not;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -69,6 +70,12 @@ pub struct VisionElement {
     /// Optional HTML markup (common on tables).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
+    /// `true` when this element was recovered from a generation that was cut off
+    /// mid-block (see [`parse_truncated_vision_generation`]). A truncated element's
+    /// fields reflect only what was emitted before the cutoff; e.g. a `bbox` with
+    /// too few numbers is dropped rather than treated as an error.
+    #[serde(default, skip_serializing_if = "<&bool>::not")]
+    pub truncated: bool,
 }
 
 /// Pixel bounding box: `top_left_x, top_left_y, bottom_right_x, bottom_right_y`.
@@ -94,11 +101,42 @@ pub struct VisionBBox {
 /// OCR block content). Blank-line spacing between segments is left to the consumer
 /// when assembling markdown.
 ///
+/// Use [`parse_truncated_vision_generation`] instead when the caller already knows
+/// the generation was cut off by a token limit; that variant tolerates a trailing
+/// unclosed block instead of erroring.
+///
 /// # Errors
 ///
 /// Returns [`VisionParseError::UnclosedElement`] if a start tag has no matching end,
 /// or [`VisionParseError::InvalidBBox`] if a `bbox` field is malformed.
 pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionParseError> {
+    parse_vision_generation_inner(text, false)
+}
+
+/// Like [`parse_vision_generation`], but tolerates a generation that was cut off
+/// mid-`[visual_element]` block: an unclosed start tag is recovered as a trailing
+/// element (fields parsed from whatever body was emitted before the cutoff, with
+/// `truncated: true`) instead of raising [`VisionParseError::UnclosedElement`]. A
+/// malformed `bbox` on that trailing element is dropped rather than raising
+/// [`VisionParseError::InvalidBBox`].
+///
+/// Only use this when the caller already knows the generation stopped because of a
+/// token limit (e.g. from the model's `finish_reason`) — a bad `bbox` on any
+/// *closed* element still raises [`VisionParseError::InvalidBBox`], since that
+/// reflects a malformed generation rather than truncation.
+///
+/// # Errors
+///
+/// Returns [`VisionParseError::InvalidBBox`] if a `bbox` field on a closed element
+/// is malformed.
+pub fn parse_truncated_vision_generation(text: &str) -> Result<VisionGeneration, VisionParseError> {
+    parse_vision_generation_inner(text, true)
+}
+
+fn parse_vision_generation_inner(
+    text: &str,
+    allow_truncated: bool,
+) -> Result<VisionGeneration, VisionParseError> {
     let mut segments = Vec::new();
     let mut text_buf = String::new();
     // When inside an element: byte offset of the open tag line, and body so far.
@@ -129,8 +167,13 @@ pub fn parse_vision_generation(text: &str) -> Result<VisionGeneration, VisionPar
         }
     }
 
-    if let Some((start, _)) = open {
-        return Err(VisionParseError::UnclosedElement(start));
+    if let Some((start, body)) = open {
+        if !allow_truncated {
+            return Err(VisionParseError::UnclosedElement(start));
+        }
+        segments.push(VisionSegment::Element {
+            element: parse_partial_element_body(&body),
+        });
     }
     push_text_segment(&mut segments, &text_buf);
 
@@ -172,6 +215,24 @@ fn parse_element_body(body: &str) -> Result<VisionElement, VisionParseError> {
     }
 
     Ok(element)
+}
+
+/// Like [`parse_element_body`], but for a trailing element whose body was cut off
+/// before the close tag: a malformed `bbox` is dropped instead of erroring, and the
+/// result is marked `truncated`.
+fn parse_partial_element_body(body: &str) -> VisionElement {
+    let fields = parse_fields(body);
+    VisionElement {
+        element_type: fields
+            .get("type")
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default(),
+        bbox: fields.get("bbox").and_then(|raw| parse_bbox(raw).ok()),
+        description: fields.get("description").map(|s| s.trim().to_string()),
+        title: fields.get("title").map(|s| s.trim().to_string()),
+        html: fields.get("html").map(|s| s.trim().to_string()),
+        truncated: true,
+    }
 }
 
 fn parse_fields(body: &str) -> HashMap<String, String> {
@@ -526,6 +587,56 @@ after
             }
             other => panic!("expected element, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn truncated_unclosed_element_recovers_partial() {
+        let text = "\
+before
+
+[visual_element]
+type: table
+title: partial table
+description: a partially generated table
+html: <table><tr><td>a</td></tr>
+bbox: 1,2,3";
+        let parsed = parse_truncated_vision_generation(text).unwrap();
+        assert_eq!(parsed.segments.len(), 2);
+        match &parsed.segments[0] {
+            VisionSegment::Text { text } => assert_eq!(text, "before"),
+            other => panic!("expected leading text, got {other:?}"),
+        }
+        match &parsed.segments[1] {
+            VisionSegment::Element { element } => {
+                assert_eq!(element.element_type, "table");
+                assert_eq!(element.title.as_deref(), Some("partial table"));
+                assert_eq!(
+                    element.description.as_deref(),
+                    Some("a partially generated table")
+                );
+                assert_eq!(element.html.as_deref(), Some("<table><tr><td>a</td></tr>"));
+                // Malformed trailing bbox is dropped, not an error.
+                assert_eq!(element.bbox, None);
+                assert!(element.truncated);
+            }
+            other => panic!("expected partial element, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn truncated_parse_still_errors_on_closed_element_bad_bbox() {
+        // A malformed bbox on a *closed* element reflects a genuinely malformed
+        // generation, not truncation, so it still errors even in truncated mode.
+        let text = "[visual_element]\nbbox: 1,2,3\n[/visual_element]";
+        let err = parse_truncated_vision_generation(text).unwrap_err();
+        assert!(matches!(err, VisionParseError::InvalidBBox(_)));
+    }
+
+    #[test]
+    fn truncated_parse_of_well_formed_generation_matches_strict() {
+        let parsed_strict = parse_vision_generation(SAMPLE).unwrap();
+        let parsed_truncated = parse_truncated_vision_generation(SAMPLE).unwrap();
+        assert_eq!(parsed_strict, parsed_truncated);
     }
 
     #[test]
