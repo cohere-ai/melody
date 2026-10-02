@@ -123,8 +123,12 @@ Your output should adhere to the following json schema:
   {%- endif -%}
 {{ msg_role_downcased | replace: 'user', '<|USER_TOKEN|>' | replace: 'chatbot', '<|CHATBOT_TOKEN|>' | replace: 'system', '<|SYSTEM_TOKEN|>' | replace: 'tool', '<|SYSTEM_TOKEN|><|START_TOOL_RESULT|>' }}
   {%- if message.tool_calls.size > 0 -%}
-    {%- if message.content.size > 0 and message.content[0].type != 'image' and skip_thinking != true -%}
+    {%- if skip_thinking != true -%}
+      {%- if message.content.size > 0 and message.content[0].type != 'image' -%}
     <|START_THINKING|>{{ message.content[0].data }}<|END_THINKING|>
+      {%- else -%}
+    <|START_THINKING|><|END_THINKING|>
+      {%- endif -%}
     {%- endif -%}
     <|START_ACTION|>[
     {%- for res in message.tool_calls %}
@@ -148,8 +152,12 @@ Your output should adhere to the following json schema:
      {%- endfor %}
 ]<|END_TOOL_RESULT|>
      {%- elsif msg_role_downcased == "chatbot" -%}
-        {%- if message.content.size > 0 and message.content[0].type == 'thinking' and skip_thinking != true -%}
-          <|START_THINKING|>{{ message.content[0].data }}<|END_THINKING|>
+        {%- if skip_thinking != true -%}
+          {%- if message.content.size > 0 and message.content[0].type == 'thinking' -%}
+            <|START_THINKING|>{{ message.content[0].data }}<|END_THINKING|>
+          {%- else -%}
+            <|START_THINKING|><|END_THINKING|>
+          {%- endif -%}
         {%- endif -%}
         <|START_TEXT|>
         {%- if message.content[0].type == 'text' -%}
