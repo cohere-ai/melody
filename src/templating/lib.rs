@@ -127,9 +127,10 @@ pub struct RenderCmd4Options<'a> {
     pub additional_template_fields: Map<String, Value>,
     /// Special tokens to escape in the output.
     pub escaped_special_tokens: BTreeMap<String, String>,
-    /// When true, tool call names are left unescaped for templates that apply
-    /// XML attribute escaping (cmd5). Set internally by [`render_cmd5`]; do not
-    /// set manually.
+    /// When true, tool call names and tool spec names/descriptions are left
+    /// unescaped for templates that escape them themselves (cmd5: `xml_attr`
+    /// for tool calls, `tojson` for tool specs). Set internally by
+    /// [`render_cmd5`]; do not set manually.
     #[serde(skip, default)]
     pub raw_tool_call_names: bool,
 }
@@ -538,8 +539,10 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
     let mut active_opts: RenderCmd5Options<'a> = opts.clone();
     // Honor caller `template_jinja` even when `use_jinja` is false.
     active_opts.use_jinja = true;
-    // cmd5 templates XML-escape tool names via `xml_attr`; skip JSON escaping
-    // in the jinja message prep path (cmd3/cmd4 embed names in JSON instead).
+    // cmd5 templates XML-escape tool call names via `xml_attr` and JSON-encode
+    // tool spec strings via `tojson`, so skip pre-escaping in the jinja prep
+    // path (cmd3/cmd4 insert them between quotes instead). This keeps the
+    // template correct for clients such as vLLM that pass raw tool strings.
     active_opts.raw_tool_call_names = true;
 
     if let Some(template_id) = opts.template_id.as_ref() {

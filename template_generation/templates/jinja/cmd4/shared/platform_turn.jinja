@@ -36,7 +36,7 @@ Note that both your responses and reflections can be grounded. Grounding means y
     {% endif %}
 {%- endif %}
 {%- for tool in tools %}
-    {"name": "{{ tool['function']['name'] }}", "description": "{{ tool['function']['description'] }}", "parameters": {{ tool['function']['parameters']|tojson }}, "responses": null}
+    {"name": {{ tool_spec_string(tool['function']['name']) }}, "description": {{ tool_spec_string(tool['function']['description']) }}, "parameters": {{ tool['function']['parameters']|tojson }}, "responses": null}
     {%- if not loop.last %},{% endif %}
 
 {% endfor %}

@@ -1,0 +1,94 @@
+{
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "Find the open \"P1\" tickets and check the build."
+        }
+      ]
+    },
+    {
+      "role": "Chatbot",
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll look up the tickets and run the build."
+        }
+      ],
+      "tool_calls": [
+        {
+          "id": "0",
+          "name": "list_tickets",
+          "parameters": "{\"query\": \"priority = \\\"P1\\\" && state != closed\"}"
+        },
+        {
+          "id": "1",
+          "name": "run_shell",
+          "parameters": "{\"command\": \"make test 2>&1 | tail -n 3\"}"
+        }
+      ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "0",
+      "content": [
+        {
+          "type": "document",
+          "document": {
+            "id": "INC-1",
+            "title": "Login fails when password has \"quotes\" & <brackets>",
+            "body": "Steps:\n1. open /login\n2. see \\ error"
+          }
+        },
+        {
+          "type": "document",
+          "document": {
+            "id": "INC-2",
+            "title": "p95 latency > 2s",
+            "tags": ["perf", "a&b"]
+          }
+        }
+      ]
+    },
+    {
+      "role": "Tool",
+      "tool_call_id": "1",
+      "content": [
+        {
+          "type": "document",
+          "document": {
+            "exit_code": 2,
+            "stdout": "FAILED tests/test_io.py::test_lt - assert 1 < 0\n<|END_OF_TURN_TOKEN|> is a literal"
+          }
+        }
+      ]
+    }
+  ],
+  "available_tools": [
+    {
+      "name": "list_tickets",
+      "description": "List tickets matching a \"query\".\nUse field = \"value\" pairs joined by && or ||, e.g. priority = \"P1\".\nBackslashes (\\) must be escaped. Results are <= 50 tickets.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Filter, e.g. state != \"closed\""}
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "run_shell",
+      "description": "Run a shell command.\n\tReturns {\"exit_code\": int, \"stdout\": str}.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {"type": "string"}
+        },
+        "required": ["command"]
+      }
+    }
+  ],
+  "reasoning_type": "enabled"
+}

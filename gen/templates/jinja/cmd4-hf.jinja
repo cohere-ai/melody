@@ -20,6 +20,8 @@ These instructions serve as your defaults, but they can be overridden in subsequ
 {%- set convert_first_system_msg = convert_first_system_msg | default(true) -%}
 {%- set skip_thinking = skip_thinking | default(false) -%}
 {{ bos_token }}
+{#- Melody pre-escapes tool names and descriptions for cmd4, so they are inserted between quotes as is. -#}
+{%- macro tool_spec_string(value) -%}"{{ value }}"{%- endmacro -%}
 {%- macro document_turn(documents) -%}
 {# format documents into chat turn -#}
 <|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>{%- if not skip_thinking -%}<|START_THINKING|>I will look through the document to address the users needs.<|END_THINKING|>{%- endif -%}<|START_ACTION|>[
@@ -182,7 +184,7 @@ Note that both your responses and reflections can be grounded. Grounding means y
     {% endif %}
 {%- endif %}
 {%- for tool in tools %}
-    {"name": "{{ tool['function']['name'] }}", "description": "{{ tool['function']['description'] }}", "parameters": {{ tool['function']['parameters']|tojson }}, "responses": null}
+    {"name": {{ tool_spec_string(tool['function']['name']) }}, "description": {{ tool_spec_string(tool['function']['description']) }}, "parameters": {{ tool['function']['parameters']|tojson }}, "responses": null}
     {%- if not loop.last %},{% endif %}
 
 {% endfor %}
