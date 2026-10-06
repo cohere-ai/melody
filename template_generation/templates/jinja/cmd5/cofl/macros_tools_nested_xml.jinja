@@ -50,9 +50,7 @@
 {%- endif -%}
 {%- endmacro %}
 {%- macro print_cofl_tool_content(item) %}
-{%- if item.type|lower == "text" and json_tool_results -%}
-{{ xml_text(item.text) }}
-{%- elif item.type|lower == "text" -%}
+{%- if item.type|lower == "text" -%}
 {%- set text_wrapper = {"content": item.text} -%}
 {{ xml_text(text_wrapper|tojson) }}
 {%- elif item.type|lower == "document" and item.document and "data" in item.document -%}
@@ -62,15 +60,30 @@
 {%- endif -%}
 {%- endmacro %}
 {#- json_tool_results: set by clients that can only send text tool content (e.g. OpenAI-compatible
-    servers such as vLLM, via chat_template_kwargs) and send each tool result serialized as JSON.
-    Each text then renders as one result item, as Melody renders tool result documents. Without it,
-    text is a plain-text result and is wrapped as {"content": text}. -#}
+    servers such as vLLM, via chat_template_kwargs) and send tool results serialized as JSON Lines,
+    one result per line. Each line renders as one result item, as Melody renders tool result
+    documents, whether the lines arrive as one string or split across text parts (vLLM may join
+    text parts with newlines). Without it, text is a plain-text result wrapped as {"content": text}. -#}
+{%- macro json_tool_result_items(contents) -%}
+{%- set item_idx = namespace(value=0) -%}
+{%- for content in contents -%}
+{%- if content is string or content.type|lower == "text" -%}
+{%- for line in (content if content is string else content.text).split("\n") if line|trim -%}
+<cofl:tool_result_item index="{{ item_idx.value }}">{{ xml_text(line) }}</cofl:tool_result_item>
+{%- set item_idx.value = item_idx.value + 1 -%}
+{%- endfor -%}
+{%- else -%}
+<cofl:tool_result_item index="{{ item_idx.value }}">{{ print_cofl_tool_content(content) }}</cofl:tool_result_item>
+{%- set item_idx.value = item_idx.value + 1 -%}
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro -%}
 {%- macro format_tool_message(messages, tool_msg) -%}
 {#- format tool message -#}
 {%- set is_err_val = "true" if tool_msg.is_error else "false" -%}
 <cofl:tool_result id="{{ tool_call_id_to_int(messages, tool_msg.tool_call_id) }}" is_error="{{ is_err_val }}">
-{%- if tool_msg.content is string and json_tool_results -%}
-<cofl:tool_result_item index="0">{{ xml_text(tool_msg.content) }}</cofl:tool_result_item>
+{%- if json_tool_results and (tool_msg.content is string or (tool_msg.content is sequence and tool_msg.content is not mapping)) -%}
+{{ json_tool_result_items([tool_msg.content] if tool_msg.content is string else tool_msg.content) }}
 {%- elif tool_msg.content is mapping or tool_msg.content is string -%}
     {%- if tool_msg.content is string -%}
         {%- set text_wrapper = {"content": tool_msg.content} -%}

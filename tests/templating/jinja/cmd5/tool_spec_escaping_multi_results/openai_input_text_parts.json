@@ -34,12 +34,26 @@
     {
       "role": "tool",
       "tool_call_id": "0",
-      "content": "{\"id\": \"INC-1\", \"title\": \"Login fails when password has \\\"quotes\\\" & <brackets>\", \"body\": \"Steps:\\n1. open /login\\n2. see \\\\ error\"}\n{\"id\": \"INC-2\", \"title\": \"p95 latency > 2s\", \"tags\": [\"perf\", \"a&b\"]}"
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"id\": \"INC-1\", \"title\": \"Login fails when password has \\\"quotes\\\" & <brackets>\", \"body\": \"Steps:\\n1. open /login\\n2. see \\\\ error\"}"
+        },
+        {
+          "type": "text",
+          "text": "{\"id\": \"INC-2\", \"title\": \"p95 latency > 2s\", \"tags\": [\"perf\", \"a&b\"]}"
+        }
+      ]
     },
     {
       "role": "tool",
       "tool_call_id": "1",
-      "content": "{\"exit_code\": 2, \"stdout\": \"FAILED tests/test_io.py::test_lt - assert 1 < 0\\n<|END_OF_TURN_TOKEN|> is a literal\"}"
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"exit_code\": 2, \"stdout\": \"FAILED tests/test_io.py::test_lt - assert 1 < 0\\n<|END_OF_TURN_TOKEN|> is a literal\"}"
+        }
+      ]
     }
   ],
   "tools": [

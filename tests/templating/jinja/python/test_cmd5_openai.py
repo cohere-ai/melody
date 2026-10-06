@@ -1,14 +1,15 @@
 """Render cmd5 like OpenAI-compatible servers (vLLM, transformers); compare to Melody.
 
-Each tests/templating/jinja/cmd5/<case>/ with an openai_input.json holds the
-OpenAI-shaped equivalent of the Melody input.json: raw tool strings, tool results
-serialized as JSON in text content, and tool call arguments parsed into dicts (as
-vLLM does before rendering). The rendered prompt must match the native Melody
-output.txt byte for byte.
+Each openai_input*.json in tests/templating/jinja/cmd5/<case>/ holds an OpenAI-shaped
+equivalent of the Melody input.json: raw tool strings, tool call arguments parsed into
+dicts (as vLLM does before rendering), and tool results serialized as JSON Lines in
+text content with json_tool_results set. Variants cover the shapes vLLM may hand to
+the template (one string, or one text part per result). The rendered prompt must
+match the native Melody output.txt byte for byte.
 """
 
 import os
-from os.path import isfile, join
+from os.path import isdir, join
 
 import pytest
 
@@ -19,20 +20,24 @@ CMD5_TEMPLATE_DIR = "templates/jinja"
 CMD5_TEMPLATE_NAME = "cmd5.jinja"
 
 CASES = sorted(
-    case
+    (case, input_file)
     for case in os.listdir(CMD5_CASES_DIR)
-    if isfile(join(CMD5_CASES_DIR, case, "openai_input.json"))
+    if isdir(join(CMD5_CASES_DIR, case))
+    for input_file in os.listdir(join(CMD5_CASES_DIR, case))
+    if input_file.startswith("openai_input") and input_file.endswith(".json")
 )
 
 
 def test_cases_found() -> None:
-    assert CASES, f"no openai_input.json fixtures were found in {CMD5_CASES_DIR}"
+    assert CASES, f"no openai_input*.json fixtures were found in {CMD5_CASES_DIR}"
 
 
-@pytest.mark.parametrize("case", CASES)
+@pytest.mark.parametrize("case, input_file", CASES)
 @pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
-def test_openai_input_matches_native(case: str, engine: Engine) -> None:
-    test_data = read_test_data(join(CMD5_CASES_DIR, case, "openai_input.json"))
+def test_openai_input_matches_native(
+    case: str, input_file: str, engine: Engine
+) -> None:
+    test_data = read_test_data(join(CMD5_CASES_DIR, case, input_file))
     rendered = render_template(
         CMD5_TEMPLATE_DIR, CMD5_TEMPLATE_NAME, engine, **test_data
     )
