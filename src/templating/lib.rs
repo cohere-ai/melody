@@ -544,6 +544,14 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
     // path (cmd3/cmd4 insert them between quotes instead). This keeps the
     // template correct for clients such as vLLM that pass raw tool strings.
     active_opts.raw_tool_call_names = true;
+    // cmd5 templates read text tool content as JSON Lines unless json_tool_results is false, since
+    // OpenAI-compatible clients can only send text. Melody passes tool results as document parts,
+    // which the flag does not affect, but text tool content must stay plain text if it ever reaches
+    // the template.
+    active_opts
+        .additional_template_fields
+        .entry("json_tool_results")
+        .or_insert(Value::Bool(false));
 
     if let Some(template_id) = opts.template_id.as_ref() {
         let template_enum = CMD5JinjaTemplates::from_str(template_id)?;
@@ -914,6 +922,40 @@ mod tests {
             rendered.contains("CHATBOT"),
             "template_id=cmd5 should render via jinja, ignoring leftover liquid template"
         );
+    }
+
+    fn render_cmd5_text_tool_result(additional_template_fields: Value) -> String {
+        render_cmd5_from_input(&json!({
+            "messages": [
+                {"role": "User", "content": [{"type": "text", "text": "Run it."}]},
+                {
+                    "role": "Chatbot",
+                    "tool_calls": [{"id": "0", "name": "run_shell", "parameters": "{}"}]
+                },
+                {
+                    "role": "Tool",
+                    "tool_call_id": "0",
+                    "content": [{"type": "text", "text": "first line\nsecond line"}]
+                }
+            ],
+            "additional_template_fields": additional_template_fields
+        }))
+    }
+
+    #[test]
+    fn test_render_cmd5_text_tool_content_is_one_result_regardless_of_json_tool_results() {
+        let rendered = render_cmd5_text_tool_result(json!({}));
+        assert!(
+            rendered.contains(r#"<cofl:tool_result_item index="0">{"content": "first line\nsecond line"}</cofl:tool_result_item></cofl:tool_result>"#),
+            "text tool content should render as one plain-text result: {rendered}"
+        );
+        for json_tool_results in [true, false] {
+            assert_eq!(
+                rendered,
+                render_cmd5_text_tool_result(json!({"json_tool_results": json_tool_results})),
+                "json_tool_results={json_tool_results} changed the native rendering"
+            );
+        }
     }
 
     #[test]

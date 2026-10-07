@@ -83,6 +83,5 @@
   ],
   "add_generation_prompt": true,
   "bos_token": "<BOS_TOKEN>",
-  "grounding": "enabled",
-  "json_tool_results": true
+  "grounding": "enabled"
 }

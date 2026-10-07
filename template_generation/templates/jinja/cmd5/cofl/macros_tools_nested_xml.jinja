@@ -59,11 +59,12 @@
 {{ xml_text(item|tojson) }}
 {%- endif -%}
 {%- endmacro %}
-{#- json_tool_results: set by clients that can only send text tool content (e.g. OpenAI-compatible
-    servers such as vLLM, via chat_template_kwargs) and send tool results serialized as JSON Lines,
-    one result per line. Each line renders as one result item, as Melody renders tool result
-    documents, whether the lines arrive as one string or split across text parts (vLLM may join
-    text parts with newlines). Without it, text is a plain-text result wrapped as {"content": text}. -#}
+{#- json_tool_results (on unless set to false): text tool content holds tool results serialized as
+    JSON Lines, one result per line, since OpenAI-compatible servers such as vLLM can only send text
+    tool content. Each line renders as one result item, as Melody renders tool result documents,
+    whether the lines arrive as one string or split across text parts (vLLM may join text parts with
+    newlines). Native Melody sets it to false; clients can do so via chat_template_kwargs. When false,
+    text is a plain-text result wrapped as {"content": text}. -#}
 {%- macro json_tool_result_items(contents) -%}
 {%- set item_idx = namespace(value=0) -%}
 {%- for content in contents -%}
@@ -82,7 +83,7 @@
 {#- format tool message -#}
 {%- set is_err_val = "true" if tool_msg.is_error else "false" -%}
 <cofl:tool_result id="{{ tool_call_id_to_int(messages, tool_msg.tool_call_id) }}" is_error="{{ is_err_val }}">
-{%- if json_tool_results and (tool_msg.content is string or (tool_msg.content is sequence and tool_msg.content is not mapping)) -%}
+{%- if (json_tool_results is not defined or json_tool_results) and (tool_msg.content is string or (tool_msg.content is sequence and tool_msg.content is not mapping)) -%}
 {{ json_tool_result_items([tool_msg.content] if tool_msg.content is string else tool_msg.content) }}
 {%- elif tool_msg.content is mapping or tool_msg.content is string -%}
     {%- if tool_msg.content is string -%}
