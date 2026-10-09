@@ -50,11 +50,8 @@
 {{ xml_text(item|tojson) }}
 {%- endif -%}
 {%- endmacro %}
-{#- json_tool_results (on unless set to false): text tool content holds tool results serialized as
-    JSON Lines, one result per line, since OpenAI-compatible servers such as vLLM can only send text
-    tool content. Each line renders as one result item, as Melody renders tool result documents,
-    whether the lines arrive as one string or split across text parts (vLLM may join text parts with
-    newlines). Native Melody sets it to false; clients can do so via chat_template_kwargs. When false,
+{#- json_tool_results (on by default): text tool content holds tool results serialized as
+    JSON Lines, one result per line. When false,
     text is a plain-text result wrapped as {"content": text}. -#}
 {%- macro json_tool_result_items(contents) -%}
 {%- set item_idx = namespace(value=0) -%}
