@@ -13,6 +13,8 @@
 {#- Escape XML text, then restore <|...|> special-token delimiters (e.g. image placeholders) so tokenizers still recognize them. -#}
 {%- macro xml_text(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('&lt;|', '<|')|replace('|&gt;', '|>') }}{%- endmacro -%}
 {%- macro xml_attr(value) -%}{{ value|replace('&', '&amp;')|replace('<', '&lt;')|replace('>', '&gt;')|replace('"', '&quot;') }}{%- endmacro -%}
+{#- Tool names and descriptions are inserted into the JSON tool list, so encode them as JSON strings. -#}
+{%- macro tool_spec_string(value) -%}{{ (value if value is string else "")|tojson }}{%- endmacro -%}
 {%- macro render_tool_call_params(arguments) -%}
 {%- for param_name, param_value in arguments|items -%}
 {%- if param_value is string -%}
@@ -60,11 +62,33 @@
 {{ xml_text(item|tojson) }}
 {%- endif -%}
 {%- endmacro %}
+{#- json_tool_results (on unless set to false): text tool content holds tool results serialized as
+    JSON Lines, one result per line, since OpenAI-compatible servers such as vLLM can only send text
+    tool content. Each line renders as one result item, as Melody renders tool result documents,
+    whether the lines arrive as one string or split across text parts (vLLM may join text parts with
+    newlines). Native Melody sets it to false; clients can do so via chat_template_kwargs. When false,
+    text is a plain-text result wrapped as {"content": text}. -#}
+{%- macro json_tool_result_items(contents) -%}
+{%- set item_idx = namespace(value=0) -%}
+{%- for content in contents -%}
+{%- if content is string or content.type|lower == "text" -%}
+{%- for line in (content if content is string else content.text).split("\n") if line|trim -%}
+<cofl:tool_result_item index="{{ item_idx.value }}">{{ xml_text(line) }}</cofl:tool_result_item>
+{%- set item_idx.value = item_idx.value + 1 -%}
+{%- endfor -%}
+{%- else -%}
+<cofl:tool_result_item index="{{ item_idx.value }}">{{ print_cofl_tool_content(content) }}</cofl:tool_result_item>
+{%- set item_idx.value = item_idx.value + 1 -%}
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro -%}
 {%- macro format_tool_message(messages, tool_msg) -%}
 {#- format tool message -#}
 {%- set is_err_val = "true" if tool_msg.is_error else "false" -%}
 <cofl:tool_result id="{{ tool_call_id_to_int(messages, tool_msg.tool_call_id) }}" is_error="{{ is_err_val }}">
-{%- if tool_msg.content is mapping or tool_msg.content is string -%}
+{%- if (json_tool_results is not defined or json_tool_results) and (tool_msg.content is string or (tool_msg.content is sequence and tool_msg.content is not mapping)) -%}
+{{ json_tool_result_items([tool_msg.content] if tool_msg.content is string else tool_msg.content) }}
+{%- elif tool_msg.content is mapping or tool_msg.content is string -%}
     {%- if tool_msg.content is string -%}
         {%- set text_wrapper = {"content": tool_msg.content} -%}
     {%- else -%}
@@ -179,7 +203,7 @@ Note that both your responses and reflections can be grounded. Grounding means y
     {% endif %}
 {%- endif %}
 {%- for tool in tools %}
-    {"name": "{{ tool['function']['name'] }}", "description": "{{ tool['function']['description'] }}", "parameters": {{ tool['function']['parameters']|tojson }}, "responses": null}
+    {"name": {{ tool_spec_string(tool['function']['name']) }}, "description": {{ tool_spec_string(tool['function']['description']) }}, "parameters": {{ tool['function']['parameters']|tojson }}, "responses": null}
     {%- if not loop.last %},{% endif %}
 
 {% endfor %}

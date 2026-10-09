@@ -127,9 +127,10 @@ pub struct RenderCmd4Options<'a> {
     pub additional_template_fields: Map<String, Value>,
     /// Special tokens to escape in the output.
     pub escaped_special_tokens: BTreeMap<String, String>,
-    /// When true, tool call names are left unescaped for templates that apply
-    /// XML attribute escaping (cmd5). Set internally by [`render_cmd5`]; do not
-    /// set manually.
+    /// When true, tool call names and tool spec names/descriptions are left
+    /// unescaped for templates that escape them themselves (cmd5: `xml_attr`
+    /// for tool calls, `tojson` for tool specs). Set internally by
+    /// [`render_cmd5`]; do not set manually.
     #[serde(skip, default)]
     pub raw_tool_call_names: bool,
 }
@@ -538,9 +539,17 @@ pub fn render_cmd5<'a>(opts: &RenderCmd5Options<'a>) -> Result<String, MelodyErr
     let mut active_opts: RenderCmd5Options<'a> = opts.clone();
     // Honor caller `template_jinja` even when `use_jinja` is false.
     active_opts.use_jinja = true;
-    // cmd5 templates XML-escape tool names via `xml_attr`; skip JSON escaping
-    // in the jinja message prep path (cmd3/cmd4 embed names in JSON instead).
+    // cmd5 templates XML-escape tool call names via `xml_attr` and JSON-encode
+    // tool spec strings via `tojson`, so skip pre-escaping in the jinja prep
+    // path (cmd3/cmd4 insert them between quotes instead). This keeps the
+    // template correct for clients such as vLLM that pass raw tool strings.
     active_opts.raw_tool_call_names = true;
+    // Set json_tool_results to default false since melody pre-processes tool result turns
+    // via `convert_messages_for_jinja`.
+    active_opts
+        .additional_template_fields
+        .entry("json_tool_results")
+        .or_insert(Value::Bool(false));
 
     if let Some(template_id) = opts.template_id.as_ref() {
         let template_enum = CMD5JinjaTemplates::from_str(template_id)?;
@@ -911,6 +920,39 @@ mod tests {
             rendered.contains("CHATBOT"),
             "template_id=cmd5 should render via jinja, ignoring leftover liquid template"
         );
+    }
+
+    #[test]
+    fn test_render_cmd5_text_tool_content_is_one_result_regardless_of_json_tool_results() {
+        let render_cmd5_text_tool_result = |additional_template_fields: Value| {
+            render_cmd5_from_input(&json!({
+                "messages": [
+                    {"role": "User", "content": [{"type": "text", "text": "Run it."}]},
+                    {
+                        "role": "Chatbot",
+                        "tool_calls": [{"id": "0", "name": "run_shell", "parameters": "{}"}]
+                    },
+                    {
+                        "role": "Tool",
+                        "tool_call_id": "0",
+                        "content": [{"type": "text", "text": "first line\nsecond line"}]
+                    }
+                ],
+                "additional_template_fields": additional_template_fields
+            }))
+        };
+        let rendered = render_cmd5_text_tool_result(json!({}));
+        assert!(
+            rendered.contains(r#"<cofl:tool_result_item index="0">{"content": "first line\nsecond line"}</cofl:tool_result_item></cofl:tool_result>"#),
+            "text tool content should render as one plain-text result: {rendered}"
+        );
+        for json_tool_results in [true, false] {
+            assert_eq!(
+                rendered,
+                render_cmd5_text_tool_result(json!({"json_tool_results": json_tool_results})),
+                "json_tool_results={json_tool_results} changed the native rendering"
+            );
+        }
     }
 
     #[test]

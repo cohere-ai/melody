@@ -188,14 +188,24 @@ pub(crate) fn tools_to_template(tools: &[Tool]) -> Result<Vec<Map<String, Value>
 
 // Convert tools to template for jinja. Takes the input format of 'available_tools' and converts it to
 // chat completions tool format: https://developers.openai.com/api/reference/resources/chat#(resource)%20chat.completions%20%3E%20(model)%20chat_completion_tool%20%3E%20(schema)
-fn tools_to_template_jinja(tools: &[Tool]) -> Vec<Map<String, Value>> {
+// When `raw_strings` is set the name and description are passed through as is, because the template
+// JSON-encodes them itself (cmd5). Otherwise they are pre-escaped for templates that insert them
+// between quotes (cmd3/cmd4).
+fn tools_to_template_jinja(tools: &[Tool], raw_strings: bool) -> Vec<Map<String, Value>> {
+    let escape = |s: &str| {
+        if raw_strings {
+            s.to_string()
+        } else {
+            json_escape_string(s)
+        }
+    };
     let mut template_tools: Vec<Map<String, Value>> = Vec::with_capacity(tools.len());
     for tool in tools {
         let mut tool_map = Map::new();
         tool_map.insert("type".to_string(), Value::String("function".to_string()));
         let func = json!({
-            "name": json_escape_string(&tool.name),
-            "description": json_escape_string(&tool.description),
+            "name": escape(&tool.name),
+            "description": escape(&tool.description),
             "parameters": tool.parameters,
         });
         tool_map.insert("function".to_string(), func);
@@ -987,7 +997,7 @@ pub(crate) fn get_jinja_vars(
     raw_tool_call_names: bool,
 ) -> Result<(Vec<Value>, Vec<Map<String, Value>>, Vec<Value>), MelodyError> {
     let messages = convert_messages_for_jinja(messages, raw_tool_call_names)?;
-    let template_tools = tools_to_template_jinja(tools);
+    let template_tools = tools_to_template_jinja(tools, raw_tool_call_names);
     let docs = docs_to_template_jinja(documents, special_token_map);
     Ok((messages, template_tools, docs))
 }

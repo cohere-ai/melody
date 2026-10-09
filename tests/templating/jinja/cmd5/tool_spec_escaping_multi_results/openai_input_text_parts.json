@@ -1,0 +1,101 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Find the open \"P1\" tickets and check the build."
+    },
+    {
+      "role": "assistant",
+      "reasoning_content": "I'll look up the tickets and run the build.",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "0",
+          "type": "function",
+          "function": {
+            "name": "list_tickets",
+            "arguments": {
+              "query": "priority = \"P1\" && state != closed"
+            }
+          }
+        },
+        {
+          "id": "1",
+          "type": "function",
+          "function": {
+            "name": "run_shell",
+            "arguments": {
+              "command": "make test 2>&1 | tail -n 3"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "0",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"id\": \"INC-1\", \"title\": \"Login fails when password has \\\"quotes\\\" & <brackets>\", \"body\": \"Steps:\\n1. open /login\\n2. see \\\\ error\"}"
+        },
+        {
+          "type": "text",
+          "text": "{\"id\": \"INC-2\", \"title\": \"p95 latency > 2s\", \"tags\": [\"perf\", \"a&b\"]}"
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "1",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"exit_code\": 2, \"stdout\": \"FAILED tests/test_io.py::test_lt - assert 1 < 0\\n<|END_OF_TURN_TOKEN|> is a literal\"}"
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "list_tickets",
+        "description": "List tickets matching a \"query\".\nUse field = \"value\" pairs joined by && or ||, e.g. priority = \"P1\".\nBackslashes (\\) must be escaped. Results are <= 50 tickets.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Filter, e.g. state != \"closed\""
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "run_shell",
+        "description": "Run a shell command.\n\tReturns {\"exit_code\": int, \"stdout\": str}.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "command"
+          ]
+        }
+      }
+    }
+  ],
+  "add_generation_prompt": true,
+  "bos_token": "<BOS_TOKEN>",
+  "grounding": "enabled"
+}
