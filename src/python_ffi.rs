@@ -3,7 +3,10 @@
 //! Provides `PyFilter` for parsing and `render_cmd3`/`render_cmd4`/`render_cmd5` for templating.
 
 use crate::parsing::{AccumulatedToolCall, FilterAggregatedResult, SearchQueryDelta};
-use crate::parsing::{Filter, FilterImpl, FilterOptions, new_filter, parse_vision_generation};
+use crate::parsing::{
+    Filter, FilterImpl, FilterOptions, new_filter, parse_truncated_vision_generation,
+    parse_vision_generation,
+};
 use crate::templating::types::{Document, Message};
 use crate::templating::{
     RenderCmd3Options, RenderCmd4Options, RenderCmd5Options, render_cmd3 as rust_render_cmd3,
@@ -520,6 +523,38 @@ fn parse_vision_generation_py(py: Python<'_>, text: &str) -> PyResult<Py<PyAny>>
     Ok(obj.into())
 }
 
+/// Like `parse_vision_generation`, but tolerates a generation that was cut off
+/// mid-`[visual_element]` block: an unclosed start tag is recovered as a trailing
+/// element (fields parsed from whatever body was emitted before the cutoff, with
+/// `truncated: True`) instead of raising `ValueError`. A malformed `bbox` on that
+/// trailing element is dropped rather than raising `ValueError`.
+///
+/// Only use this when the caller already knows the generation stopped because of
+/// a token limit (e.g. from the model's `finish_reason`) -- a bad `bbox` on any
+/// *closed* element still raises `ValueError`, since that reflects a malformed
+/// generation rather than truncation.
+///
+/// # Errors
+///
+/// Raises `ValueError` if a `bbox` field on a closed element is malformed.
+///
+/// # Example
+///
+/// ```python
+/// result = parse_truncated_vision_generation(
+///     "[visual_element]\\ntype: table\\nbbox: 0,0,10,10"
+/// )
+/// assert result["segments"][0]["element"]["truncated"] is True
+/// ```
+#[pyfunction]
+#[pyo3(name = "parse_truncated_vision_generation")]
+fn parse_truncated_vision_generation_py(py: Python<'_>, text: &str) -> PyResult<Py<PyAny>> {
+    let parsed = parse_truncated_vision_generation(text)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let obj = pythonize(py, &parsed).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok(obj.into())
+}
+
 #[pymodule]
 fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOptions>()?;
@@ -531,6 +566,7 @@ fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(render_cmd4, m)?)?;
     m.add_function(wrap_pyfunction!(render_cmd5, m)?)?;
     m.add_function(wrap_pyfunction!(parse_vision_generation_py, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_truncated_vision_generation_py, m)?)?;
     Ok(())
 }
 

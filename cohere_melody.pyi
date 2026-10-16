@@ -88,3 +88,28 @@ class PyFilter:
 def render_cmd3(config: dict) -> str: ...
 def render_cmd4(config: dict) -> str: ...
 def render_cmd5(config: dict) -> str: ...
+def parse_vision_generation(text: str) -> dict:
+    """Parse a complete parse-model generation with interleaved
+    `[visual_element]` blocks.
+
+    Unary only -- pass the full generation text. Returns a dict with
+    ordered `segments` (`type: "text" | "element"`).
+
+    Raises `ValueError` on unclosed tags or invalid `bbox` fields.
+    """
+    ...
+
+def parse_truncated_vision_generation(text: str) -> dict:
+    """Like `parse_vision_generation`, but tolerates a generation that was
+    cut off mid-`[visual_element]` block: an unclosed element is recovered
+    as a trailing segment (fields parsed from whatever body was emitted
+    before the cutoff, with `truncated: True`) instead of raising
+    `ValueError`. A malformed `bbox` on that trailing element is dropped
+    rather than raising `ValueError`.
+
+    Only use this when the caller already knows the generation stopped
+    because of a token limit (e.g. from the model's `finish_reason`) --
+    a bad `bbox` on any *closed* element still raises `ValueError`, since
+    that reflects a malformed generation rather than truncation.
+    """
+    ...
