@@ -3,3 +3,17 @@
 # macOS" than the consumer's deployment target.
 [env]
 MACOSX_DEPLOYMENT_TARGET = { value = "11.0", force = true }
+
+# Package managers such as Homebrew rewrite a dylib's own install name
+# (LC_ID_DYLIB) in place, from @rpath/<leaf> to an absolute path under the
+# install prefix. That only works if the Mach-O header has enough padding for
+# the longer string; the linker's default pad is ~16 bytes per dylib load
+# command, which overflows for prefixes like
+# /opt/homebrew/opt/<formula>/libexec/lib/python3.11/site-packages/...
+# -headerpad_max_install_names reserves ~1 KiB per dylib command instead, the
+# same headroom other PyO3 wheels (pydantic-core, rpds-py) ship with.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-headerpad_max_install_names"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-headerpad_max_install_names"]
