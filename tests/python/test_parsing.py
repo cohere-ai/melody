@@ -1,7 +1,13 @@
 """Tests for the parsing functionality (PyFilter)."""
 
 import pytest
-from cohere_melody import PyFilter, PyFilterOptions
+
+from cohere_melody import (
+    PyFilter,
+    PyFilterOptions,
+    parse_truncated_vision_generation,
+    parse_vision_generation,
+)
 
 
 class TestPyFilterWriteDecoded:
@@ -466,3 +472,67 @@ class TestIsReasoning:
         assert f.is_reasoning() is True
         f.write_decoded("think<|END_THINKING|>")
         assert f.is_reasoning() is False
+
+
+class TestParseVisionGeneration:
+    """Tests for parse_vision_generation / parse_truncated_vision_generation."""
+
+    def test_well_formed_generation(self):
+        text = (
+            "before\n\n"
+            "[visual_element]\ntype: table\nbbox: 1,2,3,4\n[/visual_element]\n\n"
+            "after"
+        )
+        result = parse_vision_generation(text)
+        segments = result["segments"]
+        assert [s["type"] for s in segments] == ["text", "element", "text"]
+        assert segments[0]["text"] == "before"
+        assert segments[1]["element"]["type"] == "table"
+        assert segments[1]["element"]["bbox"] == {
+            "top_left_x": 1,
+            "top_left_y": 2,
+            "bottom_right_x": 3,
+            "bottom_right_y": 4,
+        }
+        assert segments[1]["element"].get("truncated", False) is False
+        assert segments[2]["text"] == "after"
+
+    def test_unclosed_element_raises(self):
+        text = "[visual_element]\ntype: table\nbbox: 1,2,3,4"
+        with pytest.raises(ValueError):
+            parse_vision_generation(text)
+
+    def test_invalid_bbox_raises(self):
+        text = "[visual_element]\nbbox: 1,2,3\n[/visual_element]"
+        with pytest.raises(ValueError):
+            parse_vision_generation(text)
+
+    def test_truncated_recovers_partial_trailing_element(self):
+        """An unclosed trailing element is recovered (truncated=True)
+        instead of raising, and a malformed trailing bbox is dropped."""
+        text = (
+            "before\n\n[visual_element]\ntype: table\ntitle: partial table\nbbox: 1,2,3"
+        )
+        result = parse_truncated_vision_generation(text)
+        segments = result["segments"]
+        assert segments[0]["text"] == "before"
+        element = segments[1]["element"]
+        assert element["type"] == "table"
+        assert element["title"] == "partial table"
+        assert "bbox" not in element
+        assert element["truncated"] is True
+
+    def test_truncated_still_raises_on_closed_element_bad_bbox(self):
+        """A malformed bbox on a *closed* element is a genuinely malformed
+        generation, not truncation, so it still raises."""
+        text = "[visual_element]\nbbox: 1,2,3\n[/visual_element]"
+        with pytest.raises(ValueError):
+            parse_truncated_vision_generation(text)
+
+    def test_truncated_matches_strict_for_well_formed_generation(self):
+        text = (
+            "before\n\n"
+            "[visual_element]\ntype: table\nbbox: 1,2,3,4\n[/visual_element]\n\n"
+            "after"
+        )
+        assert parse_truncated_vision_generation(text) == parse_vision_generation(text)
