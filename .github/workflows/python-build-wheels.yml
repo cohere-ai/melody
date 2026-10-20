@@ -67,7 +67,9 @@ jobs:
           ref: ${{ needs.resolve-tag.outputs.tag }}
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          # Pinned below 3.15: pyo3 0.27.2 supports Python <= 3.14 (see the
+          # windows job).
+          python-version: "3.14"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -127,7 +129,9 @@ jobs:
           ref: ${{ needs.resolve-tag.outputs.tag }}
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          # Pinned below 3.15: pyo3 0.27.2 supports Python <= 3.14 (see the
+          # windows job).
+          python-version: "3.14"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -235,7 +239,9 @@ jobs:
           ref: ${{ needs.resolve-tag.outputs.tag }}
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          # Pinned below 3.15: pyo3 0.27.2 supports Python <= 3.14 (see the
+          # windows job).
+          python-version: "3.14"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
