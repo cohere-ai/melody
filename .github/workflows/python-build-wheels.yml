@@ -187,7 +187,14 @@ jobs:
           ref: ${{ needs.resolve-tag.outputs.tag }}
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          # Pinned below 3.15: pyo3 0.27.2's max supported Python version is
+          # 3.14, and "3.x" resolves to whatever is newest on the runner
+          # image (which started installing 3.15 by default), breaking the
+          # build. Bump this once pyo3 supports 3.15, or ideally stop
+          # pinning once Windows hosted runners ship older interpreters
+          # pre-installed for every supported architecture the way Linux/
+          # macOS runners do (see --find-interpreter in the other jobs).
+          python-version: "3.14"
           architecture: ${{ matrix.platform.target }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
