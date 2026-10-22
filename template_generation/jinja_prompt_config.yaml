@@ -107,7 +107,7 @@ cmd5:
     setup.jinja:
       path: cmd4/shared/setup.jinja
     platform_turn.jinja:
-      path: cmd4/shared/platform_turn.jinja
+      path: cmd5/platform_turn.jinja
     messages_loop.jinja:
       path: cmd5/cofl/messages_loop.jinja
     generation_prompt_reasoning.jinja:
@@ -129,7 +129,7 @@ cmd5-no-escape:
     setup.jinja:
       path: cmd4/shared/setup.jinja
     platform_turn.jinja:
-      path: cmd4/shared/platform_turn.jinja
+      path: cmd5/platform_turn.jinja
     messages_loop.jinja:
       path: cmd5/cofl/messages_loop.jinja
     generation_prompt_reasoning.jinja:
@@ -151,7 +151,7 @@ cmd5-strict:
     setup.jinja:
       path: cmd4/shared/setup.jinja
     platform_turn.jinja:
-      path: cmd4/shared/platform_turn.jinja
+      path: cmd5/platform_turn.jinja
     messages_loop.jinja:
       path: cmd5/cofl/messages_loop.jinja
     generation_prompt_reasoning.jinja:
