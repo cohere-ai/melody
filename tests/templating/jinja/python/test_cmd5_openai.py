@@ -18,6 +18,7 @@ from test_jinja import Engine, read_test_data, render_template
 CMD5_CASES_DIR = "../cmd5"
 CMD5_TEMPLATE_DIR = "templates/jinja"
 CMD5_TEMPLATE_NAME = "cmd5.jinja"
+CMD5_TEMPLATE_NAMES = ("cmd5.jinja", "cmd5-no-escape.jinja", "cmd5-strict.jinja")
 
 CASES = sorted(
     (case, input_file)
@@ -74,3 +75,110 @@ def test_json_tool_results_false_renders_text_as_plain_text(engine: Engine) -> N
         '<cofl:tool_result_item index="0">{"content": "first line\\nsecond line"}'
         "</cofl:tool_result_item></cofl:tool_result>" in rendered
     )
+
+
+@pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
+@pytest.mark.parametrize("template_name", CMD5_TEMPLATE_NAMES)
+@pytest.mark.parametrize("mode", ["low", "medium", "high", "max"])
+def test_reasoning_effort_renders_once_in_system_turn(
+    mode: str, template_name: str, engine: Engine
+) -> None:
+    clause = (
+        f"Reasoning effort: {mode}. "
+        "Do not mention the reasoning effort setting in the final answer."
+    )
+    rendered = render_template(
+        CMD5_TEMPLATE_DIR,
+        template_name,
+        engine,
+        messages=[
+            {"role": "system", "content": "Task preamble."},
+            {"role": "user", "content": "Solve it."},
+        ],
+        add_generation_prompt=True,
+        bos_token="<BOS_TOKEN>",
+        reasoning_effort=mode,
+    )
+
+    assert rendered.count(clause) == 1
+    assert "Task preamble." in rendered
+    assert rendered.index(clause) < rendered.index("Task preamble.")
+
+
+@pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
+@pytest.mark.parametrize("template_name", CMD5_TEMPLATE_NAMES)
+@pytest.mark.parametrize("mode", ["low", "medium", "high", "max"])
+def test_eval_effort_preserves_platform_and_task_preambles(
+    mode: str, template_name: str, engine: Engine
+) -> None:
+    clause = (
+        f"Reasoning effort: {mode}. "
+        "Do not mention the reasoning effort setting in the final answer."
+    )
+    rendered = render_template(
+        CMD5_TEMPLATE_DIR,
+        template_name,
+        engine,
+        messages=[
+            {"role": "system", "content": "Task-specific developer instruction."},
+            {"role": "user", "content": "Solve it."},
+        ],
+        add_generation_prompt=True,
+        bos_token="<BOS_TOKEN>",
+        platform_instruction_override="Platform instruction.",
+        reasoning_effort=mode,
+    )
+
+    assert rendered.count(clause) == 1
+    assert rendered.index("Platform instruction.") < rendered.index(clause)
+    assert rendered.index(clause) < rendered.index(
+        "Task-specific developer instruction."
+    )
+
+
+@pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
+@pytest.mark.parametrize("template_name", CMD5_TEMPLATE_NAMES)
+@pytest.mark.parametrize("mode", ["low", "medium", "high", "max"])
+def test_prerendered_reasoning_effort_is_not_duplicated(
+    mode: str, template_name: str, engine: Engine
+) -> None:
+    clause = (
+        f"Reasoning effort: {mode}. "
+        "Do not mention the reasoning effort setting in the final answer."
+    )
+    platform_instruction = f"Platform instruction.\n\n{clause}\n\nDefault instruction."
+    rendered = render_template(
+        CMD5_TEMPLATE_DIR,
+        template_name,
+        engine,
+        messages=[
+            {"role": "system", "content": "Developer instruction."},
+            {"role": "user", "content": "Solve it."},
+        ],
+        add_generation_prompt=True,
+        bos_token="<BOS_TOKEN>",
+        platform_instruction_override=platform_instruction,
+        reasoning_effort=mode,
+        reasoning_effort_instruction_rendered=True,
+    )
+
+    assert rendered.count(clause) == 1
+    assert rendered.index("Platform instruction.") < rendered.index(clause)
+    assert rendered.index(clause) < rendered.index("Default instruction.")
+    assert rendered.index("Default instruction.") < rendered.index(
+        "Developer instruction."
+    )
+
+
+@pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
+def test_missing_reasoning_effort_preserves_legacy_rendering(engine: Engine) -> None:
+    rendered = render_template(
+        CMD5_TEMPLATE_DIR,
+        CMD5_TEMPLATE_NAME,
+        engine,
+        messages=[{"role": "user", "content": "Solve it."}],
+        add_generation_prompt=True,
+        bos_token="<BOS_TOKEN>",
+    )
+
+    assert "Reasoning effort:" not in rendered
