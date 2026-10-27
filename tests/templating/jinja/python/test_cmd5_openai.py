@@ -74,3 +74,47 @@ def test_json_tool_results_false_renders_text_as_plain_text(engine: Engine) -> N
         '<cofl:tool_result_item index="0">{"content": "first line\\nsecond line"}'
         "</cofl:tool_result_item></cofl:tool_result>" in rendered
     )
+
+
+@pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
+@pytest.mark.parametrize(
+    "template_name", ["cmd5.jinja", "cmd5-strict.jinja", "cmd5-no-escape.jinja"]
+)
+def test_tool_result_images_render_placeholders(
+    engine: Engine, template_name: str
+) -> None:
+    rendered = render_template(
+        CMD5_TEMPLATE_DIR,
+        template_name,
+        engine,
+        messages=[
+            {
+                "role": "tool",
+                "tool_call_id": "0",
+                "content": [
+                    {"type": "image"},
+                    {
+                        "type": "image",
+                        "image": {
+                            "template_placeholder": (
+                                "<|START_IMAGE|>imagedata<|END_IMAGE|>"
+                            )
+                        },
+                    },
+                ],
+            },
+        ],
+        add_generation_prompt=True,
+        bos_token="<BOS_TOKEN>",
+        regen_tool_call_ids=False,
+    )
+    placeholders = [
+        "<|IMG_PATCH|>",
+        "<|START_IMAGE|>imagedata<|END_IMAGE|>",
+    ]
+    for index, placeholder in enumerate(placeholders):
+        assert (
+            f'<cofl:tool_result_item index="{index}">'
+            f'{{"image_content": "{placeholder}"}}'
+            "</cofl:tool_result_item>" in rendered
+        )

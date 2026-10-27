@@ -58,6 +58,10 @@
 {{ xml_text(text_wrapper|tojson) }}
 {%- elif item.type|lower == "document" and item.document and "data" in item.document -%}
 {{ xml_text(item.document.data|tojson) }}
+{%- elif item.type|lower == "image" -%}
+{%- set image_placeholder = item.image.template_placeholder if item.image and item.image.template_placeholder else "<|IMG_PATCH|>" -%}
+{%- set image_wrapper = {"image_content": image_placeholder} -%}
+{{ xml_text(image_wrapper|tojson) }}
 {%- else -%}
 {{ xml_text(item|tojson) }}
 {%- endif -%}
