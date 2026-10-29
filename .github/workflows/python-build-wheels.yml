@@ -183,8 +183,13 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
+            python-architecture: x64
           - runner: windows-latest
             target: x86
+            python-architecture: x86
+          - runner: windows-11-arm
+            target: aarch64
+            python-architecture: arm64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -199,7 +204,7 @@ jobs:
           # pre-installed for every supported architecture the way Linux/
           # macOS runners do (see --find-interpreter in the other jobs).
           python-version: "3.14"
-          architecture: ${{ matrix.platform.target }}
+          architecture: ${{ matrix.platform.python-architecture }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -212,15 +217,14 @@ jobs:
           name: cohere-melody-wheels-windows-${{ matrix.platform.target }}
           path: dist
       - name: pytest
-        if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
         run: |
           set -e
-          python3 -m venv .venv
+          python -m venv .venv
           source .venv/Scripts/activate
-          pip install cohere_melody --find-links dist --force-reinstall
-          pip install pytest
-          pytest --ignore=tests/templating/jinja/python
+          python -m pip install cohere_melody --no-index --find-links dist --force-reinstall
+          python -m pip install pytest
+          python -m pytest --ignore=tests/templating/jinja/python
 
   macos:
     needs: [resolve-tag]
