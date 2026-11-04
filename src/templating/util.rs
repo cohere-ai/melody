@@ -791,6 +791,14 @@ fn tojson(value: &minijinja::Value) -> Result<minijinja::Value, minijinja::Error
         .map(|s| minijinja::Value::from_safe_string(add_spaces_to_json_encoding(&s)))
 }
 
+// Same helper huggingface exposes to chat templates for failing a render with a message.
+fn raise_exception(message: String) -> Result<minijinja::Value, minijinja::Error> {
+    Err(minijinja::Error::new(
+        minijinja::ErrorKind::InvalidOperation,
+        message,
+    ))
+}
+
 // Set the minijinja env according to the huggingface settings:
 // https://github.com/huggingface/transformers/blob/57278c904c5158999d31a0db8bfcd63360c37b48/src/transformers/utils/chat_template_utils.py#L455-L460
 pub(crate) fn get_minijinja_env<'a>(
@@ -801,6 +809,7 @@ pub(crate) fn get_minijinja_env<'a>(
     env.set_trim_blocks(true);
     env.set_lstrip_blocks(true);
     env.add_filter("tojson", tojson);
+    env.add_function("raise_exception", raise_exception);
     env.add_template(template_name, template)?;
     Ok(env)
 }
