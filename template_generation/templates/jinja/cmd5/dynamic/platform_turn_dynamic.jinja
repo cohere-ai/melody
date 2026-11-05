@@ -1,0 +1,91 @@
+{#- Dynamic system preamble. Callers pass in:
+    wording: mapping of preamble text; grounding_clause is required when the grounding section renders.
+    layout: list of system turns, each a list of section names ("platform", "grounding", "tools",
+        "json_mode"), e.g. [["tools"], ["platform", "grounding"]]. Each name may appear once, and every
+        section that has content must appear. Sections without content are skipped, and so are turns
+        left empty.
+    show_tools_header: whether to write "# Available Tools" above the tool list.
+    With wording.grounding_clause set to the served grounding sentence, layout
+    [["platform", "grounding", "tools", "json_mode"]] and show_tools_header true, this renders the same
+    prompt as cmd5. -#}
+{%- set dynamic_sections = ["platform", "grounding", "tools", "json_mode"] -%}
+{%- if wording is not defined or layout is not defined or show_tools_header is not defined -%}
+{{ raise_exception("cmd5-dynamic needs wording, layout and show_tools_header") }}
+{%- endif -%}
+{%- if render_grounding and "grounding_clause" not in wording -%}
+{{ raise_exception("Missing cmd5-dynamic input: wording.grounding_clause") }}
+{%- endif -%}
+{%- set layout_names = namespace(value=[]) -%}
+{%- for turn in layout -%}
+{%- for name in turn -%}
+{%- if name not in dynamic_sections -%}
+{{ raise_exception("Unknown section in layout: " ~ name) }}
+{%- elif name in layout_names.value -%}
+{{ raise_exception("Section appears more than once in layout: " ~ name) }}
+{%- endif -%}
+{%- set layout_names.value = layout_names.value + [name] -%}
+{%- endfor -%}
+{%- endfor -%}
+{%- if render_platform_instruction_override and "platform" not in layout_names.value -%}
+{{ raise_exception("Section has content but is missing from layout: platform") }}
+{%- elif render_grounding and "grounding" not in layout_names.value -%}
+{{ raise_exception("Section has content but is missing from layout: grounding") }}
+{%- elif render_tools_section and "tools" not in layout_names.value -%}
+{{ raise_exception("Section has content but is missing from layout: tools") }}
+{%- elif json_mode and "json_mode" not in layout_names.value -%}
+{{ raise_exception("Section has content but is missing from layout: json_mode") }}
+{%- endif -%}
+
+{%- macro dynamic_section(name) -%}
+{%- if name == "platform" and render_platform_instruction_override -%}
+{{ platform_instruction_override }}
+{%- elif name == "grounding" and render_grounding -%}
+{{ wording.grounding_clause }}
+{%- elif name == "tools" and render_tools_section -%}
+{%- if show_tools_header %}
+# Available Tools
+{% endif -%}
+```json
+[
+{% if tools_or_docs_exist %}
+{%- if documents %}
+    {"name": "direct-injected-document", "description": "This is a special tool to directly inject user-uploaded documents into the chat as additional context. DO NOT use this tool by yourself!", "parameters": {"type": "object", "properties": {}, "required": []}, "responses": {"200": {"description": "Successfully returned a list of chunked text snippets from the directly uploaded documents.", "content": {"application/json": {"schema": {"type": "array", "items": {"type": "object", "required": ["url", "snippet"], "properties": {"url": {"type": "string", "description": "The url of the uploaded document."}, "snippet": {"type": "string", "description": "The text snippet for the returned document chunk."}}}}}}}}}
+    {%- if tools %},
+    {% else %}
+
+    {% endif %}
+{%- endif %}
+{%- for tool in tools %}
+    {"name": {{ tool_spec_string(tool['function']['name']) }}, "description": {{ tool_spec_string(tool['function']['description']) }}, "parameters": {{ tool['function']['parameters']|tojson }}, "responses": null}
+    {%- if not loop.last %},{% endif %}
+
+{% endfor %}
+{%- else %}
+
+{% endif %}
+]
+```
+{%- elif name == "json_mode" and json_mode -%}
+When generating JSON objects, do not generate block markers. Generate an object directly without prefixing with ```json. Return only the JSON and nothing else.
+    {%- if json_schema %}
+
+Your output should adhere to the following json schema:
+{{ json_schema }}
+    {%- endif -%}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- for turn in layout -%}
+{%- set parts = namespace(value=[]) -%}
+{%- for name in turn -%}
+{%- set text = dynamic_section(name) -%}
+{%- if text -%}{%- set parts.value = parts.value + [text] -%}{%- endif -%}
+{%- endfor -%}
+{%- if parts.value -%}
+<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>{{ parts.value | join("\n\n") }}<|END_TEXT|><|END_OF_TURN_TOKEN|>
+{%- endif -%}
+{%- endfor -%}
+
+{%- if render_developer_instruction -%}
+<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{{ print_msg(developer_instruction) }}<|END_OF_TURN_TOKEN|>
+{%- endif %}
