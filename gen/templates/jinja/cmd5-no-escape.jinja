@@ -168,7 +168,11 @@
 {%- set tool_ids_seen = namespace(value=[]) %}
 {%- set regen_tool_call_ids = regen_tool_call_ids | default(true) -%}
 {%- set sent_documents = namespace(value=false) -%}
-{%- set render_reasoning_effort = reasoning_effort is defined and (reasoning_effort | lower) in ["low", "medium", "high", "max"] and not (reasoning_effort_instruction_rendered is defined and reasoning_effort_instruction_rendered) -%}
+{%- set supported_reasoning_efforts = ["none", "low", "medium", "high", "max", "xhigh"] -%}
+{%- if reasoning_effort is defined and (reasoning_effort | lower) not in supported_reasoning_efforts -%}
+{{ raise_exception("Unsupported reasoning_effort '" ~ reasoning_effort ~ "'. Choose one of: none, low, medium, high, max, xhigh.") }}
+{%- endif -%}
+{%- set render_reasoning_effort = reasoning_effort is defined and (reasoning_effort | lower) != "none" and not (reasoning_effort_instruction_rendered is defined and reasoning_effort_instruction_rendered) -%}
 
 {%- if render_tools_section or render_platform_instruction_override or render_reasoning_effort or render_grounding or json_mode -%}
 <|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>

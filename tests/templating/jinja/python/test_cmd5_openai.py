@@ -20,6 +20,11 @@ CMD5_TEMPLATE_DIR = "templates/jinja"
 CMD5_TEMPLATE_NAME = "cmd5.jinja"
 CMD5_TEMPLATE_NAMES = ("cmd5.jinja", "cmd5-no-escape.jinja", "cmd5-strict.jinja")
 
+
+def raise_exception(message: str) -> None:
+    raise ValueError(message)
+
+
 CASES = sorted(
     (case, input_file)
     for case in os.listdir(CMD5_CASES_DIR)
@@ -121,7 +126,7 @@ def test_tool_result_images_render_placeholders(
 
 @pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
 @pytest.mark.parametrize("template_name", CMD5_TEMPLATE_NAMES)
-@pytest.mark.parametrize("mode", ["low", "medium", "high", "max"])
+@pytest.mark.parametrize("mode", ["low", "medium", "high", "max", "xhigh"])
 def test_reasoning_effort_renders_once_in_system_turn(
     mode: str, template_name: str, engine: Engine
 ) -> None:
@@ -149,7 +154,7 @@ def test_reasoning_effort_renders_once_in_system_turn(
 
 @pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
 @pytest.mark.parametrize("template_name", CMD5_TEMPLATE_NAMES)
-@pytest.mark.parametrize("mode", ["low", "medium", "high", "max"])
+@pytest.mark.parametrize("mode", ["low", "medium", "high", "max", "xhigh"])
 def test_eval_effort_preserves_platform_and_task_preambles(
     mode: str, template_name: str, engine: Engine
 ) -> None:
@@ -180,7 +185,7 @@ def test_eval_effort_preserves_platform_and_task_preambles(
 
 @pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
 @pytest.mark.parametrize("template_name", CMD5_TEMPLATE_NAMES)
-@pytest.mark.parametrize("mode", ["low", "medium", "high", "max"])
+@pytest.mark.parametrize("mode", ["low", "medium", "high", "max", "xhigh"])
 def test_prerendered_reasoning_effort_is_not_duplicated(
     mode: str, template_name: str, engine: Engine
 ) -> None:
@@ -224,3 +229,19 @@ def test_missing_reasoning_effort_preserves_legacy_rendering(engine: Engine) -> 
     )
 
     assert "Reasoning effort:" not in rendered
+
+
+@pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
+@pytest.mark.parametrize("template_name", CMD5_TEMPLATE_NAMES)
+def test_unsupported_reasoning_effort_fails(template_name: str, engine: Engine) -> None:
+    with pytest.raises(ValueError, match="Unsupported reasoning_effort 'unsupported'"):
+        render_template(
+            CMD5_TEMPLATE_DIR,
+            template_name,
+            engine,
+            messages=[{"role": "user", "content": "Solve it."}],
+            add_generation_prompt=True,
+            bos_token="<BOS_TOKEN>",
+            reasoning_effort="unsupported",
+            raise_exception=raise_exception,
+        )
