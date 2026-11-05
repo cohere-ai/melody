@@ -5,11 +5,6 @@
 {% include "macros_content.jinja" %}
 {% include "macros_reasoning.jinja" %}
 {% include "setup.jinja" %}
-{%- set supported_reasoning_efforts = ["none", "low", "medium", "high", "max", "xhigh"] -%}
-{%- if reasoning_effort is defined and (reasoning_effort | lower) not in supported_reasoning_efforts -%}
-{{ raise_exception("Unsupported reasoning_effort '" ~ reasoning_effort ~ "'. Choose one of: none, low, medium, high, max, xhigh.") }}
-{%- endif -%}
-{%- set render_reasoning_effort = reasoning_effort is defined and (reasoning_effort | lower) != "none" and not (reasoning_effort_instruction_rendered is defined and reasoning_effort_instruction_rendered) -%}
 
 {% include "platform_turn.jinja" %}
 {% include "messages_loop.jinja" %}{% include "generation_prompt_reasoning.jinja" %}
