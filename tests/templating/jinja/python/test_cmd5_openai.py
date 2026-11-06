@@ -19,10 +19,7 @@ CMD5_CASES_DIR = "../cmd5"
 CMD5_TEMPLATE_DIR = "templates/jinja"
 CMD5_TEMPLATE_NAME = "cmd5.jinja"
 CMD5_TEMPLATE_NAMES = ("cmd5.jinja", "cmd5-no-escape.jinja", "cmd5-strict.jinja")
-
-
-def raise_exception(message: str) -> None:
-    raise ValueError(message)
+CMD4_TEMPLATE_NAMES = ("cmd4-v1.jinja", "cmd4-v2.jinja", "cmd4-hf.jinja")
 
 
 CASES = sorted(
@@ -232,16 +229,37 @@ def test_missing_reasoning_effort_preserves_legacy_rendering(engine: Engine) -> 
 
 
 @pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
+@pytest.mark.parametrize("template_name", CMD4_TEMPLATE_NAMES)
+def test_cmd4_ignores_reasoning_effort(template_name: str, engine: Engine) -> None:
+    rendered = render_template(
+        CMD5_TEMPLATE_DIR,
+        template_name,
+        engine,
+        messages=[{"role": "user", "content": "Solve it."}],
+        add_generation_prompt=True,
+        bos_token="<BOS_TOKEN>",
+        reasoning_effort="custom",
+    )
+
+    assert "Reasoning effort:" not in rendered
+
+
+@pytest.mark.parametrize("engine", [Engine.JINJA2, Engine.MINIJINJA])
 @pytest.mark.parametrize("template_name", CMD5_TEMPLATE_NAMES)
-def test_unsupported_reasoning_effort_fails(template_name: str, engine: Engine) -> None:
-    with pytest.raises(ValueError, match="Unsupported reasoning_effort 'unsupported'"):
-        render_template(
-            CMD5_TEMPLATE_DIR,
-            template_name,
-            engine,
-            messages=[{"role": "user", "content": "Solve it."}],
-            add_generation_prompt=True,
-            bos_token="<BOS_TOKEN>",
-            reasoning_effort="unsupported",
-            raise_exception=raise_exception,
-        )
+def test_unfamiliar_reasoning_effort_renders(
+    template_name: str, engine: Engine
+) -> None:
+    rendered = render_template(
+        CMD5_TEMPLATE_DIR,
+        template_name,
+        engine,
+        messages=[{"role": "user", "content": "Solve it."}],
+        add_generation_prompt=True,
+        bos_token="<BOS_TOKEN>",
+        reasoning_effort="custom",
+    )
+
+    assert (
+        "Reasoning effort: custom. "
+        "Do not mention the reasoning effort setting in the final answer."
+    ) in rendered
