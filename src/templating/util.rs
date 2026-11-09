@@ -321,7 +321,7 @@ fn add_citation_insert_pair(
         end: false,
         id: String::new(),
     };
-    let mut citation_id_map: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut citation_id_map: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for source in &citation.sources {
         citation_id_map
             .entry(source.tool_call_index)
@@ -1127,6 +1127,26 @@ mod tests {
         let result = to_string(&escaped).unwrap();
         let expected = r#"{"outer_key":["zoozoo",{"inner_key_ooo":["foofoo",{"inner_inner_key_ooo":"inner_inner_volue_ooo"}]}]}"#;
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_citation_sources_render_in_tool_call_order() {
+        let citation: FilterCitation = serde_json::from_value(json!({
+            "start_index": 0,
+            "end_index": 5,
+            "text": "Hello",
+            "is_thinking": false,
+            "sources": [
+                {"tool_call_index": 3, "tool_result_indices": [0]},
+                {"tool_call_index": 1, "tool_result_indices": [2]},
+                {"tool_call_index": 2, "tool_result_indices": [1]},
+            ],
+        }))
+        .unwrap();
+        let mut inserts = Vec::new();
+        add_citation_insert_pair(&citation, &mut inserts);
+        let rendered = build_text_with_citation(&"Hello world".to_string(), &mut inserts);
+        assert_eq!(rendered, "<co>Hello</co: 1:[2],2:[1],3:[0]> world");
     }
 
     mod test_prompt_render_ids_from_messages {
