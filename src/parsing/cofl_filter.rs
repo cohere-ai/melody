@@ -206,12 +206,8 @@ impl FilterImpl {
         let close_pos = after_open + close_rel;
         let attrs = &s[after_open..close_pos];
 
-        let id = extract_attr(attrs, "id")
-            .map(decode_xml_entities)
-            .unwrap_or_default();
-        let name = extract_attr(attrs, "name")
-            .map(decode_xml_entities)
-            .unwrap_or_default();
+        let id = extract_attr(attrs, "id").map_or_else(String::default, decode_xml_entities);
+        let name = extract_attr(attrs, "name").map_or_else(String::default, decode_xml_entities);
 
         let mut out = Vec::new();
         if self.stream_tool_actions && !id.is_empty() {
@@ -273,9 +269,7 @@ impl FilterImpl {
         let close_pos = after_open + close_rel;
         let attrs = &s[after_open..close_pos];
 
-        let name = extract_attr(attrs, "name")
-            .map(decode_xml_entities)
-            .unwrap_or_default();
+        let name = extract_attr(attrs, "name").map_or_else(String::default, decode_xml_entities);
         // Default to `true` so a missing `string` attribute is treated as a
         // raw string (the conservative choice).
         let is_string = extract_attr(attrs, "string").is_none_or(|v| v != "false");
