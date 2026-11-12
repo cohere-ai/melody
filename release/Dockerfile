@@ -9,9 +9,15 @@ COPY ./benches ./benches
 COPY ./template_generation ./template_generation
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
-RUN cargo build --release --features tkzrs
+COPY ./release/strip_lto_bitcode.sh ./release/
+# The strip step keeps the archive linkable by Go 1.27.4+, which rejects LTO
+# sections in #cgo LDFLAGS archives.
+RUN cargo build --release --features tkzrs && \
+    ./release/strip_lto_bitcode.sh target/release/libcohere_melody.a
 
-FROM golang:1.25 as builder-go
+# Go 1.27.4 is the version that enforces the LTO check, so the smoke test below
+# doubles as the regression gate for the strip step.
+FROM golang:1.27.4 as builder-go
 ARG TARGETPLATFORM
 WORKDIR /workspace
 COPY ./go.mod   .
