@@ -1,4 +1,4 @@
-{%- if render_tools_section or render_platform_instruction_override or render_grounding or json_mode -%}
+{%- if render_tools_section or render_platform_instruction_override or render_reasoning_effort or render_grounding or json_mode -%}
 <|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|><|START_TEXT|>
 {%- elif not render_developer_instruction -%}
 <|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>
@@ -10,6 +10,14 @@
 {{ platform_instruction_override }}
 {% set rendered_platform_turn_chunk = true %}
 {%- else %}
+{%- endif %}
+
+{%- if render_reasoning_effort -%}
+{%- if rendered_platform_turn_chunk %}
+
+{% endif -%}
+Reasoning effort: {{ reasoning_effort | lower }}. Do not mention the reasoning effort setting in the final answer.
+{% set rendered_platform_turn_chunk = true %}
 {%- endif %}
 
 {%- if render_grounding -%}
