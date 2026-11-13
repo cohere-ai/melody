@@ -54,7 +54,7 @@ fi
 # ELF keeps the bitcode in sections, Mach-O in an __LLVM segment. Naming a
 # section the archive does not have is a no-op, so pass both sets and let the
 # archive format decide; that also keeps the script idempotent.
-sections=(.llvmbc .llvmcmd __LLVM,__bitcode __LLVM,__cmdline)
+sections=(.llvmbc .llvmcmd "__LLVM,__bitcode" "__LLVM,__cmdline")
 
 args=()
 for section in "${sections[@]}"; do
