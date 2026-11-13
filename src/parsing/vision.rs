@@ -202,8 +202,7 @@ fn parse_element_body(body: &str) -> Result<VisionElement, VisionParseError> {
     let mut element = VisionElement {
         element_type: fields
             .get("type")
-            .map(|s| s.trim().to_string())
-            .unwrap_or_default(),
+            .map_or_else(String::default, |s| s.trim().to_string()),
         description: fields.get("description").map(|s| s.trim().to_string()),
         title: fields.get("title").map(|s| s.trim().to_string()),
         html: fields.get("html").map(|s| s.trim().to_string()),
@@ -225,8 +224,7 @@ fn parse_partial_element_body(body: &str) -> VisionElement {
     VisionElement {
         element_type: fields
             .get("type")
-            .map(|s| s.trim().to_string())
-            .unwrap_or_default(),
+            .map_or_else(String::default, |s| s.trim().to_string()),
         bbox: fields.get("bbox").and_then(|raw| parse_bbox(raw).ok()),
         description: fields.get("description").map(|s| s.trim().to_string()),
         title: fields.get("title").map(|s| s.trim().to_string()),

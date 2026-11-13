@@ -162,12 +162,8 @@ impl FilterImpl {
         let full = caps.get(0).expect("full match");
         let attrs = caps.get(1).map_or("", |m| m.as_str());
 
-        let id = extract_attr(attrs, "id")
-            .map(decode_xml_entities)
-            .unwrap_or_default();
-        let name = extract_attr(attrs, "name")
-            .map(decode_xml_entities)
-            .unwrap_or_default();
+        let id = extract_attr(attrs, "id").map_or_else(String::default, decode_xml_entities);
+        let name = extract_attr(attrs, "name").map_or_else(String::default, decode_xml_entities);
 
         let mut out = Vec::new();
         if self.stream_tool_actions && !id.is_empty() {

@@ -436,15 +436,13 @@ fn extract_content_doc_id(content: &Content) -> String {
         ContentType::Document => content
             .document
             .as_ref()
-            .map(extract_doc_id)
-            .unwrap_or_default(),
+            .map_or_else(String::default, extract_doc_id),
         ContentType::Multipart => content
             .multipart
             .as_ref()
             .and_then(|parts| parts.first())
             .and_then(|part| part.document.as_ref())
-            .map(extract_doc_id)
-            .unwrap_or_default(),
+            .map_or_else(String::default, extract_doc_id),
         _ => String::new(),
     }
 }
@@ -746,8 +744,7 @@ pub(crate) fn messages_to_template(
                         data: content_item
                             .image
                             .as_ref()
-                            .map(|img| img.template_placeholder.clone())
-                            .unwrap_or_default(),
+                            .map_or_else(String::default, |img| img.template_placeholder.clone()),
                     });
                 }
                 ContentType::Unknown => {}
