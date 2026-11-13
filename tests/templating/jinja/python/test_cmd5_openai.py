@@ -127,10 +127,7 @@ def test_tool_result_images_render_placeholders(
 def test_reasoning_effort_renders_once_in_system_turn(
     mode: str, template_name: str, engine: Engine
 ) -> None:
-    clause = (
-        f"Reasoning effort: {mode}. "
-        "Do not mention the reasoning effort setting in the final answer."
-    )
+    clause = f"Reasoning effort: {mode}."
     rendered = render_template(
         CMD5_TEMPLATE_DIR,
         template_name,
@@ -155,10 +152,7 @@ def test_reasoning_effort_renders_once_in_system_turn(
 def test_eval_effort_preserves_platform_and_task_preambles(
     mode: str, template_name: str, engine: Engine
 ) -> None:
-    clause = (
-        f"Reasoning effort: {mode}. "
-        "Do not mention the reasoning effort setting in the final answer."
-    )
+    clause = f"Reasoning effort: {mode}."
     rendered = render_template(
         CMD5_TEMPLATE_DIR,
         template_name,
@@ -186,10 +180,7 @@ def test_eval_effort_preserves_platform_and_task_preambles(
 def test_prerendered_reasoning_effort_is_not_duplicated(
     mode: str, template_name: str, engine: Engine
 ) -> None:
-    clause = (
-        f"Reasoning effort: {mode}. "
-        "Do not mention the reasoning effort setting in the final answer."
-    )
+    clause = f"Reasoning effort: {mode}."
     platform_instruction = f"Platform instruction.\n\n{clause}\n\nDefault instruction."
     rendered = render_template(
         CMD5_TEMPLATE_DIR,
@@ -259,7 +250,4 @@ def test_unfamiliar_reasoning_effort_renders(
         reasoning_effort="custom",
     )
 
-    assert (
-        "Reasoning effort: custom. "
-        "Do not mention the reasoning effort setting in the final answer."
-    ) in rendered
+    assert "Reasoning effort: custom." in rendered
