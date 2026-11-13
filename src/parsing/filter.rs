@@ -2311,6 +2311,68 @@ mod tests {
     }
 
     #[test]
+    fn test_cmd4_tool_call_with_empty_parameters_has_json_arguments() {
+        // A tool call with no arguments must still produce valid JSON
+        // arguments ("{}"), like the cofl parsers do, not an empty string.
+        let text = concat!(
+            "<|START_THINKING|>plan<|END_THINKING|><|START_ACTION|>",
+            r#"[{"tool_call_id": "0", "tool_name": "get_time", "parameters": {}}, "#,
+            r#"{"tool_call_id": "1", "tool_name": "search", "parameters": {"q": "x"}}]"#,
+            "<|END_ACTION|>",
+        );
+
+        let mut f = make_cmd4_filter();
+        let r = f.process_full_text(text);
+        assert_eq!(r.tool_calls.len(), 2);
+        assert_eq!(r.tool_calls[0].name, "get_time");
+        assert_eq!(r.tool_calls[0].arguments, "{}");
+        assert_eq!(r.tool_calls[1].name, "search");
+        assert_eq!(r.tool_calls[1].arguments, r#"{"q": "x"}"#);
+
+        // Same result when streamed one character at a time.
+        let chunks: Vec<String> = text.chars().map(|c| c.to_string()).collect();
+        let mut f = make_cmd4_filter();
+        let streamed = f.process_full(&chunks);
+        assert_eq!(streamed.tool_calls.len(), 2);
+        assert_eq!(streamed.tool_calls[0].arguments, "{}");
+        assert_eq!(streamed.tool_calls[1].arguments, r#"{"q": "x"}"#);
+    }
+
+    #[test]
+    fn test_cmd4_empty_parameters_not_taken_from_next_tool_call() {
+        // The first call has no "parameters" key at all; the `{}` that
+        // follows belongs to the second call.
+        let text = concat!(
+            "<|START_ACTION|>",
+            r#"[{"tool_call_id": "0", "tool_name": "a"}, "#,
+            r#"{"tool_call_id": "1", "tool_name": "b", "parameters": {}}]"#,
+            "<|END_ACTION|>",
+        );
+        let mut f = make_cmd4_filter();
+        let r = f.process_full_text(text);
+        assert_eq!(r.tool_calls.len(), 2);
+        assert_eq!(r.tool_calls[0].name, "a");
+        assert_eq!(r.tool_calls[0].arguments, "");
+        assert_eq!(r.tool_calls[1].name, "b");
+        assert_eq!(r.tool_calls[1].arguments, "{}");
+    }
+
+    #[test]
+    fn test_cmd3_tool_call_with_empty_parameters_processed_params_mode() {
+        let text = concat!(
+            "<|START_ACTION|>",
+            r#"[{"tool_call_id": "0", "tool_name": "get_time", "parameters": { }}]"#,
+            "<|END_ACTION|>",
+        );
+        let mut f = new_filter(FilterOptions::default().cmd3().stream_processed_params());
+        let r = f.process_full_text(text);
+        assert_eq!(r.tool_calls.len(), 1);
+        assert_eq!(r.tool_calls[0].name, "get_time");
+        assert_eq!(r.tool_calls[0].arguments, "");
+        assert!(r.tool_calls[0].processed_params.is_empty());
+    }
+
+    #[test]
     fn test_cmd5_start_in_answer_bare_text_and_delimiters() {
         let mut default = make_cmd5_filter();
         let r = default.process_full_text("{\"a\": 1}");

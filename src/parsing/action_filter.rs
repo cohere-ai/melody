@@ -17,8 +17,9 @@ static TOOL_NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#""tool_name":\s*""#).expect("Invalid tool_name regex"));
 static PARAM_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#""parameters":\s*\{\s*""#).expect("Invalid parameters regex"));
-static RAW_PARAM_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#""parameters":\s*"#).expect("Invalid raw parameters regex"));
+static RAW_PARAM_OBJECT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#""parameters":\s*\{"#).expect("Invalid raw parameters object regex")
+});
 static PARAM_NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\s*:\s*").expect("Invalid param name regex"));
 
@@ -157,19 +158,22 @@ impl FilterImpl {
     }
 
     fn handle_tool_name_end(&mut self, s: &str) -> (Vec<FilterOutput>, usize) {
-        let param_regex = &*PARAM_REGEX;
-
-        if let Some(mat) = param_regex.find(s) {
-            if self.stream_processed_params {
+        if self.stream_processed_params {
+            if let Some(mat) = PARAM_REGEX.find(s) {
                 self.action_metadata.mode = ActionMode::ParamName;
                 let (out, rem) = self.parse_actions(&s[mat.end()..]);
                 return (out, rem + mat.end());
             }
-            self.action_metadata.mode = ActionMode::RawParam;
-            let raw_param_regex = &*RAW_PARAM_REGEX;
-            if let Some(mat) = raw_param_regex.find(s) {
-                let (out, rem) = self.parse_actions(&s[mat.end()..]);
-                return (out, rem + mat.end());
+        } else if let Some(mat) = RAW_PARAM_OBJECT_REGEX.find(s) {
+            // Raw mode streams the parameters object as-is, so an empty
+            // `{}` must be streamed too. Otherwise a tool call with no
+            // arguments ends up with `arguments == ""`, which is not JSON.
+            // Only take the match if it belongs to this tool call.
+            if s.find('}').is_none_or(|end| mat.start() < end) {
+                self.action_metadata.mode = ActionMode::RawParam;
+                let start = mat.end() - 1;
+                let (out, rem) = self.parse_actions(&s[start..]);
+                return (out, rem + start);
             }
         }
 
