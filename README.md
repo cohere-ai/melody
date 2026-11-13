@@ -114,6 +114,32 @@ let options = templating::RenderCmd4Options {
 let prompt = templating::render_cmd4(&options).unwrap();
 ```
 
+### Rendering an AgentTrajectory (Python)
+
+`cohere_melody.agent_trajectory` renders a datatools `AgentTrajectory` with the
+cmd4/cmd5 Jinja templates, converting it the same way the API converts requests.
+It takes the pydantic model or its `model_dump(mode="json")` dict, and does not
+depend on datatools.
+
+```python
+from cohere_melody.agent_trajectory import (
+    render_trajectory_cmd5,
+    trajectory_to_render_options,
+)
+
+prompt = render_trajectory_cmd5(
+    trajectory.as_without_trailing_chatbot_turn(),
+    image_placeholder="<|IMG_PATCH|>",  # or a callable that gets the image dict
+    template_id="cmd5-strict",  # any other render_cmd5 option
+)
+
+# Or get the render_cmd4 / render_cmd5 options and adjust them yourself.
+options = trajectory_to_render_options(trajectory)
+```
+
+Trajectory features the templates cannot express, such as a custom default
+preamble or text next to tool calls, raise `UnsupportedTrajectoryError`.
+
 ## Releasing
 
 Bump the version in `Cargo.toml` and push to `main`. The CI will automatically create a GitHub release, build wheels for all platforms, and publish to PyPI.
