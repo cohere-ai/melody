@@ -556,6 +556,7 @@ fn parse_truncated_vision_generation_py(py: Python<'_>, text: &str) -> PyResult<
 }
 
 #[pymodule]
+#[pyo3(name = "_cohere_melody")]
 fn cohere_melody(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOptions>()?;
     m.add_class::<PyFilter>()?;
