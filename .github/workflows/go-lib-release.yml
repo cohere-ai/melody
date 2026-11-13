@@ -76,11 +76,18 @@ jobs:
         with:
           path: target
           key: linux-${{ matrix.makefile_suffix }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.4"
+          cache: false
       - name: Build and package Linux static library
         run: |
           set -eux
           cargo build --release --features tkzrs
           ./release/strip_lto_bitcode.sh target/release/libcohere_melody.a
+          # Go 1.27.4 rejects archives that still carry LTO sections, so this
+          # link is what proves the strip worked before the artifact ships.
+          go run ./release
           mkdir -p "artifacts/linux-${{ matrix.makefile_suffix }}"
           cp target/release/libcohere_melody.a "artifacts/linux-${{ matrix.makefile_suffix }}/"
           cd "artifacts/linux-${{ matrix.makefile_suffix }}"
@@ -130,11 +137,20 @@ jobs:
         with:
           path: target
           key: darwin-${{ matrix.suffix }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.4"
+          cache: false
       - name: Build and package Darwin static library
         run: |
           set -eux
           cargo build --release --target "${{ matrix.target }}" --features tkzrs
           ./release/strip_lto_bitcode.sh "target/${{ matrix.target }}/release/libcohere_melody.a"
+          # Go 1.27.4 rejects archives that still carry LTO sections, so this
+          # link is what proves the strip worked before the artifact ships.
+          mkdir -p target/release
+          cp "target/${{ matrix.target }}/release/libcohere_melody.a" target/release/
+          go run ./release
           mkdir -p "artifacts/darwin-${{ matrix.suffix }}"
           cp "target/${{ matrix.target }}/release/libcohere_melody.a" "artifacts/darwin-${{ matrix.suffix }}/"
           cd "artifacts/darwin-${{ matrix.suffix }}"
