@@ -116,7 +116,7 @@ let prompt = templating::render_cmd4(&options).unwrap();
 
 ## Releasing
 
-Bump the version in `Cargo.toml` and push to `main`. The CI will automatically create a GitHub release, build wheels for all platforms, and publish to PyPI.
+Bump the version in `Cargo.toml` and push to `main`. The CI will automatically create a GitHub release, build wheels for Linux, macOS, and Windows (x86, x64, and ARM64), and publish to PyPI. Windows ARM64 wheels (`win_arm64`) are built and tested natively on `windows-11-arm` runners.
 
 ## Building Python Bindings
 
