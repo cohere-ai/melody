@@ -26,8 +26,8 @@ Issues = "https://github.com/cohere-ai/melody/issues"
 
 [tool.maturin]
 features = ["pyo3/extension-module", "python_ffi"]
-module-name = "cohere_melody"
-include=["cohere_melody.pyi"]
+module-name = "cohere_melody._cohere_melody"
+python-source = "python"
 
 [tool.uv]
 managed = false
