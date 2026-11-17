@@ -1,0 +1,48 @@
+{
+  "platform_instruction": "You are Command, built by Cohere.",
+  "dev_instruction": "Only answer questions about weather.",
+  "grounding": "enabled",
+  "reasoning_type": "enabled",
+  "available_tools": [
+    {
+      "name": "search",
+      "description": "Search the web.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string"}
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {"type": "string"}
+        },
+        "required": ["city"]
+      }
+    }
+  ],
+  "messages": [
+    {
+      "role": "User",
+      "content": [
+        {
+          "type": "text",
+          "text": "What's the weather in Toronto?"
+        }
+      ]
+    }
+  ],
+  "additional_template_fields": {
+    "wording": {
+      "grounding_clause": "To ensure your responses are well-grounded, follow this approach: wrap each supported span in \"<co>\" and \"</co: {tool_call_id}:[{list of result indices}]>\"."
+    },
+    "layout": [["tools"], ["platform", "grounding"]],
+    "show_tools_header": false
+  }
+}

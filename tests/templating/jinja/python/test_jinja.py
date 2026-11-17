@@ -14,6 +14,11 @@ class Engine(Enum):
     MINIJINJA = 2
 
 
+def raise_exception(message: str) -> None:
+    # Same helper huggingface exposes to chat templates.
+    raise jinja2.exceptions.TemplateError(message)
+
+
 def render_template_jinja2(template_dir: str, template_name: str, **kwargs: Any) -> str:
     # This jinja environment should match the huggingface settings from here:
     # https://github.com/huggingface/transformers/blob/57278c904c5158999d31a0db8bfcd63360c37b48/src/transformers/utils/chat_template_utils.py#L455-L460
@@ -31,6 +36,7 @@ def render_template_jinja2(template_dir: str, template_name: str, **kwargs: Any)
         *args, ensure_ascii=False, sort_keys=False, **kwargs
     )
     env.policies["json.dumps_kwargs"] = {"sort_keys": False}
+    env.globals["raise_exception"] = raise_exception
     template = env.get_template(template_name)
 
     return template.render(**kwargs)
@@ -56,6 +62,7 @@ def render_template_minijinja(
     env = minijinja.Environment(
         loader=loader,
         filters=filters,
+        globals={"raise_exception": raise_exception},
         lstrip_blocks=True,
         trim_blocks=True,
     )

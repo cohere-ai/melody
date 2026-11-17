@@ -144,6 +144,8 @@ static CMD5_NO_ESCAPE_JINJA_TEMPLATE: &str =
     include_str!("../../gen/templates/jinja/cmd5-no-escape.jinja");
 static CMD5_STRICT_JINJA_TEMPLATE: &str =
     include_str!("../../gen/templates/jinja/cmd5-strict.jinja");
+static CMD5_DYNAMIC_JINJA_TEMPLATE: &str =
+    include_str!("../../gen/templates/jinja/cmd5-dynamic.jinja");
 impl Default for RenderCmd4Options<'_> {
     fn default() -> Self {
         Self {
@@ -241,6 +243,7 @@ enum CMD5JinjaTemplates {
     CMD5,
     CMD5NoEscape,
     CMD5Strict,
+    CMD5Dynamic,
 }
 
 impl CMD5JinjaTemplates {
@@ -249,6 +252,7 @@ impl CMD5JinjaTemplates {
             CMD5JinjaTemplates::CMD5 => CMD5_JINJA_TEMPLATE,
             CMD5JinjaTemplates::CMD5NoEscape => CMD5_NO_ESCAPE_JINJA_TEMPLATE,
             CMD5JinjaTemplates::CMD5Strict => CMD5_STRICT_JINJA_TEMPLATE,
+            CMD5JinjaTemplates::CMD5Dynamic => CMD5_DYNAMIC_JINJA_TEMPLATE,
         }
     }
 }
@@ -261,6 +265,7 @@ impl FromStr for CMD5JinjaTemplates {
             "cmd5" => Ok(Self::CMD5),
             "cmd5-no-escape" => Ok(Self::CMD5NoEscape),
             "cmd5-strict" => Ok(Self::CMD5Strict),
+            "cmd5-dynamic" => Ok(Self::CMD5Dynamic),
             _ => Err(MelodyError::TemplateValidation(format!(
                 "unknown template id: {o}"
             ))),
@@ -863,6 +868,131 @@ mod tests {
         );
     }
 
+    fn render_cmd5_dynamic(input_json: &Value) -> Result<String, MelodyError> {
+        let mut opts = deserialize::<_, RenderCmd5Options>(input_json).unwrap();
+        opts.template_id = Some("cmd5-dynamic".to_string());
+        render_cmd5(&opts)
+    }
+
+    fn with_additional_template_fields(input_json: &Value, fields: &Value) -> Value {
+        let mut input = input_json.clone();
+        let additional = input
+            .as_object_mut()
+            .unwrap()
+            .entry("additional_template_fields")
+            .or_insert_with(|| json!({}))
+            .as_object_mut()
+            .unwrap();
+        for (key, value) in fields.as_object().unwrap() {
+            additional.insert(key.clone(), value.clone());
+        }
+        input
+    }
+
+    #[test]
+    fn test_render_cmd5_dynamic_jinja_from_dir() {
+        let mut ran_any = false;
+        for (test_name, input_json, expected, _) in read_test_cases("jinja/cmd5_dynamic") {
+            println!("Running cmd5-dynamic jinja test case: {}", test_name);
+            let rendered = render_cmd5_dynamic(&input_json).unwrap();
+            assert_eq!(expected, rendered, "Failed test: {}", test_name);
+            ran_any = true;
+        }
+        assert!(
+            ran_any,
+            "no cmd5-dynamic jinja test fixtures were found in tests/templating/jinja/cmd5_dynamic"
+        );
+    }
+
+    #[test]
+    fn test_render_cmd5_dynamic_with_served_wording_matches_cmd5() {
+        let grounding_clause = CMD5_JINJA_TEMPLATE
+            .lines()
+            .find(|line| line.starts_with("Note that both your responses"))
+            .expect("cmd5 template should contain the grounding sentence");
+        let served_fields = json!({
+            "wording": {"grounding_clause": grounding_clause},
+            "layout": [["platform", "grounding", "tools", "json_mode"]],
+            "show_tools_header": true
+        });
+        let mut ran = 0;
+        for version in [
+            "jinja/cmd5",
+            "jinja/cmd5_strict",
+            "jinja/cmd5_no_escape",
+            "jinja/cmd5_dynamic",
+        ] {
+            for (test_name, input_json, _, _) in read_test_cases(version) {
+                let served = render_cmd5_from_input(&input_json);
+                let dynamic = render_cmd5_dynamic(&with_additional_template_fields(
+                    &input_json,
+                    &served_fields,
+                ))
+                .unwrap();
+                assert_eq!(served, dynamic, "{version}/{test_name} differs from cmd5");
+                ran += 1;
+            }
+        }
+        assert!(ran > 0, "no cmd5 fixtures were found");
+    }
+
+    #[test]
+    fn test_render_cmd5_dynamic_rejects_bad_inputs() {
+        let input = json!({
+            "platform_instruction": "You are Command.",
+            "available_tools": [{"name": "search", "description": "Search the web.", "parameters": {}}],
+            "messages": [{"role": "User", "content": [{"type": "text", "text": "Hi"}]}]
+        });
+        let mut json_input = input.clone();
+        json_input["json_mode"] = json!(true);
+        let wording = json!({"grounding_clause": "Cite your sources."});
+        let cases = [
+            (
+                &input,
+                json!({"layout": [["tools"]], "show_tools_header": true}),
+                "cmd5-dynamic needs wording, layout and show_tools_header",
+            ),
+            (
+                &input,
+                json!({"wording": {}, "layout": [["platform", "grounding", "tools"]], "show_tools_header": true}),
+                "Missing cmd5-dynamic input: wording.grounding_clause",
+            ),
+            (
+                &input,
+                json!({"wording": wording, "layout": [["platform", "grounding", "tool"]], "show_tools_header": true}),
+                "Unknown section in layout: tool",
+            ),
+            (
+                &input,
+                json!({"wording": wording, "layout": [["platform", "grounding"], ["tools", "platform"]], "show_tools_header": true}),
+                "Section appears more than once in layout: platform",
+            ),
+            (
+                &input,
+                json!({"wording": wording, "layout": [["platform", "tools"]], "show_tools_header": true}),
+                "Section has content but is missing from layout: grounding",
+            ),
+            (
+                &input,
+                json!({"wording": wording, "layout": [], "show_tools_header": true}),
+                "Section has content but is missing from layout: platform",
+            ),
+            (
+                &json_input,
+                json!({"wording": wording, "layout": [["platform", "grounding", "tools"]], "show_tools_header": true}),
+                "Section has content but is missing from layout: json_mode",
+            ),
+        ];
+        for (input, fields, expected) in cases {
+            let err = render_cmd5_dynamic(&with_additional_template_fields(input, &fields))
+                .expect_err(expected);
+            assert!(
+                err.to_string().contains(expected),
+                "expected {expected:?}, got: {err}"
+            );
+        }
+    }
+
     #[test]
     fn test_render_cmd5_preserves_custom_template_jinja() {
         // Sentinel template that does not depend on any of the cmd5 substitutions so
@@ -1009,6 +1139,25 @@ mod tests {
         );
         for (test_name, input_json, _, output_path) in cases {
             let rendered = render_cmd5_from_input(&input_json);
+            let bytes_written = rendered.len();
+            fs::write(&output_path, &rendered)
+                .unwrap_or_else(|e| panic!("failed to write {output_path:?} for {test_name}: {e}"));
+            println!("Wrote fixture: {test_name} ({bytes_written} bytes)");
+        }
+    }
+
+    /// Helper test that rewrites every `output.txt` under `tests/templating/jinja/cmd5_dynamic`
+    /// from the current cmd5-dynamic template output.
+    #[test]
+    #[ignore = "fixture regenerator; run on demand via `--ignored`"]
+    fn regenerate_cmd5_dynamic_jinja_fixtures() {
+        let cases = read_test_cases("jinja/cmd5_dynamic");
+        assert!(
+            !cases.is_empty(),
+            "no cmd5-dynamic jinja input fixtures were found in tests/templating/jinja/cmd5_dynamic"
+        );
+        for (test_name, input_json, _, output_path) in cases {
+            let rendered = render_cmd5_dynamic(&input_json).unwrap();
             let bytes_written = rendered.len();
             fs::write(&output_path, &rendered)
                 .unwrap_or_else(|e| panic!("failed to write {output_path:?} for {test_name}: {e}"));
