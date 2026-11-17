@@ -114,6 +114,26 @@ let options = templating::RenderCmd4Options {
 let prompt = templating::render_cmd4(&options).unwrap();
 ```
 
+In Python, the render functions take the same options as a dict. `cohere_melody.templating`
+describes its shape with `TypedDict`s (`RenderCmd3Options`, `RenderCmd4Options`,
+`RenderCmd5Options`, `Message`, `Content`, `ToolCall`, `Tool`, `Citation`, ...), so a type
+checker or IDE can check the keys and values you pass:
+
+```python
+from cohere_melody import RenderCmd5Options, render_cmd5
+
+options: RenderCmd5Options = {
+    "messages": [
+        {"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]},
+        {"role": "user", "content": [{"type": "text", "text": "Hello Command!"}]},
+    ],
+    "grounding": "disabled",
+}
+prompt = render_cmd5(options)
+```
+
+A plain `dict` is still accepted.
+
 ## Releasing
 
 Bump the version in `Cargo.toml` and push to `main`. The CI will automatically create a GitHub release, build wheels for all platforms, and publish to PyPI.

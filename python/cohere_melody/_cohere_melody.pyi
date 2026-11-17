@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+from typing import Any
+
+from cohere_melody.templating import (
+    Document,
+    Message,
+    RenderCmd3Options,
+    RenderCmd4Options,
+    RenderCmd5Options,
+)
+
 class PyFilterOptions:
     def __init__(self) -> None: ...
     def cmd3(self) -> PyFilterOptions: ...
@@ -23,8 +33,8 @@ class PyFilterOptions:
     def remove_token(self, token: str) -> PyFilterOptions: ...
     def with_message_history(
         self,
-        messages: list[dict] | None = None,
-        documents: list[dict] | None = None,
+        messages: list[Message] | list[dict[str, Any]] | None = None,
+        documents: list[Document] | None = None,
     ) -> PyFilterOptions:
         """Configure the parser with the `messages` and `documents` that
         will be rendered into the prompt, so it can resolve citation
@@ -85,9 +95,10 @@ class PyFilter:
     def process_full_text(self, text: str) -> FilterAggregatedResult: ...
     def classify_content_chunks(self, token_strings: list[str]) -> list[bool]: ...
 
-def render_cmd3(config: dict) -> str: ...
-def render_cmd4(config: dict) -> str: ...
-def render_cmd5(config: dict) -> str: ...
+# A plain dict is accepted too, so callers that build untyped dicts keep type-checking.
+def render_cmd3(config: RenderCmd3Options | dict[str, Any]) -> str: ...
+def render_cmd4(config: RenderCmd4Options | dict[str, Any]) -> str: ...
+def render_cmd5(config: RenderCmd5Options | dict[str, Any]) -> str: ...
 def parse_vision_generation(text: str) -> dict:
     """Parse a complete parse-model generation with interleaved
     `[visual_element]` blocks.
