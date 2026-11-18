@@ -7,6 +7,7 @@
 use crate::parsing::action_filter::ActionMode;
 use crate::parsing::filter::{FilterImpl, PartialMatchResult, find_partial};
 use crate::parsing::types::FilterOutput;
+use serde::de::IgnoredAny;
 
 /// State machine for parsing parameter values.
 ///
@@ -136,9 +137,8 @@ impl FilterImpl {
 
 /// Find the (byte) index of the first valid json prefix (returns number of bytes)
 ///
-/// This function incrementally tests each character position to see if appending
-/// it would complete a valid JSON value. This is used for streaming JSON parsing
-/// where we need to know when we have a complete value.
+/// This uses serde's streaming deserializer to find the end of the first complete
+/// JSON value without constructing a JSON tree or reparsing every prefix.
 ///
 /// # Arguments
 ///
@@ -150,27 +150,26 @@ impl FilterImpl {
 /// The index in `s` where a valid JSON value completes, or `usize::MAX` if no
 /// complete value is found yet.
 ///
-/// # Performance Note
-///
-/// This function calls `serde_json::from_str` for each character position, which
-/// can be expensive for large values. For production use with large parameters,
-/// consider a more efficient streaming JSON parser.
 pub(crate) fn find_valid_json_value(buffer: &str, s: &str) -> usize {
-    // PERFORMANCE: This approach of testing JSON validity at each character position
-    // can be slow for large parameter values. The repeated string allocations and
-    // JSON parsing could be replaced with a dedicated streaming JSON parser that
-    // tracks nesting depth and quotes.
-    let mut whole_str = buffer.to_string();
-
-    for (i, c) in s.char_indices() {
-        whole_str.push(c);
-        if serde_json::from_str::<serde_json::Value>(&whole_str).is_ok() {
-            // Return the byte index after this character
-            return i + c.len_utf8();
+    fn first_value_end(input: &str) -> Option<usize> {
+        let mut values = serde_json::Deserializer::from_str(input).into_iter::<IgnoredAny>();
+        match values.next() {
+            Some(Ok(_)) => Some(values.byte_offset()),
+            Some(Err(_)) | None => None,
         }
     }
 
-    usize::MAX
+    if buffer.is_empty() {
+        return first_value_end(s).unwrap_or(usize::MAX);
+    }
+
+    let mut input = String::with_capacity(buffer.len() + s.len());
+    input.push_str(buffer);
+    input.push_str(s);
+
+    first_value_end(&input)
+        .and_then(|end| end.checked_sub(buffer.len()))
+        .unwrap_or(usize::MAX)
 }
 
 #[cfg(test)]
@@ -188,6 +187,25 @@ mod tests {
             cur_param_state: ParamState::Beginning,
             param_value_buffer: String::new(),
         }
+    }
+
+    #[test]
+    fn test_find_valid_json_value_complete_prefix() {
+        assert_eq!(find_valid_json_value("", r#"{"a":[1,"}"]} trailing"#), 13);
+    }
+
+    #[test]
+    fn test_find_valid_json_value_across_chunks() {
+        assert_eq!(
+            find_valid_json_value(r#"{"message":"hé"#, r#"llo"} rest"#),
+            5
+        );
+    }
+
+    #[test]
+    fn test_find_valid_json_value_incomplete_or_invalid() {
+        assert_eq!(find_valid_json_value("", r#"{"a": [1, 2]"#), usize::MAX);
+        assert_eq!(find_valid_json_value("", r#"{"a", 1}"#), usize::MAX);
     }
 
     #[test]
